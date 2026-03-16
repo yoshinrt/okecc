@@ -483,8 +483,8 @@ public:
 				m_param.get() == FIGHT		? "格闘" :
 				m_param.get() == CROUCH		? "伏せ" :
 				m_param.get() == GUARD		? "防御" :
-				m_param.get() == ACTION1	? "ア1" :
-				m_param.get() == ACTION2	? "ア2" : "ア3";
+				m_param.get() == ACTION1	? "Action1" :
+				m_param.get() == ACTION2	? "Action2" : "Action3";
 		}
 		else return "";
 	}
@@ -960,87 +960,7 @@ public:
         state = best_state;
         printf("Step: %7d | Energy: %5.4f\n", i, current_E);
     }
-
-	void print_layout(const std::vector<Pos>& final_state, const CChipPool& pool) {
-	    // 1. グリッドの初期化 (座標からチップIDを逆引きできるようにする)
-	    std::vector<std::vector<int>> grid(grid_height, std::vector<int>(grid_width, -1));
-	    for (int i = 0; i < (int)final_state.size(); ++i) {
-	        const Pos& pos = final_state[i];
-	        if (pos.x >= 0 && pos.x < grid_width && pos.y >= 0 && pos.y < grid_height) {
-	            grid[pos.y][pos.x] = i;
-	        }
-	    }
-
-	    // 2. 方向記号の取得ロジック
-	    auto get_dir_code = [&](Pos current, UINT next_idx) -> std::string {
-	        if (next_idx == IDX_NONE) return "  ";
-	        if (next_idx == IDX_EXIT) return "EX";
-
-	        // 範囲チェック: 異常なインデックスの場合は "??" を返す
-	        if (next_idx >= (UINT)final_state.size()) return "??";
-
-	        Pos target = final_state[next_idx];
-	        int dx = target.x - current.x;
-	        int dy = target.y - current.y;
-
-	        // 隣接（距離1）だけでなく、離れている場合も方向を計算
-	        if (dx > 0 && dy == 0) return "->";
-	        if (dx < 0 && dy == 0) return "<-";
-	        if (dx == 0 && dy > 0) return "vv";
-	        if (dx == 0 && dy < 0) return "^^";
-	        if (dx > 0 && dy > 0) return "-v";
-	        if (dx > 0 && dy < 0) return "-^";
-	        if (dx < 0 && dy > 0) return "v-";
-	        if (dx < 0 && dy < 0) return "^-";
-
-	        return ".."; // 同一座標などのイレギュラー
-	    };
-
-	    std::cout << "\n=== Carnage Heart Chip Layout (US-ASCII) ===\n";
-
-	    // ヘッダー（列番号）
-	    std::cout << "     ";
-	    for (int x = 0; x < grid_width; ++x) {
-	        printf("  [%02d]  ", x);
-	    }
-	    std::cout << "\n";
-
-	    auto print_border = [&]() {
-	        std::cout << "    +";
-	        for (int x = 0; x < grid_width; ++x) std::cout << "-------+";
-	        std::cout << "\n";
-	    };
-
-	    for (int y = 0; y < grid_height; ++y) {
-	        print_border();
-
-	        // 行1: チップID (poolのインデックスを表示)
-	        printf("%2d  |", y);
-	        for (int x = 0; x < grid_width; ++x) {
-	            int idx = grid[y][x];
-	            if (idx != -1) printf(" ID:%02d |", idx % 100);
-	            else          printf("       |");
-	        }
-	        std::cout << "\n    |";
-
-	        // 行2: 接続先方向 (Green / Red)
-	        for (int x = 0; x < grid_width; ++x) {
-	            int idx = grid[y][x];
-	            if (idx != -1) {
-	                CChip* chip = pool[idx];
-	                std::string g = get_dir_code(final_state[idx], chip->m_next_g);
-	                std::string r = chip->valid_r() ? get_dir_code(final_state[idx], chip->m_next_r) : "  ";
-	                // 厳密に7文字: G(1) + dir(2) + space(1) + R(1) + dir(2) = 7
-	                printf("G%s R%s|", g.c_str(), r.c_str());
-	            } else {
-	                printf("       |");
-	            }
-	        }
-	        std::cout << "\n";
-	    }
-	    print_border();
-	}
-
+	
 	const std::vector<Pos>& get_result() const { return state; }
 };
 
@@ -1261,7 +1181,7 @@ int main(void){
 
 	CarnageSA sa(g_ChipPool, 15, 15);
 	sa.run();
-	sa.print_layout(sa.get_result(), g_ChipPool);
+	//sa.print_layout(sa.get_result(), g_ChipPool);
 	//_setmode(_fileno(stdout), _O_U16TEXT);
 	FILE *fp = fopen("chip.txt", "w");
 	print_layout(fp, sa.get_result(), g_ChipPool);
