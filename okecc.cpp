@@ -863,10 +863,11 @@ public:
 	    double cohesion_energy = 0.0;
 	    
 	    // 1. 占有状況の高速検索用マップ
-	    // 座標 (y * width + x) をキーにするか、2次元ベクタを使用
 	    std::vector<int> grid_occupancy(grid_width * grid_height, -1);
 	    std::map<Pos, int> overlap_count; // 重なりペナルティ用
-	
+
+	    const size_t N = current_state.size();
+
 	    for (UINT i = 0; i < (UINT)current_state.size(); ++i) {
 	        Pos p = current_state[i];
 	        if (p.x >= 0 && p.x < grid_width && p.y >= 0 && p.y < grid_height) {
@@ -874,7 +875,7 @@ public:
 	        }
 	        overlap_count[p]++;
 	    }
-	
+
 	    // 重心計算
 	    double avg_x = 0, avg_y = 0;
 	    for (const auto& p : current_state) {
@@ -882,176 +883,380 @@ public:
 	    }
 	    avg_x /= current_state.size();
 	    avg_y /= current_state.size();
-	
+
+	    // 隣接リスト（outgoing / incoming）構築
+	    std::vector<std::vector<UINT>> adj_out(N), adj_in(N);
+	    for (UINT u = 0; u < N; ++u) {
+	        if (pool[u]->m_next_g != IDX_NONE && pool[u]->m_next_g < N) {
+	            adj_out[u].push_back(pool[u]->m_next_g);
+	            adj_in[pool[u]->m_next_g].push_back(u);
+	        }
+	        if (pool[u]->m_next_r != IDX_NONE && pool[u]->m_next_r < N) {
+	            adj_out[u].push_back(pool[u]->m_next_r);
+	            adj_in[pool[u]->m_next_r].push_back(u);
+	        }
+	    }
+
+	    // パラメータ（調整可能）
+	    const int hop_k = 2;                      // ホップ幅
+	    const double weight_out = 0.25;           // outgoing に対する重み
+	    const double weight_in  = 0.12;           // incoming に対する重み（小さめ）
+	    const double max_local_penalty = 300.0;   // 局所ペナルティ上限
+
 	    for (UINT i = 0; i < (UINT)current_state.size(); ++i) {
 	        Pos p = current_state[i];
 	        CChip* chip = pool[i];
-	
+
 	        // 物理制約
 	        if (p.x < 0 || p.x >= grid_width || p.y < 0 || p.y >= grid_height) base_energy += 5000.0;
-	
-	        // 凝集コスト
+
+	        // 凝集コスト（全体的な重心への寄せ）
 	        cohesion_energy += (std::abs(p.x - avg_x) + std::abs(p.y - avg_y)) * 0.05;
-	
+
 	        // Startチップ制約
 	        if (i == pool.m_start && p.y != 0) base_energy += (double)std::abs(p.y) * 200.0;
-	
-	        // 4. 接続コスト（NOP経路検証付き）
-			auto eval_link = [&](UINT next_idx) {
-			    if (next_idx == IDX_NONE) return 0.0;
-			    if (next_idx == IDX_EXIT) {
-			        int dx_edge = std::min(p.x, (grid_width - 1) - p.x);
-			        int dy_edge = std::min(p.y, (grid_height - 1) - p.y);
-			        return (double)std::min(dx_edge, dy_edge) * 150.0;
-			    }
-			
-			    assert(next_idx < current_state.size());
-			    Pos target = current_state[next_idx];
-			    
-			    int diff_x = target.x - p.x;
-			    int diff_y = target.y - p.y;
-			    int abs_dx = std::abs(diff_x);
-			    int abs_dy = std::abs(diff_y);
-			    int dist = std::max(abs_dx, abs_dy);
-			
-			    if (dist <= 1) return 0.0; // 隣接
-			
-			    double route_penalty = 0.0;
-			    Pos check = p;
-			
-			    // dist 回（NOPの必要数分）ステップを繰り返す
-			    for (int step = 1; step < dist; ++step) {
-			        bool found_step = false;
-			        
-			        // 1. x差 == y差 の場合（完全な斜め 45度）
-			        if (abs_dx == abs_dy) {
-			            check.x += (diff_x > 0) ? 1 : -1;
-			            check.y += (diff_y > 0) ? 1 : -1;
-			            found_step = true;
-			        } 
-			        // 2. 差が異なる場合
-			        else {
-			            int main_step_x = 0, main_step_y = 0;
-			            int sub_step_x = 0, sub_step_y = 0;
-			
-			            // 主軸（差が大きい方）を特定
-			            bool x_is_main = (abs_dx > abs_dy);
-			            if (x_is_main) {
-			                main_step_x = (diff_x > 0) ? 1 : -1;
-			            } else {
-			                main_step_y = (diff_y > 0) ? 1 : -1;
-			            }
-			
-			            // 副軸の移動候補（近づく、維持、離れる）
-			            int sub_dir = x_is_main ? ((diff_y > 0) ? 1 : (diff_y < 0 ? -1 : 0))
-			                                    : ((diff_x > 0) ? 1 : (diff_x < 0 ? -1 : 0));
-			            
-			            int candidates[] = { sub_dir, 0, -sub_dir };
-			
-			            for (int c : candidates) {
-			                Pos next_p = check;
-			                if (x_is_main) {
-			                    next_p.x += main_step_x;
-			                    next_p.y += c;
-			                } else {
-			                    next_p.x += c;
-			                    next_p.y += main_step_y;
-			                }
-			
-			                // 条件：ターゲットとの残り距離が、ステップ数を超えない（遠ざかりすぎない）
-			                int remaining_dist = std::max(std::abs(target.x - next_p.x), std::abs(target.y - next_p.y));
-			                if (remaining_dist <= (dist - step)) {
-			                    // 空き地チェック
-			                    if (next_p.x >= 0 && next_p.x < grid_width && next_p.y >= 0 && next_p.y < grid_height) {
-			                        int occupant = grid_occupancy[next_p.y * grid_width + next_p.x];
-			                        if (occupant == -1) { // 空いていれば採用
-			                            check = next_p;
-			                            found_step = true;
-			                            break;
-			                        }
-			                    }
-			                }
-			            }
-			
-			            // どこも空いていなければ、仕方なく「近づく」方向へ進みペナルティ
-			            if (!found_step) {
-			                if (x_is_main) {
-			                    check.x += main_step_x;
-			                    check.y += sub_dir;
-			                } else {
-			                    check.x += sub_dir;
-			                    check.y += main_step_y;
-			                }
-			                route_penalty += 50.0;
-			            }
-			        }
-			
-			        // 枠外ペナルティ（found_step で空き地が見つからなかった場合も含む）
-			        if (check.x < 0 || check.x >= grid_width || check.y < 0 || check.y >= grid_height) {
-			            route_penalty += 100.0;
-			        }
-			    }
-			
-			    return (double)(dist - 1) + route_penalty;
-			};
-	
+
+	        // 接続コスト（NOP経路検証付き）
+	        auto eval_link = [&](UINT next_idx) {
+	            if (next_idx == IDX_NONE) return 0.0;
+	            if (next_idx == IDX_EXIT) {
+	                int dx_edge = std::min(p.x, (grid_width - 1) - p.x);
+	                int dy_edge = std::min(p.y, (grid_height - 1) - p.y);
+	                return (double)std::min(dx_edge, dy_edge) * 150.0;
+	            }
+
+	            assert(next_idx < current_state.size());
+	            Pos target = current_state[next_idx];
+	            
+	            int diff_x = target.x - p.x;
+	            int diff_y = target.y - p.y;
+	            int abs_dx = std::abs(diff_x);
+	            int abs_dy = std::abs(diff_y);
+	            int dist = std::max(abs_dx, abs_dy);
+
+	            if (dist <= 1) return 0.0; // 隣接
+
+	            double route_penalty = 0.0;
+	            Pos check = p;
+
+	            // dist 回（NOPの必要数分）ステップを繰り返す
+	            for (int step = 1; step < dist; ++step) {
+	                bool found_step = false;
+	                
+	                if (abs_dx == abs_dy) {
+	                    check.x += (diff_x > 0) ? 1 : -1;
+	                    check.y += (diff_y > 0) ? 1 : -1;
+	                    found_step = true;
+	                } else {
+	                    int main_step_x = 0, main_step_y = 0;
+	                    bool x_is_main = (abs_dx > abs_dy);
+	                    if (x_is_main) {
+	                        main_step_x = (diff_x > 0) ? 1 : -1;
+	                    } else {
+	                        main_step_y = (diff_y > 0) ? 1 : -1;
+	                    }
+
+	                    int sub_dir = x_is_main ? ((diff_y > 0) ? 1 : (diff_y < 0 ? -1 : 0))
+	                                            : ((diff_x > 0) ? 1 : (diff_x < 0 ? -1 : 0));
+	                    
+	                    int candidates[] = { sub_dir, 0, -sub_dir };
+
+	                    for (int c : candidates) {
+	                        Pos next_p = check;
+	                        if (x_is_main) {
+	                            next_p.x += main_step_x;
+	                            next_p.y += c;
+	                        } else {
+	                            next_p.x += c;
+	                            next_p.y += main_step_y;
+	                        }
+
+	                        // 条件：ターゲットとの残り距離が、ステップ数を超えない（遠ざかりすぎない）
+	                        int remaining_dist = std::max(std::abs(target.x - next_p.x), std::abs(target.y - next_p.y));
+	                        if (remaining_dist <= (dist - step)) {
+	                            // 空き地チェック
+	                            if (next_p.x >= 0 && next_p.x < grid_width && next_p.y >= 0 && next_p.y < grid_height) {
+	                                int occupant = grid_occupancy[next_p.y * grid_width + next_p.x];
+	                                if (occupant == -1) {
+	                                    check = next_p;
+	                                    found_step = true;
+	                                    break;
+	                                }
+	                            }
+	                        }
+	                    }
+
+	                    // どこも空いていなければ、仕方なく「近づく」方向へ進みペナルティ
+	                    if (!found_step) {
+	                        if (x_is_main) {
+	                            check.x += main_step_x;
+	                            check.y += sub_dir;
+	                        } else {
+	                            check.x += sub_dir;
+	                            check.y += main_step_y;
+	                        }
+	                        route_penalty += 50.0;
+	                    }
+	                }
+
+	                // 枠外ペナルティ（found_step で空き地が見つからなかった場合も含む）
+	                if (check.x < 0 || check.x >= grid_width || check.y < 0 || check.y >= grid_height) {
+	                    route_penalty += 100.0;
+	                }
+	            }
+
+	            return (double)(dist - 1) + route_penalty;
+	        };
+
 	        base_energy += eval_link(chip->m_next_g);
 	        if (chip->valid_r()) base_energy += eval_link(chip->m_next_r);
+
+	        // ホップ版局所平均距離を計算（outgoing と incoming を別個に BFS）
+	        auto bfs_mean_dist = [&](UINT src, bool use_out, bool use_in) -> double {
+	            std::vector<int> dist(N, -1);
+	            std::vector<UINT> q;
+	            dist[src] = 0;
+	            q.push_back(src);
+	            size_t qhead = 0;
+	            while (qhead < q.size()) {
+	                UINT v = q[qhead++];
+	                if (dist[v] >= hop_k) continue;
+	                if (use_out) {
+	                    for (UINT w : adj_out[v]) {
+	                        if (dist[w] == -1) { dist[w] = dist[v] + 1; q.push_back(w); }
+	                    }
+	                }
+	                if (use_in) {
+	                    for (UINT w : adj_in[v]) {
+	                        if (dist[w] == -1) { dist[w] = dist[v] + 1; q.push_back(w); }
+	                    }
+	                }
+	            }
+	            double sumd = 0.0;
+	            int cnt = 0;
+	            for (UINT j = 0; j < N; ++j) {
+	                if (j == src) continue;
+	                if (dist[j] > 0 && dist[j] <= hop_k) {
+	                    sumd += (double)(std::abs(current_state[j].x - p.x) + std::abs(current_state[j].y - p.y)); // Manhattan
+	                    ++cnt;
+	                }
+	            }
+	            return cnt > 0 ? (sumd / cnt) : 0.0;
+	        };
+
+	        double mean_out = bfs_mean_dist(i, true, false);
+	        double mean_in  = bfs_mean_dist(i, false, true);
+
+	        // 局所ペナルティは「遠いほど正のペナルティ」
+	        double local_pen_out = (mean_out > 0.0) ? (weight_out * mean_out) : 0.0;
+	        double local_pen_in  = (mean_in  > 0.0) ? (weight_in  * mean_in)  : 0.0;
+	        double local_pen = local_pen_out + local_pen_in;
+	        if (local_pen > max_local_penalty) local_pen = max_local_penalty;
+
+	        base_energy += local_pen;
 	    }
-	
-	    // 重なりペナルティ
-	    for (auto const& [pos, count] : overlap_count) {
+
+	    // 重なりペナルティ（通常は swap により 0 だが防御的に残す）
+	    for (auto const& kv : overlap_count) {
+	        int count = kv.second;
 	        if (count > 1) base_energy += (double)count * 1000.0;
 	    }
-	
+
 	    if (base_energy <= 0.0) return 0.0;
 	    return base_energy + cohesion_energy;
 	}
 	
-    void run() {
-        double T = 100.0;
-        double cooling = 0.99998; // 凝集が入るので少しゆっくり冷やす
-        double current_E = calculate_energy(state);
-        auto best_state = state;
-        double best_E = current_E;
+	void run() {
+		// 改良版 SA:
+		// - 隣接スワップ中心（局所探索）
+		// - 低確率で任意2点スワップ（global）とランダムジャンプ
+		// - k個のインデックスを回転させる multi-rotate operator
+		// - 停滞検出によるリヒート（温度を復元して探索幅を一時拡大）
+		double T0 = 100.0;
+		double T = T0;
+		double cooling = 0.99997; // 既定より少し緩やかに
+		double current_E = calculate_energy(state);
+		auto best_state = state;
+		double best_E = current_E;
 
-        std::uniform_int_distribution<UINT> dist_idx(0, (UINT)pool.size() - 1);
-        std::uniform_int_distribution<int> dist_move(-1, 1);
-        std::uniform_real_distribution<double> dist_prob(0.0, 1.0);
+		std::uniform_int_distribution<UINT> dist_idx(0, (UINT)pool.size() - 1);
+		std::uniform_int_distribution<int> dist_dir(0, 7);
+		std::uniform_real_distribution<double> dist_prob(0.0, 1.0);
+		std::uniform_int_distribution<int> dist_x(0, grid_width - 1);
+		std::uniform_int_distribution<int> dist_y(0, grid_height - 1);
 
-        int i;
-        for (i = 0; i < 2000000; ++i) { // 試行回数を増やして精度向上
-            auto next_state = state;
-            UINT target = dist_idx(gen);
+		// occupancy
+		std::vector<int> occ(grid_width * grid_height, -1);
+		auto rebuild_occ = [&](const std::vector<Pos>& s) {
+			std::fill(occ.begin(), occ.end(), -1);
+			for (UINT j = 0; j < (UINT)s.size(); ++j) {
+				const Pos& pp = s[j];
+				if (pp.x >= 0 && pp.x < grid_width && pp.y >= 0 && pp.y < grid_height)
+					occ[pp.y * grid_width + pp.x] = (int)j;
+			}
+			};
+		rebuild_occ(state);
 
-            next_state[target].x += dist_move(gen);
-            next_state[target].y += dist_move(gen);
+		// move probabilities (base)
+		double p_random_swap = 0.04; // 任意2点スワップ
+		double p_long = 0.01;        // ランダムセルジャンプ
+		double p_rotate = 0.02;      // multi-rotate operator
+		// neighbor-swap が残りの確率
 
-            double next_E = calculate_energy(next_state);
+		// stagnation / reheating
+		const int stagnation_limit = 200000;
+		int iter_since_improve = 0;
+		const double reheating_multiplier = 1.8;
+		const int reheating_boost_steps = 50000;
+		int reheating_steps_left = 0;
 
-            // 早期終了: エネルギーが極めて低い（ほぼ0）なら終了
-            if (next_E < 0.0001) {
-                current_E = next_E;
-                best_state = next_state;
-                break;
-            }
+		const int max_iter = 2000000;
+		for (int iter = 0; iter < max_iter; ++iter) {
+			auto next_state = state;
+			UINT a = dist_idx(gen);
+			double r = dist_prob(gen);
 
-            double diff = next_E - current_E;
-            if (diff < 0 || dist_prob(gen) < std::exp(-diff / T)) {
-                state = next_state;
-                current_E = next_E;
-                if (current_E < best_E) {
-                    best_E = current_E;
-                    best_state = state;
-                }
-            }
-            T *= cooling;
-            if (i % 200000 == 0) printf("Step: %7d | Energy: %5.4f\n", i, current_E);
-        }
-        state = best_state;
-        printf("Step: %7d | Energy: %5.4f\n", i, current_E);
-    }
-	
+			bool proposed = false;
+			int b = -1; // -1 means move to empty cell
+
+			// Possibly boost exploratory moves during reheating
+			double local_p_random_swap = p_random_swap;
+			double local_p_long = p_long;
+			double local_p_rotate = p_rotate;
+			if (reheating_steps_left > 0) {
+				local_p_random_swap = std::min(0.5, p_random_swap * 6.0);
+				local_p_long = std::min(0.2, p_long * 6.0);
+				local_p_rotate = std::min(0.5, p_rotate * 6.0);
+				reheating_steps_left--;
+			}
+
+			double threshold1 = local_p_random_swap;
+			double threshold2 = threshold1 + local_p_long;
+			double threshold3 = threshold2 + local_p_rotate;
+
+			if (r < threshold1) {
+				// 任意 2 点スワップ (global)
+				UINT bb = dist_idx(gen);
+				if (bb == a) continue;
+				std::swap(next_state[a], next_state[bb]);
+				proposed = true;
+				b = (int)bb;
+			}
+			else if (r < threshold2) {
+				// ランダムセルへのジャンプ（空きがあれば移動、なければスワップ）
+				int nx = dist_x(gen);
+				int ny = dist_y(gen);
+				int occIdx = occ[ny * grid_width + nx];
+				if (occIdx == -1) {
+					next_state[a].x = nx;
+					next_state[a].y = ny;
+					b = -1;
+					proposed = true;
+				}
+				else {
+					UINT bb = (UINT)occIdx;
+					if (bb == a) continue;
+					std::swap(next_state[a], next_state[bb]);
+					proposed = true;
+					b = (int)bb;
+				}
+			}
+			else if (r < threshold3) {
+				// multi-rotate: k 個ランダムインデックスを選び位置を回転させる
+				int k = 3 + (gen() % 3); // 3..5
+				std::vector<UINT> ids;
+				ids.reserve(k);
+				// collect distinct indices
+				std::uniform_int_distribution<UINT> di(0, (UINT)pool.size() - 1);
+				while ((int)ids.size() < k) {
+					UINT cid = di(gen);
+					// ensure unique
+					bool found = false;
+					for (UINT v : ids) if (v == cid) { found = true; break; }
+					if (!found) ids.push_back(cid);
+				}
+				// rotate positions among ids (circular right shift)
+				std::vector<Pos> tmp(k);
+				for (int i = 0; i < k; ++i) tmp[i] = next_state[ids[i]];
+				for (int i = 0; i < k; ++i) next_state[ids[(i + 1) % k]] = tmp[i];
+				proposed = true;
+				b = -2; // special marker
+			}
+			else {
+				// 隣接セルとのスワップ（8方向）
+				int dir = dist_dir(gen);
+				int nx = state[a].x + dx[dir];
+				int ny = state[a].y + dy[dir];
+				if (nx < 0 || nx >= grid_width || ny < 0 || ny >= grid_height) continue;
+				int occIdx = occ[ny * grid_width + nx];
+				if (occIdx == -1) {
+					next_state[a].x = nx;
+					next_state[a].y = ny;
+					b = -1;
+					proposed = true;
+				}
+				else {
+					UINT bb = (UINT)occIdx;
+					if (bb == a) continue;
+					std::swap(next_state[a], next_state[bb]);
+					proposed = true;
+					b = (int)bb;
+				}
+			}
+
+			if (!proposed) continue;
+
+			double next_E = calculate_energy(next_state);
+
+			// 早期最適性判定
+			if (next_E < 0.0001) {
+				state = next_state;
+				current_E = next_E;
+				best_state = next_state;
+				best_E = next_E;
+				break;
+			}
+
+			double diff = next_E - current_E;
+			if (diff < 0 || dist_prob(gen) < std::exp(-diff / T)) {
+				// accept
+				state = next_state;
+				// rebuild occ (safer than incremental updates for multiple operators)
+				rebuild_occ(state);
+				current_E = next_E;
+				if (current_E < best_E - 1e-9) {
+					best_E = current_E;
+					best_state = state;
+					iter_since_improve = 0;
+				}
+				else {
+					++iter_since_improve;
+				}
+			}
+			else {
+				++iter_since_improve;
+			}
+
+			// cooling
+			T *= cooling;
+
+			// stagnation -> reheating
+			if (iter_since_improve >= stagnation_limit) {
+				// reheat
+				T = std::max(T, T0) * reheating_multiplier;
+				reheating_steps_left = reheating_boost_steps;
+				iter_since_improve = 0;
+				// optionally print a message
+				printf("Reheat at iter %d : T=%.4f\n", iter, T);
+			}
+
+			if (iter % 200000 == 0) printf("Step: %7d | Energy: %5.4f | Best: %5.4f\n", iter, current_E, best_E);
+		}
+
+		state = best_state;
+		printf("Step: %7d | Energy: %5.4f\n", max_iter, best_E);
+	}
+
 	const std::vector<Pos>& get_result() const { return state; }
 };
 
