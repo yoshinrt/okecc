@@ -1,4 +1,6 @@
-﻿#include <algorithm>
+﻿#define _CRT_SECURE_NO_WARNINGS
+
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <fcntl.h>
@@ -13,7 +15,6 @@
 #include <vector>
 #include <wchar.h>
 #include <string>
-#include <format>
 
 enum {
 	OKE_BIPED,
@@ -167,6 +168,11 @@ public:
 class CChipPool {
 public:
 	std::vector<CChip*> m_list;
+	UINT m_start = IDX_NONE;	// 開始チップの index
+	UINT m_width;
+	UINT m_height;
+
+	CChipPool(UINT width, UINT height) : m_width(width), m_height(height) {}
 
 	UINT add(CChip *chip){
 		m_list.push_back(chip);
@@ -201,7 +207,7 @@ public:
 	}
 };
 
-CChipPool	g_ChipPool;
+CChipPool	g_ChipPool(15, 15);
 
 //////////////////////////////////////////////////////////////////////////////
 // Chip tree
@@ -837,8 +843,8 @@ class CarnageSA {
 	inline static const int dy[] = {-1, -1,  0,  1,  1,  1,  0, -1};
 
 public:
-    CarnageSA(CChipPool& p, int w, int h)
-        : pool(p), grid_width(w), grid_height(h), gen(std::random_device{}()) {
+    CarnageSA(CChipPool& p)
+        : pool(p), grid_width(p.m_width), grid_height(p.m_height), gen(std::random_device{}()) {
         initialize_zigzag();
     }
 
@@ -855,8 +861,20 @@ public:
 	double calculate_energy(const std::vector<Pos>& current_state) {
 	    double base_energy = 0.0;
 	    double cohesion_energy = 0.0;
-	    std::map<Pos, int> occupancy;
-
+	    
+	    // 1. 占有状況の高速検索用マップ
+	    // 座標 (y * width + x) をキーにするか、2次元ベクタを使用
+	    std::vector<int> grid_occupancy(grid_width * grid_height, -1);
+	    std::map<Pos, int> overlap_count; // 重なりペナルティ用
+	
+	    for (UINT i = 0; i < (UINT)current_state.size(); ++i) {
+	        Pos p = current_state[i];
+	        if (p.x >= 0 && p.x < grid_width && p.y >= 0 && p.y < grid_height) {
+	            grid_occupancy[p.y * grid_width + p.x] = (int)i;
+	        }
+	        overlap_count[p]++;
+	    }
+	
 	    // 重心計算
 	    double avg_x = 0, avg_y = 0;
 	    for (const auto& p : current_state) {
@@ -864,56 +882,132 @@ public:
 	    }
 	    avg_x /= current_state.size();
 	    avg_y /= current_state.size();
-
+	
 	    for (UINT i = 0; i < (UINT)current_state.size(); ++i) {
 	        Pos p = current_state[i];
 	        CChip* chip = pool[i];
-
-	        // 1. 物理制約
+	
+	        // 物理制約
 	        if (p.x < 0 || p.x >= grid_width || p.y < 0 || p.y >= grid_height) base_energy += 5000.0;
-	        occupancy[p]++;
-
-	        // 2. 凝集コスト
+	
+	        // 凝集コスト
 	        cohesion_energy += (std::abs(p.x - avg_x) + std::abs(p.y - avg_y)) * 0.05;
-
-	        // 3. Startチップ制約
-	        if (i == 0 && p.y != 0) base_energy += (double)std::abs(p.y) * 200.0;
-
-	        // 4. 接続コスト
-	        auto eval_link = [&](UINT next_idx) {
-	            if (next_idx == IDX_NONE) return 0.0;
-	            if (next_idx == IDX_EXIT) {
-	                int dx = std::min(p.x, (grid_width - 1) - p.x);
-	                int dy = std::min(p.y, (grid_height - 1) - p.y);
-	                return (double)std::min(dx, dy) * 150.0;
-	            }
-
-	            // --- 厳格なインデックスチェック ---
-	            if (next_idx >= (UINT)current_state.size()) {
-	                fprintf(stderr, "\n[FATAL ERROR] Invalid connection: Index %u tried to connect to non-existent Index %u (Pool Size: %zu)\n",
-	                        i, next_idx, current_state.size());
-	                // デバッグしやすくするため、アサーションで停止させるか例外を投げる
-	                assert(next_idx < current_state.size());
-	                throw std::out_of_range("Connection index out of range");
-	            }
-
-	            Pos target = current_state[next_idx];
-	            int dist = std::max(std::abs(p.x - target.x), std::abs(p.y - target.y));
-	            return (double)(dist - 1);
-	        };
-
+	
+	        // Startチップ制約
+	        if (i == pool.m_start && p.y != 0) base_energy += (double)std::abs(p.y) * 200.0;
+	
+	        // 4. 接続コスト（NOP経路検証付き）
+			auto eval_link = [&](UINT next_idx) {
+			    if (next_idx == IDX_NONE) return 0.0;
+			    if (next_idx == IDX_EXIT) {
+			        int dx_edge = std::min(p.x, (grid_width - 1) - p.x);
+			        int dy_edge = std::min(p.y, (grid_height - 1) - p.y);
+			        return (double)std::min(dx_edge, dy_edge) * 150.0;
+			    }
+			
+			    assert(next_idx < current_state.size());
+			    Pos target = current_state[next_idx];
+			    
+			    int diff_x = target.x - p.x;
+			    int diff_y = target.y - p.y;
+			    int abs_dx = std::abs(diff_x);
+			    int abs_dy = std::abs(diff_y);
+			    int dist = std::max(abs_dx, abs_dy);
+			
+			    if (dist <= 1) return 0.0; // 隣接
+			
+			    double route_penalty = 0.0;
+			    Pos check = p;
+			
+			    // dist 回（NOPの必要数分）ステップを繰り返す
+			    for (int step = 1; step < dist; ++step) {
+			        bool found_step = false;
+			        
+			        // 1. x差 == y差 の場合（完全な斜め 45度）
+			        if (abs_dx == abs_dy) {
+			            check.x += (diff_x > 0) ? 1 : -1;
+			            check.y += (diff_y > 0) ? 1 : -1;
+			            found_step = true;
+			        } 
+			        // 2. 差が異なる場合
+			        else {
+			            int main_step_x = 0, main_step_y = 0;
+			            int sub_step_x = 0, sub_step_y = 0;
+			
+			            // 主軸（差が大きい方）を特定
+			            bool x_is_main = (abs_dx > abs_dy);
+			            if (x_is_main) {
+			                main_step_x = (diff_x > 0) ? 1 : -1;
+			            } else {
+			                main_step_y = (diff_y > 0) ? 1 : -1;
+			            }
+			
+			            // 副軸の移動候補（近づく、維持、離れる）
+			            int sub_dir = x_is_main ? ((diff_y > 0) ? 1 : (diff_y < 0 ? -1 : 0))
+			                                    : ((diff_x > 0) ? 1 : (diff_x < 0 ? -1 : 0));
+			            
+			            int candidates[] = { sub_dir, 0, -sub_dir };
+			
+			            for (int c : candidates) {
+			                Pos next_p = check;
+			                if (x_is_main) {
+			                    next_p.x += main_step_x;
+			                    next_p.y += c;
+			                } else {
+			                    next_p.x += c;
+			                    next_p.y += main_step_y;
+			                }
+			
+			                // 条件：ターゲットとの残り距離が、ステップ数を超えない（遠ざかりすぎない）
+			                int remaining_dist = std::max(std::abs(target.x - next_p.x), std::abs(target.y - next_p.y));
+			                if (remaining_dist <= (dist - step)) {
+			                    // 空き地チェック
+			                    if (next_p.x >= 0 && next_p.x < grid_width && next_p.y >= 0 && next_p.y < grid_height) {
+			                        int occupant = grid_occupancy[next_p.y * grid_width + next_p.x];
+			                        if (occupant == -1) { // 空いていれば採用
+			                            check = next_p;
+			                            found_step = true;
+			                            break;
+			                        }
+			                    }
+			                }
+			            }
+			
+			            // どこも空いていなければ、仕方なく「近づく」方向へ進みペナルティ
+			            if (!found_step) {
+			                if (x_is_main) {
+			                    check.x += main_step_x;
+			                    check.y += sub_dir;
+			                } else {
+			                    check.x += sub_dir;
+			                    check.y += main_step_y;
+			                }
+			                route_penalty += 50.0;
+			            }
+			        }
+			
+			        // 枠外ペナルティ（found_step で空き地が見つからなかった場合も含む）
+			        if (check.x < 0 || check.x >= grid_width || check.y < 0 || check.y >= grid_height) {
+			            route_penalty += 100.0;
+			        }
+			    }
+			
+			    return (double)(dist - 1) + route_penalty;
+			};
+	
 	        base_energy += eval_link(chip->m_next_g);
 	        if (chip->valid_r()) base_energy += eval_link(chip->m_next_r);
 	    }
-
-	    for (auto const& [pos, count] : occupancy) {
+	
+	    // 重なりペナルティ
+	    for (auto const& [pos, count] : overlap_count) {
 	        if (count > 1) base_energy += (double)count * 1000.0;
 	    }
-
+	
 	    if (base_energy <= 0.0) return 0.0;
 	    return base_energy + cohesion_energy;
 	}
-
+	
     void run() {
         double T = 100.0;
         double cooling = 0.99998; // 凝集が入るので少しゆっくり冷やす
@@ -933,9 +1027,6 @@ public:
             next_state[target].x += dist_move(gen);
             next_state[target].y += dist_move(gen);
 
-			if(i == 209343){
-				int a = 0;
-			}
             double next_E = calculate_energy(next_state);
 
             // 早期終了: エネルギーが極めて低い（ほぼ0）なら終了
@@ -969,12 +1060,13 @@ public:
 void print_layout(FILE *fp, const std::vector<Pos>& state, const CChipPool& pool){
 
 	std::vector<std::vector<int>> grid;
-	int max_x = 0, max_y = 0;
+	int max_x = 0, min_x = 0x7FFFFFFF, max_y = 0;
 
 	// grid にチップIDを配置
 	for(UINT u = 0; u < state.size(); ++u) {
 		const auto& p = state[u];
 		if (p.x > max_x) max_x = p.x;
+		if (p.x < min_x) min_x = p.x;
 		if (p.y > max_y) max_y = p.y;
 		while ((int)grid.size() <= p.y) grid.emplace_back();
 		while ((int)grid[p.y].size() <= p.x) grid[p.y].emplace_back(IDX_NONE);
@@ -982,6 +1074,13 @@ void print_layout(FILE *fp, const std::vector<Pos>& state, const CChipPool& pool
 
 		// 次チップの方向から方向コードを決定
 		auto get_dir_code = [&](UINT NextChip) -> UINT {
+			if(NextChip == IDX_EXIT){
+				if     (p.y == 0    ) return 0; // 上端なら上向き
+				else if(p.x == 0    ) return 6; // 左端なら左向き
+				else if(p.y == max_y) return 4; // 下端なら下向き
+				else                  return 2; // 右端なら右向き
+			}
+			
 			const auto& next_p = state[NextChip];
 			if(next_p.y < p.y){
 				if     (next_p.x <  p.x) return 7;
@@ -1000,8 +1099,8 @@ void print_layout(FILE *fp, const std::vector<Pos>& state, const CChipPool& pool
 		};
 
 		// Chip.m_raw_g, m_raw_r を 更新
-		if(pool[u]->valid_g()) pool[u]->m_raw_g = get_dir_code(pool[u]->m_next_g);
-		if(pool[u]->valid_r()) pool[u]->m_raw_r = get_dir_code(pool[u]->m_next_r);
+		if(pool[u]->m_next_g != IDX_NONE) pool[u]->m_raw_g = get_dir_code(pool[u]->m_next_g);
+		if(pool[u]->m_next_r != IDX_NONE) pool[u]->m_raw_r = get_dir_code(pool[u]->m_next_r);
 	}
 	
 	auto get_chip = [&](int x, int y) -> CChip* {
@@ -1022,7 +1121,7 @@ void print_layout(FILE *fp, const std::vector<Pos>& state, const CChipPool& pool
 
 			if(line == 0 || line == 4) fputs(" ", fp);
 			
-			for(int x = 0; x <= max_x + 1; ++x){
+			for(int x = min_x; x <= max_x + 1; ++x){
 				CChip *pchip = get_chip(x, y);
 				
 				if(x > max_x && (line < 1 || 3 < line)) continue;
@@ -1032,22 +1131,22 @@ void print_layout(FILE *fp, const std::vector<Pos>& state, const CChipPool& pool
 					case 0:
 						// 左上
 						if(!pchip) fputs("  ", fp);
-						else if(pchip->valid_g() && pchip->m_raw_g.get() == 7) fputs("←", fp);
-						else if(pchip->valid_r() && pchip->m_raw_r.get() == 7) fputs("▽", fp);
+						else if(pchip->m_next_g != IDX_NONE && pchip->m_raw_g.get() == 7) fputs("←", fp);
+						else if(pchip->m_next_r != IDX_NONE && pchip->m_raw_r.get() == 7) fputs("▽", fp);
 						else fputs("／", fp);
 						fputs("  ", fp);
 
 						// 中上
 						if(!pchip) fputs("  ", fp);
-						else if(pchip->valid_g() && pchip->m_raw_g.get() == 0) fputs("↑", fp);
-						else if(pchip->valid_r() && pchip->m_raw_r.get() == 0) fputs("△", fp);
+						else if(pchip->m_next_g != IDX_NONE && pchip->m_raw_g.get() == 0) fputs("↑", fp);
+						else if(pchip->m_next_r != IDX_NONE && pchip->m_raw_r.get() == 0) fputs("△", fp);
 						else fputs("  ", fp);
 						fputs("  ", fp);
 
 						// 右上
 						if(!pchip) fputs("  ", fp);
-						else if(pchip->valid_g() && pchip->m_raw_g.get() == 1) fputs("→", fp);
-						else if(pchip->valid_r() && pchip->m_raw_r.get() == 1) fputs("▽", fp);
+						else if(pchip->m_next_g != IDX_NONE && pchip->m_raw_g.get() == 1) fputs("→", fp);
+						else if(pchip->m_next_r != IDX_NONE && pchip->m_raw_r.get() == 1) fputs("▽", fp);
 						else fputs("＼", fp);
 						break;
 
@@ -1074,21 +1173,22 @@ void print_layout(FILE *fp, const std::vector<Pos>& state, const CChipPool& pool
 						
 						// 左下
 						if(!pchip) fputs("  ", fp);
-						else if(pchip->valid_g() && pchip->m_raw_g.get() == 5) fputs("←", fp);
-						else if(pchip->valid_r() && pchip->m_raw_r.get() == 5) fputs("△", fp);
+						else if(pchip->m_next_g != IDX_NONE && pchip->m_raw_g.get() == 5) fputs("←", fp);
+						else if(pchip->m_next_r != IDX_NONE && pchip->m_raw_r.get() == 5) fputs("△", fp);
 						else fputs("＼", fp);
 						fputs(pchip || pchip_down ? "＿" : "  ", fp);
 
 						// 中下
-						if     (pchip && pchip->valid_g() && pchip->m_raw_g.get() == 4) fputs("↓", fp);
-						else if(pchip && pchip->valid_r() && pchip->m_raw_r.get() == 4) fputs("▽", fp);
+						if     (pchip && pchip->m_next_g != IDX_NONE && pchip->m_raw_g.get() == 4) fputs("↓", fp);
+						else if(y == -1 && get_chip(x, 0) == pool[pool.m_start])        fputs("↓", fp);
+						else if(pchip && pchip->m_next_r != IDX_NONE && pchip->m_raw_r.get() == 4) fputs("▽", fp);
 						else fputs(pchip || pchip_down ? "＿" : "  ", fp);
 						fputs(pchip || pchip_down ? "＿" : "  ", fp);
 
 						// 右下
 						if(!pchip) fputs("  ", fp);
-						else if(pchip->valid_g() && pchip->m_raw_g.get() == 3) fputs("→", fp);
-						else if(pchip->valid_r() && pchip->m_raw_r.get() == 3) fputs("△", fp);
+						else if(pchip->m_next_g != IDX_NONE && pchip->m_raw_g.get() == 3) fputs("→", fp);
+						else if(pchip->m_next_r != IDX_NONE && pchip->m_raw_r.get() == 3) fputs("△", fp);
 						else fputs("／", fp);
 						break;
 				}
@@ -1101,17 +1201,18 @@ void print_layout(FILE *fp, const std::vector<Pos>& state, const CChipPool& pool
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void){
-	jump_forward();
-	IF(enemy_num(0, 416, 160, OKE_ALL))
-		IF(enemy_num(0, 128, 320, OKE_ALL) && enemy_num(0, 128, 320, OKE_ALL))
-			turn_right();
-			jump_forward();
-		ELSE
-			move_forward();
+	for(int i = 0; i < 10; ++i){
+		IF(enemy_num(0, 416, 160, OKE_ALL))
+			IF(enemy_num(0, 128, 320, OKE_ALL) && enemy_num(0, 128, 320, OKE_ALL))
+				turn_right();
+				jump_backward();
+			ELSE
+				move_forward();
+			ENDIF
+			action1();
 		ENDIF
-		action1();
-	ENDIF
-	guard();
+		guard();
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1155,7 +1256,7 @@ int main(void){
 		}else{
 			delete g_ChipPool[u];
 		}
-		IdxOld2New.push_back(IdxNew2Old.size() - 1);
+		IdxOld2New.push_back((UINT)IdxNew2Old.size() - 1);
 	}
 
 	//Goto 削除
@@ -1164,6 +1265,7 @@ int main(void){
 		if(g_ChipPool[u]->valid_g()) g_ChipPool[u]->m_next_g = IdxOld2New[g_ChipPool[u]->m_next_g];
 		if(g_ChipPool[u]->valid_r()) g_ChipPool[u]->m_next_r = IdxOld2New[g_ChipPool[u]->m_next_r];
 	}
+	g_ChipPool.m_start = IdxOld2New[tree.m_start];
 	g_ChipPool.m_list.resize(IdxNew2Old.size());
 
 	printf("Number of chip(s): %d\n", (UINT)g_ChipPool.m_list.size());
@@ -1179,7 +1281,7 @@ int main(void){
 	}
 	//exit(0);
 
-	CarnageSA sa(g_ChipPool, 15, 15);
+	CarnageSA sa(g_ChipPool);
 	sa.run();
 	//sa.print_layout(sa.get_result(), g_ChipPool);
 	//_setmode(_fileno(stdout), _O_U16TEXT);
