@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <climits>
 #include <cmath>
 #include <fcntl.h>
 #include <format>
@@ -12,9 +13,9 @@
 #include <source_location>
 #include <stdexcept>
 #include <stdio.h>
+#include <string>
 #include <vector>
 #include <wchar.h>
-#include <string>
 
 enum {
 	OKE_BIPED,
@@ -1262,147 +1263,112 @@ public:
 
 //////////////////////////////////////////////////////////////////////////////
 
-void print_layout(FILE *fp, const std::vector<Pos>& state, const CChipPool& pool){
+void print_layout_svg(FILE *fp, const std::vector<Pos>& state, const CChipPool& pool) {
+    const int CELL_SIZE = 80;    // 1セルの大きさ
+    const int CHIP_SIZE = 50;    // チップ（箱）の大きさ
+    const int OFFSET = (CELL_SIZE - CHIP_SIZE) / 2;
+    const int VIEW_WIDTH = 800;  // ブラウザ等での表示幅
+    const int VIEW_HEIGHT = 800; // ブラウザ等での表示高さ
 
-	std::vector<std::vector<int>> grid;
-	int max_x = 0, min_x = 0x7FFFFFFF, max_y = 0;
+    // 1. 全チップを包含する矩形を計算 (viewBox用)
+    int min_x = INT_MAX, min_y = INT_MAX;
+    int max_x = INT_MIN, max_y = INT_MIN;
 
-	// grid にチップIDを配置
-	for(UINT u = 0; u < state.size(); ++u) {
-		const auto& p = state[u];
-		if (p.x > max_x) max_x = p.x;
-		if (p.x < min_x) min_x = p.x;
-		if (p.y > max_y) max_y = p.y;
-		while ((int)grid.size() <= p.y) grid.emplace_back();
-		while ((int)grid[p.y].size() <= p.x) grid[p.y].emplace_back(IDX_NONE);
-		grid[p.y][p.x] = u;
+    for (const auto& p : state) {
+        if (p.x < min_x) min_x = p.x;
+        if (p.y < min_y) min_y = p.y;
+        if (p.x > max_x) max_x = p.x;
+        if (p.y > max_y) max_y = p.y;
+    }
+    
+    // データが空の場合のガード
+    if (state.empty()) {
+        min_x = min_y = 0;
+        max_x = max_y = 5;
+    }
 
-		// 次チップの方向から方向コードを決定
-		auto get_dir_code = [&](UINT NextChip) -> UINT {
-			if(NextChip == IDX_EXIT){
-				if     (p.y == 0    ) return 0; // 上端なら上向き
-				else if(p.x == 0    ) return 6; // 左端なら左向き
-				else if(p.y == max_y) return 4; // 下端なら下向き
-				else                  return 2; // 右端なら右向き
-			}
-			
-			const auto& next_p = state[NextChip];
-			if(next_p.y < p.y){
-				if     (next_p.x <  p.x) return 7;
-				else if(next_p.x == p.x) return 0;
-				else                     return 1;
-			}
-			else if(next_p.y == p.y){
-				if     (next_p.x <  p.x) return 6;
-				else                     return 2;
-			}
-			else{
-				if     (next_p.x <  p.x) return 5;
-				else if(next_p.x == p.x) return 4;
-				else                     return 3;
-			}
-		};
+    int grid_w = (max_x - min_x + 1);
+    int grid_h = (max_y - min_y + 1);
+    int vb_width = grid_w * CELL_SIZE + 40;
+    int vb_height = grid_h * CELL_SIZE + 40;
+    int vb_x = min_x * CELL_SIZE - 20;
+    int vb_y = min_y * CELL_SIZE - 20;
 
-		// Chip.m_raw_g, m_raw_r を 更新
-		if(pool[u]->m_next_g != IDX_NONE) pool[u]->m_raw_g = get_dir_code(pool[u]->m_next_g);
-		if(pool[u]->m_next_r != IDX_NONE) pool[u]->m_raw_r = get_dir_code(pool[u]->m_next_r);
-	}
-	
-	auto get_chip = [&](int x, int y) -> CChip* {
-		if(y < 0 || y >= (int)grid.size()) return nullptr;
-		if(x < 0 || x >= (int)grid[y].size()) return nullptr;
-		int idx = grid[y][x];
-		if(idx == IDX_NONE) return nullptr;
-		return pool[idx];
-	};
+    // 2. ヘッダー出力
+    fprintf(fp, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    fprintf(fp, "<svg width=\"%d\" height=\"%d\" viewBox=\"%d %d %d %d\" xmlns=\"http://www.w3.org/2000/svg\">\n", 
+            VIEW_WIDTH, VIEW_HEIGHT, vb_x, vb_y, vb_width, vb_height);
+    
+    // 矢印の定義 (marker)
+    fprintf(fp, "  <defs>\n");
+    fprintf(fp, "    <marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"3\" orient=\"auto\" markerUnits=\"strokeWidth\">\n");
+    fprintf(fp, "      <path d=\"M0,0 L0,6 L9,3 z\" fill=\"context-stroke\" />\n");
+    fprintf(fp, "    </marker>\n");
+    fprintf(fp, "  </defs>\n");
 
-	// chip レイアウト出力
-	for(int y = -1; y <= max_y; ++y){
-		for(int line = 0; line < 5; ++line){
-			if(y == -1 && line < 4){
-				line = 3;
-				continue;
-			}
+    // 背景
+    fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" fill=\"#f8f9fa\" />\n", vb_x, vb_y, vb_width, vb_height);
 
-			if(line == 0 || line == 4) fputs(" ", fp);
-			
-			for(int x = min_x; x <= max_x + 1; ++x){
-				CChip *pchip = get_chip(x, y);
-				
-				if(x > max_x && (line < 1 || 3 < line)) continue;
-				
-				switch(line){
-					// 最上行
-					case 0:
-						// 左上
-						if(!pchip) fputs("  ", fp);
-						else if(pchip->m_next_g != IDX_NONE && pchip->m_raw_g.get() == 7) fputs("←", fp);
-						else if(pchip->m_next_r != IDX_NONE && pchip->m_raw_r.get() == 7) fputs("▽", fp);
-						else fputs("／", fp);
-						fputs("  ", fp);
+    // 3. 接続線（エッジ）の描画
+    auto draw_edge = [&](int from_idx, uint32_t to_idx, const char* color) {
+        if (to_idx == IDX_NONE) return;
+        
+        Pos p1 = state[from_idx];
+        double x1 = p1.x * CELL_SIZE + CELL_SIZE / 2.0;
+        double y1 = p1.y * CELL_SIZE + CELL_SIZE / 2.0;
 
-						// 中上
-						if(!pchip) fputs("  ", fp);
-						else if(pchip->m_next_g != IDX_NONE && pchip->m_raw_g.get() == 0) fputs("↑", fp);
-						else if(pchip->m_next_r != IDX_NONE && pchip->m_raw_r.get() == 0) fputs("△", fp);
-						else fputs("  ", fp);
-						fputs("  ", fp);
+        if (to_idx == IDX_EXIT) {
+            // EXITは右側にダッシュ線で表現
+            fprintf(fp, "  <line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"2\" stroke-dasharray=\"4\" marker-end=\"url(#arrow)\" />\n",
+                    x1 + (CHIP_SIZE/2.0), y1, x1 + (CHIP_SIZE/2.0) + 20, y1, color);
+            return;
+        }
 
-						// 右上
-						if(!pchip) fputs("  ", fp);
-						else if(pchip->m_next_g != IDX_NONE && pchip->m_raw_g.get() == 1) fputs("→", fp);
-						else if(pchip->m_next_r != IDX_NONE && pchip->m_raw_r.get() == 1) fputs("▽", fp);
-						else fputs("＼", fp);
-						break;
+        Pos p2 = state[to_idx];
+        double x2 = p2.x * CELL_SIZE + CELL_SIZE / 2.0;
+        double y2 = p2.y * CELL_SIZE + CELL_SIZE / 2.0;
 
-					case 1:
-					case 2:
-					case 3: {
-						CChip *pchip_l = get_chip(x - 1, y);
-						
-						if     (line == 2 && pchip   && pchip  ->valid_g() && pchip  ->m_raw_g.get() == 6) fputs("←", fp);
-						else if(line == 2 && pchip   && pchip  ->valid_r() && pchip  ->m_raw_r.get() == 6) fputs("＜", fp);
-						else if(line == 2 && pchip_l && pchip_l->valid_g() && pchip_l->m_raw_g.get() == 2) fputs("→", fp);
-						else if(line == 2 && pchip_l && pchip_l->valid_r() && pchip_l->m_raw_r.get() == 2) fputs("＞", fp);
-						else fputs(pchip || pchip_l ? "｜" : "  ", fp);
-						
-						if(x > max_x) continue;
-						
-						fputs(pchip ? std::format("{:<8}", pchip->GetLayoutText(line - 1)).c_str() : "        ", fp);
-						break;
-					}
-					
-					// 最下行
-					case 4:
-						CChip *pchip_down = get_chip(x, y + 1);
-						
-						// 左下
-						if(!pchip) fputs("  ", fp);
-						else if(pchip->m_next_g != IDX_NONE && pchip->m_raw_g.get() == 5) fputs("←", fp);
-						else if(pchip->m_next_r != IDX_NONE && pchip->m_raw_r.get() == 5) fputs("△", fp);
-						else fputs("＼", fp);
-						fputs(pchip || pchip_down ? "＿" : "  ", fp);
+        double dx = x2 - x1;
+        double dy = y2 - y1;
+        double dist = sqrt(dx*dx + dy*dy);
+        
+        if (dist < 0.1) return; // 同一座標
 
-						// 中下
-						if     (pchip && pchip->m_next_g != IDX_NONE && pchip->m_raw_g.get() == 4) fputs("↓", fp);
-						else if(y == -1 && get_chip(x, 0) == pool[pool.m_start])        fputs("↓", fp);
-						else if(pchip && pchip->m_next_r != IDX_NONE && pchip->m_raw_r.get() == 4) fputs("▽", fp);
-						else fputs(pchip || pchip_down ? "＿" : "  ", fp);
-						fputs(pchip || pchip_down ? "＿" : "  ", fp);
+        // チップの縁までのオフセット（相似比を利用）
+        double ratio = (CHIP_SIZE / 2.0) / dist;
+        double ox = dx * ratio;
+        double oy = dy * ratio;
 
-						// 右下
-						if(!pchip) fputs("  ", fp);
-						else if(pchip->m_next_g != IDX_NONE && pchip->m_raw_g.get() == 3) fputs("→", fp);
-						else if(pchip->m_next_r != IDX_NONE && pchip->m_raw_r.get() == 3) fputs("△", fp);
-						else fputs("／", fp);
-						break;
-				}
-			}
-			fputs("\n", fp);
-		}
-	}
+        fprintf(fp, "  <line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"2\" marker-end=\"url(#arrow)\" />\n",
+                x1 + ox, y1 + oy, x2 - ox, y2 - oy, color);
+    };
+
+    for (int i = 0; i < (int)state.size(); ++i) {
+        CChip* chip = pool[i];
+        draw_edge(i, chip->m_next_g, "#28a745"); // Green
+        if (chip->valid_r()) {
+            draw_edge(i, chip->m_next_r, "#dc3545"); // Red
+        }
+    }
+
+    // 4. チップ（箱）の描画
+    for (int i = 0; i < (int)state.size(); ++i) {
+        int x = state[i].x * CELL_SIZE + OFFSET;
+        int y = state[i].y * CELL_SIZE + OFFSET;
+
+        // 箱
+        fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"white\" stroke=\"#343a40\" stroke-width=\"2\" />\n",
+                x, y, CHIP_SIZE, CHIP_SIZE);
+        
+        // テキスト (Type と ID)
+        fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Consolas, monospace\" font-size=\"10\" text-anchor=\"middle\" fill=\"#6c757d\">Type:%u</text>\n",
+                x + CHIP_SIZE / 2, y + 20, pool[i]->m_id.get());
+        fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Consolas, monospace\" font-size=\"11\" text-anchor=\"middle\" font-weight=\"bold\">ID:%d</text>\n",
+                x + CHIP_SIZE / 2, y + 38, i);
+    }
+
+    fprintf(fp, "</svg>\n");
 }
-
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void){
@@ -1488,10 +1454,8 @@ int main(void){
 
 	CarnageSA sa(g_ChipPool);
 	sa.run();
-	//sa.print_layout(sa.get_result(), g_ChipPool);
-	//_setmode(_fileno(stdout), _O_U16TEXT);
-	FILE *fp = fopen("chip.txt", "w");
-	print_layout(fp, sa.get_result(), g_ChipPool);
+	FILE *fp = fopen("chip.svg", "w");
+	print_layout_svg(fp, sa.get_result(), g_ChipPool);
 	fclose(fp);
 
 	return 0;
