@@ -832,6 +832,23 @@ struct Pos {
 	}
 };
 
+#include <map>
+#include <algorithm>
+#include <vector>
+
+struct PathNode {
+    uint32_t id;
+    int dist_to_exit; // EXITまでの最大距離
+};
+
+// Y座標を指定し、それ以降のチップを一括シフトする
+void shift_y_range(std::vector<Pos>& state, int threshold_y, int delta) {
+    for (auto& p : state) {
+        if (delta > 0 && p.y >= threshold_y) p.y += delta;
+        else if (delta < 0 && p.y <= threshold_y) p.y += delta;
+    }
+}
+
 class CarnageSA {
     CChipPool& pool;
     int grid_width;
@@ -846,19 +863,36 @@ class CarnageSA {
 public:
     CarnageSA(CChipPool& p)
         : pool(p), grid_width(p.m_width), grid_height(p.m_height), gen(std::random_device{}()) {
-        initialize_zigzag();
+        initialize();
     }
-
-    void initialize_zigzag() {
-        for (UINT i = 0; i < (UINT)pool.size(); ++i) {
-            int row = (int)i / grid_width;
-            int col = (int)i % grid_width;
-            int x = (row % 2 == 0) ? col : (grid_width - 1 - col);
-            int y = grid_height - 1 - (row % grid_height);
-            state.push_back({x, y});
-        }
-    }
-
+    
+	// 座標の正規化：最小値を (0, 0) に合わせる
+	void normalize_coordinates() {
+	    int min_x = INT_MAX, min_y = INT_MAX;
+	    bool has_data = false;
+	
+	    for (const auto& p : state) {
+	        if (p.x != INT_MAX) {
+	            min_x = std::min(min_x, p.x);
+	            min_y = std::min(min_y, p.y);
+	            has_data = true;
+	        }
+	    }
+	
+	    if (!has_data) return;
+	
+	    for (auto& p : state) {
+	        if (p.x != INT_MAX) {
+	            p.x -= min_x;
+	            p.y -= min_y;
+	        }
+	    }
+	}
+	
+	void initialize(void);
+	std::vector<int> calculate_max_distances(void);
+	uint32_t find_join_node(uint32_t start_idx, const std::vector<int>& dists);
+	
 	double calculate_energy(const std::vector<Pos>& current_state) {
 	    double base_energy = 0.0;
 	    double cohesion_energy = 0.0;
@@ -1261,6 +1295,230 @@ public:
 	const std::vector<Pos>& get_result() const { return state; }
 };
 
+std::vector<int> CarnageSA::calculate_max_distances() {
+    const int num_chips = (int)pool.size();
+    // -1 は「まだ EXIT までの距離が不明」または「到達不能」を意味する
+    std::vector<int> dists(num_chips, -1);
+
+    // 1. 初期状態：EXIT に直接つながっているチップの距離を 1 とする
+    for (int i = 0; i < num_chips; ++i) {
+        if (pool[i]->m_next_g == IDX_EXIT || 
+           (pool[i]->valid_r() && pool[i]->m_next_r == IDX_EXIT)) {
+            dists[i] = 1;
+        }
+    }
+
+    // 2. 最大 chip 数分だけ反復して距離を更新する（ベルマン・フォード法）
+    // 最長パスを求めるため、dists[next] + 1 が現在の dists[i] より大きければ更新
+    for (int iter = 0; iter < num_chips; ++iter) {
+        bool changed = false;
+        for (int i = 0; i < num_chips; ++i) {
+            auto update = [&](uint32_t next) {
+                if (next < (uint32_t)num_chips && dists[next] != -1) {
+                    if (dists[i] < dists[next] + 1) {
+                        dists[i] = dists[next] + 1;
+                        changed = true;
+                    }
+                }
+            };
+
+            update(pool[i]->m_next_g);
+            if (pool[i]->valid_r()) {
+                update(pool[i]->m_next_r);
+            }
+        }
+        // 更新がなくなれば、すべての最短ではない「最長パス」が確定したことになる
+        if (!changed) break;
+    }
+
+    return dists;
+}
+
+void CarnageSA::initialize() {
+    // --- 0. 準備 ---
+    const int num_chips = (int)pool.m_list.size();
+    state.assign(num_chips, {INT_MAX, INT_MAX});
+    std::vector<int> vertical_lines_x;
+
+    // --- 1. ヘルパー関数の定義 (ラムダ式) ---
+
+    // EXIT までの最長距離を計算 (Bellman-Ford法)
+    auto calculate_max_distances = [&]() {
+        std::vector<int> dists(num_chips, -1);
+        for (int i = 0; i < num_chips; ++i) {
+            if (pool.m_list[i]->m_next_g == IDX_EXIT || 
+               (pool.m_list[i]->valid_r() && pool.m_list[i]->m_next_r == IDX_EXIT)) {
+                dists[i] = 1;
+            }
+        }
+        for (int iter = 0; iter < num_chips; ++iter) {
+            bool changed = false;
+            for (int i = 0; i < num_chips; ++i) {
+                auto update = [&](uint32_t from_idx, uint32_t next) {
+                    if (next < (uint32_t)num_chips && dists[next] != -1) {
+                        if (dists[from_idx] < dists[next] + 1) {
+                            dists[from_idx] = dists[next] + 1;
+                            changed = true;
+                        }
+                    }
+                };
+                update(i, pool.m_list[i]->m_next_g);
+                if (pool.m_list[i]->valid_r()) update(i, pool.m_list[i]->m_next_r);
+            }
+            if (!changed) break;
+        }
+        return dists;
+    };
+    std::vector<int> dists = calculate_max_distances();
+
+    // 距離リストから安全に値を取得
+    auto get_d = [&](uint32_t idx) -> int {
+        if (idx == IDX_EXIT) return 0;
+        if (idx == IDX_NONE || idx >= (uint32_t)dists.size()) return -100;
+        return dists[idx];
+    };
+
+    // 未配置の分岐先を特定
+    auto get_unplaced_branch = [&](uint32_t node_idx) -> uint32_t {
+        if (node_idx >= (uint32_t)pool.m_list.size()) return IDX_NONE;
+        CChip* chip = pool.m_list[node_idx];
+        if (chip->m_next_g != IDX_EXIT && chip->m_next_g != IDX_NONE && state[chip->m_next_g].x == INT_MAX) return chip->m_next_g;
+        if (chip->valid_r() && chip->m_next_r != IDX_EXIT && chip->m_next_r != IDX_NONE && state[chip->m_next_r].x == INT_MAX) return chip->m_next_r;
+        return IDX_NONE;
+    };
+
+    // 合流先を探索 (最長パス優先)
+    auto find_join_node = [&](uint32_t start_idx) -> uint32_t {
+        uint32_t curr = start_idx;
+        while (curr != IDX_EXIT && curr != IDX_NONE) {
+            if (curr < (uint32_t)state.size() && state[curr].x != INT_MAX) return curr;
+            bool has_r = (curr < (uint32_t)pool.m_list.size()) ? pool.m_list[curr]->valid_r() : false;
+            int dg = (curr < (uint32_t)pool.m_list.size()) ? get_d(pool.m_list[curr]->m_next_g) : -100;
+            int dr = (curr < (uint32_t)pool.m_list.size() && has_r) ? get_d(pool.m_list[curr]->m_next_r) : -100;
+            curr = (dg >= dr) ? pool.m_list[curr]->m_next_g : pool.m_list[curr]->m_next_r;
+        }
+        return IDX_NONE;
+    };
+
+    // 接続の書き換え
+    auto modify_next = [&](uint32_t from, uint32_t old_to, uint32_t new_to) {
+        if (from >= (uint32_t)pool.m_list.size()) return;
+        if (pool.m_list[from]->m_next_g == old_to) pool.m_list[from]->m_next_g = new_to;
+        else if (pool.m_list[from]->valid_r() && pool.m_list[from]->m_next_r == old_to) pool.m_list[from]->m_next_r = new_to;
+    };
+
+    // GoToチップの動的追加
+    auto add_goto_chip = [&](int x, int y) -> uint32_t {
+        uint32_t new_id = (uint32_t)pool.m_list.size();
+        pool.m_list.push_back(new CChipGoto()); 
+        state.push_back({x, y});
+        return new_id;
+    };
+
+    // 論理的なチップ数カウント
+    auto count_path_chips = [&](uint32_t start, uint32_t goal) -> int {
+        if (start == goal) return 0;
+        int count = 0;
+        uint32_t curr = start;
+        while (curr != goal && curr != IDX_EXIT && curr != IDX_NONE && count < 256) {
+            count++;
+            bool has_r = (curr < (uint32_t)pool.m_list.size()) ? pool.m_list[curr]->valid_r() : false;
+            int dg = (curr < (uint32_t)pool.m_list.size()) ? get_d(pool.m_list[curr]->m_next_g) : -100;
+            int dr = (curr < (uint32_t)pool.m_list.size() && has_r) ? get_d(pool.m_list[curr]->m_next_r) : -100;
+            curr = (dg >= dr) ? pool.m_list[curr]->m_next_g : pool.m_list[curr]->m_next_r;
+        }
+        return count;
+    };
+
+    // --- 2. パス配置再帰関数 ---
+    auto place_path = [&](auto self, uint32_t start_idx, int start_x, int start_y) -> void {
+        std::vector<uint32_t> current_path_chips;
+        uint32_t curr = start_idx;
+        int cur_x = start_x;
+
+        while (curr != IDX_EXIT && curr != IDX_NONE) {
+            if (curr < (uint32_t)state.size() && state[curr].x != INT_MAX) {
+                vertical_lines_x.push_back(cur_x - 1);
+                break;
+            }
+            if (curr >= (uint32_t)state.size()) state.resize(curr + 1, {INT_MAX, INT_MAX});
+            state[curr] = {cur_x, start_y};
+            current_path_chips.push_back(curr);
+
+            uint32_t next_node = IDX_NONE;
+            if (curr < (uint32_t)num_chips) {
+                bool has_r = pool.m_list[curr]->valid_r();
+                int dg = get_d(pool.m_list[curr]->m_next_g);
+                int dr = has_r ? get_d(pool.m_list[curr]->m_next_r) : -100;
+                next_node = (dg >= dr) ? pool.m_list[curr]->m_next_g : pool.m_list[curr]->m_next_r;
+            } else {
+                next_node = pool.m_list[curr]->m_next_g;
+            }
+            curr = next_node;
+            cur_x++;
+        }
+
+        for (uint32_t node_idx : current_path_chips) {
+            if (node_idx >= (uint32_t)num_chips) continue;
+            uint32_t branch_target = get_unplaced_branch(node_idx);
+            if (branch_target == IDX_NONE || branch_target == IDX_EXIT) continue;
+
+            uint32_t join_node = find_join_node(branch_target);
+            if (join_node == IDX_NONE) continue;
+
+            int bx = state[node_idx].x + 1;
+            bool move_up = (std::find(vertical_lines_x.begin(), vertical_lines_x.end(), bx) != vertical_lines_x.end()) ? true : (rand() % 2 == 0);
+            int target_y = move_up ? state[node_idx].y - 1 : state[node_idx].y + 1;
+
+            shift_y_range(state, target_y, move_up ? -1 : 1);
+
+            int target_bx = state[join_node].x - 1;
+            uint32_t final_branch_start = branch_target;
+            int path_len = count_path_chips(branch_target, join_node);
+
+            if (path_len == 0) {
+                // 0 chip コの字型迂回
+                uint32_t g1 = add_goto_chip(bx, target_y);
+                uint32_t g2 = add_goto_chip(std::max(bx, target_bx), target_y);
+                modify_next(node_idx, branch_target, g1);
+                pool.m_list[g1]->m_next_g = g2;
+                pool.m_list[g2]->m_next_g = join_node;
+                continue; 
+            } else if (path_len == 1) {
+                // 1 chip 延長
+                uint32_t g1 = add_goto_chip(std::max(bx + 1, target_bx), target_y);
+                pool.m_list[g1]->m_next_g = join_node;
+                modify_next(branch_target, join_node, g1);
+                final_branch_start = branch_target;
+            }
+
+            self(self, final_branch_start, bx, target_y);
+        }
+    };
+
+    // --- 3. 実行 ---
+    place_path(place_path, 0, 0, 0);
+    normalize_coordinates();
+}
+
+uint32_t CarnageSA::find_join_node(uint32_t start_idx, const std::vector<int>& dists) {
+    uint32_t curr = start_idx;
+    const int num_chips = (int)pool.size();
+
+    while (curr != IDX_EXIT && curr != IDX_NONE) {
+        if (state[curr].x != INT_MAX) return curr; // 合流点発見
+
+        bool has_r = pool[curr]->valid_r();
+        int d_g = (pool[curr]->m_next_g == IDX_EXIT) ? 0 : 
+                  (pool[curr]->m_next_g < num_chips ? dists[pool[curr]->m_next_g] : -100);
+        int d_r = has_r ? ((pool[curr]->m_next_r == IDX_EXIT) ? 0 : 
+                  (pool[curr]->m_next_r < num_chips ? dists[pool[curr]->m_next_r] : -100)) : -100;
+
+        curr = (d_g >= d_r) ? pool[curr]->m_next_g : pool[curr]->m_next_r;
+    }
+    return IDX_NONE;
+}
+
 //////////////////////////////////////////////////////////////////////////////
 
 void print_layout_svg(FILE *fp, const std::vector<Pos>& state, const CChipPool& pool) {
@@ -1369,10 +1627,11 @@ void print_layout_svg(FILE *fp, const std::vector<Pos>& state, const CChipPool& 
 
     fprintf(fp, "</svg>\n");
 }
+
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void){
-	for(int i = 0; i < 10; ++i){
+	for(int i = 0; i < 1; ++i){
 		IF(enemy_num(0, 416, 160, OKE_ALL))
 			IF(enemy_num(0, 128, 320, OKE_ALL) && enemy_num(0, 128, 320, OKE_ALL))
 				turn_right();
@@ -1381,6 +1640,7 @@ void chip_main(void){
 				move_forward();
 			ENDIF
 			action1();
+		ELSE
 		ENDIF
 		guard();
 	}
@@ -1453,7 +1713,7 @@ int main(void){
 	//exit(0);
 
 	CarnageSA sa(g_ChipPool);
-	sa.run();
+	//sa.run();
 	FILE *fp = fopen("chip.svg", "w");
 	print_layout_svg(fp, sa.get_result(), g_ChipPool);
 	fclose(fp);
