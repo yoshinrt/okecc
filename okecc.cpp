@@ -368,8 +368,8 @@ public:
 		return
 			m_param.get() == FWD	? "前進" :
 			m_param.get() == BACK	? "後退" :
-			m_param.get() == LEFT	? "左移" :
-			m_param.get() == RIGHT	? "右移" :
+			m_param.get() == LEFT	? "左移動" :
+			m_param.get() == RIGHT	? "右移動" :
 									  "停止";
 	}
 	
@@ -404,7 +404,7 @@ public:
 	virtual ~CChipTurn(){}
 
 	virtual std::string GetLayoutText(void){
-		return m_param.get() == LEFT	? "旋左" : "旋右";
+		return m_param.get() == LEFT	? "左旋回" : "右旋回";
 	}
 	
 	ScaledInt<1> m_param;
@@ -438,9 +438,9 @@ public:
 
 	virtual std::string GetLayoutText(void){
 		return
-			m_param.get() == FWD	? "跳前" :
-			m_param.get() == BACK	? "跳後" :
-			m_param.get() == LEFT	? "跳左" : "跳右";
+			m_param.get() == FWD	? "前Jmp" :
+			m_param.get() == BACK	? "後Jmp" :
+			m_param.get() == LEFT	? "左Jmp" : "右Jmp";
 	}
 	
 	ScaledInt<2> m_param;
@@ -890,6 +890,7 @@ public:
 	bool is_invalid_layout(const std::vector<Pos>& current_state);
 	void finalize();
 	void print_layout_svg(const char* filename);
+	bool cleanup_gotos();
 	
 	const std::vector<Pos>& get_result() const { return state; }
 };
@@ -1164,7 +1165,7 @@ double CarnageSA::calculate_energy() {
         if (dx > 0 || dy > 0) {
             energy += PENALTY_BASE_OUT + (double)(dx * dx + dy * dy) * 5000.0;
         }
-
+        
         // 3. 配線評価
         auto evaluate_conn = [&](UINT next_idx) {
             if (next_idx == IDX_EXIT || next_idx == IDX_NONE || next_idx >= (UINT)n) return;
@@ -1244,8 +1245,10 @@ bool CarnageSA::is_invalid_layout(const std::vector<Pos>& current_state) {
                 edges.push_back({ i, (int)next });
             }
         };
-        add_edge(pool.m_list[i]->m_next_g);
-        if (pool.m_list[i]->valid_r()) add_edge(pool.m_list[i]->m_next_r);
+        if(state[i].x != POS_INVALID){
+	        add_edge(pool.m_list[i]->m_next_g);
+	        if (pool.m_list[i]->valid_r()) add_edge(pool.m_list[i]->m_next_r);
+	    }
     }
 
     // 2. 貫通チェック
@@ -1267,6 +1270,59 @@ bool CarnageSA::is_invalid_layout(const std::vector<Pos>& current_state) {
     return false;
 }
 
+bool CarnageSA::cleanup_gotos() {
+    bool total_changed = false;
+
+    for (int target = 0; target < (int)pool.m_list.size(); ++target) {
+        if (!pool[target] || pool[target]->m_id.get() != CHIPID_GOTO) continue;
+        if (state[target].x == POS_INVALID) continue;
+
+        // 1. このGotoを指している全ての親（接続元）を特定
+        struct Connection { int idx; bool is_r; };
+        std::vector<Connection> parents;
+        for (int i = 0; i < (int)pool.m_list.size(); ++i) {
+            if (!pool[i] || state[i].x == POS_INVALID) continue;
+            if (pool[i]->m_next_g == (UINT)target) parents.push_back({i, false});
+            if (pool[i]->valid_r() && pool[i]->m_next_r == (UINT)target) parents.push_back({i, true});
+        }
+
+        if (parents.empty()) {
+            state[target] = { POS_INVALID, POS_INVALID };
+            total_changed = true;
+            continue;
+        }
+
+        // 2. バックアップ
+        UINT next_of_goto = pool[target]->m_next_g;
+        Pos original_goto_pos = state[target];
+        std::vector<UINT> original_conns;
+        for(auto& p : parents) {
+            original_conns.push_back(p.is_r ? pool[p.idx]->m_next_r : pool[p.idx]->m_next_g);
+        }
+        
+        // 3. 全ての親をバイパス先に繋ぎ変え、Gotoを削除
+        for (auto& p : parents) {
+            if (p.is_r) pool[p.idx]->m_next_r = next_of_goto;
+            else        pool[p.idx]->m_next_g = next_of_goto;
+        }
+        state[target] = { POS_INVALID, POS_INVALID };
+
+        // 4. バリデーション (引数に state を渡す)
+        if (is_invalid_layout(state)) {
+            // ロールバック
+            for (size_t k = 0; k < parents.size(); ++k) {
+                if (parents[k].is_r) pool[parents[k].idx]->m_next_r = original_conns[k];
+                else                 pool[parents[k].idx]->m_next_g = original_conns[k];
+            }
+            state[target] = original_goto_pos;
+        } else {
+            total_changed = true;
+        }
+    }
+
+    return total_changed;
+}
+
 void CarnageSA::run() {
     double current_energy = calculate_energy();
     double best_energy = current_energy;
@@ -1283,46 +1339,21 @@ void CarnageSA::run() {
     printf("Starting SA with GoTo Elimination... Initial Energy: %.2f\n", current_energy);
 
     for (int step = 0; step < iterations; ++step) {
-        std::uniform_int_distribution<int> dist_idx(0, (int)pool.m_list.size() - 1);
-        int target = dist_idx(this->gen);
-
-        if (state[target].x == POS_INVALID) continue;
-
-        // --- GoTo バイパス試行 ---
-        if (pool.m_list[target]->m_id.get() == CHIPID_GOTO) {
-            int parent_idx = -1;
-            bool is_r = false;
-            for (int i = 0; i < (int)pool.m_list.size(); ++i) {
-                if (state[i].x == POS_INVALID) continue;
-                if (pool.m_list[i]->m_next_g == (UINT)target) { parent_idx = i; is_r = false; break; }
-                if (pool.m_list[i]->valid_r() && pool.m_list[i]->m_next_r == (UINT)target) { parent_idx = i; is_r = true; break; }
-            }
-
-            if (parent_idx != -1) {
-                UINT next_of_goto = pool.m_list[target]->m_next_g;
-                UINT old_conn = is_r ? pool.m_list[parent_idx]->m_next_r : pool.m_list[parent_idx]->m_next_g;
-                Pos old_pos = state[target];
-
-                // バイパス適用
-                if (is_r) pool.m_list[parent_idx]->m_next_r = next_of_goto;
-                else pool.m_list[parent_idx]->m_next_g = next_of_goto;
-                state[target] = { POS_INVALID, POS_INVALID };
-
-                if (!is_invalid_layout(state)) {
-                    current_energy = calculate_energy();
-                    if (current_energy < best_energy) {
-                        best_energy = current_energy;
-                        best_state = state;
-                    }
-                    continue; 
-                } else {
-                    // 復元
-                    if (is_r) pool.m_list[parent_idx]->m_next_r = old_conn;
-                    else pool.m_list[parent_idx]->m_next_g = old_conn;
-                    state[target] = old_pos;
-                }
+		// 500回に1回、全てのGotoに対してバイパスと削除を試みる
+        if (step % 512 == 0) {
+            if (cleanup_gotos()) {
+                best_energy = current_energy = calculate_energy();
+                best_state = state;
+                
+                while(pool.m_list.back() == nullptr) pool.m_list.pop_back();
             }
         }
+        
+        int target;
+        do{
+	        std::uniform_int_distribution<int> dist_idx(0, (int)pool.m_list.size() - 1);
+	        target = dist_idx(this->gen);
+        }while(state[target].x == POS_INVALID);
 
         // --- 通常の移動処理 ---
         Pos old_pos = state[target];
@@ -1362,7 +1393,10 @@ void CarnageSA::run() {
         }
 
         T *= alpha;
-        if (step % 100000 == 0) printf("Step: %7d, Energy: %10.2f, Best: %10.2f\n", step, current_energy, best_energy);
+        if (step % 100000 == 0){
+        	printf("Step: %7d, T: %7.2f, Energy: %10.2f, Best: %10.2f\n", step, T, current_energy, best_energy);
+			print_layout_svg("chip.svg");
+        }
     }
     state = best_state;
     finalize();
@@ -1461,14 +1495,17 @@ void CarnageSA::print_layout_svg(const char* filename) {
         int y = state[i].y * CELL_SIZE + OFFSET;
         int centerX = x + CHIP_SIZE / 2;
 
-        // 箱の描画
-        fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"white\" stroke=\"#343a40\" stroke-width=\"2\" />\n",
-                x, y, CHIP_SIZE, CHIP_SIZE);
+        // goto チップは薄いグレー背景、それ以外は白
+        const char* fill_color = (pool.m_list[i]->m_id.get() == CHIPID_GOTO) ? "#e9ecef" : "white";
+
+        // 箱
+        fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"%s\" stroke=\"#343a40\" stroke-width=\"2\" />\n",
+                x, y, CHIP_SIZE, CHIP_SIZE, fill_color);
         
         // テキストの描画
         fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Meiryo, sans-serif\" text-anchor=\"middle\">\n", centerX, y + 25);
 
-        std::string txt = pool[i]->GetLayoutText();
+        std::string txt = pool[i]->GetLayoutText() + std::format("\n#{}", i);
         if (txt.empty()) {
             // テキスト空時はTypeIDを表示
             fprintf(fp, "    <tspan x=\"%d\" dy=\"1.2em\" font-size=\"10\" fill=\"#6c757d\">Type:%u</tspan>\n", centerX, pool[i]->m_id.get());
@@ -1601,7 +1638,7 @@ int main(void){
 	//exit(0);
 
 	CarnageSA sa(g_ChipPool);
-	//sa.run();
+	sa.run();
 	sa.print_layout_svg("chip.svg");
 
 	return 0;
