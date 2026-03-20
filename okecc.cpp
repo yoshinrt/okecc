@@ -26,6 +26,15 @@ enum {
 	OKE_ALL,
 };
 
+const char *OkeTypeStr[] = {
+	"二脚",
+	"四脚",
+	"車両",
+	"ホバー",
+	"飛行",
+	"ALL",
+};
+
 enum {
 	CHIPID_NULL,
 	CHIPID_NOP,
@@ -517,6 +526,12 @@ public:
 
 	virtual ~CChipAlt(){}
 
+	virtual std::string GetLayoutText(void){
+		return
+			m_param.get() == HIGH	? "高高度" :
+			m_param.get() == MID	? "中高度" : "低高度";
+	}
+	
 	ScaledInt<2> m_param;
 };
 
@@ -552,6 +567,17 @@ public:
 
 	virtual ~CChipFireNearest(){}
 
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"射撃 #{}x{}\n{} {}m\n {},{}",
+				m_weapon.get(),
+				m_cnt.get(),
+				OkeTypeStr[m_type.get()], m_distance.get(),
+				m_angleCenter.get(), m_angleRange.get()
+			);
+	}
+	
 	ScaledInt<5, 16, -240>	m_angleCenter;
 	ScaledInt<4, 32, 32>	m_angleRange;
 	ScaledInt<4, 20, 20>	m_distance;
@@ -597,6 +623,16 @@ public:
 
 	virtual ~CChipFireFixedDir(){}
 
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"射撃 #{}x{}\n方位 {}\n角度 {}",
+				m_weapon.get(),
+				m_cnt.get(),
+				m_direction.get(), m_elevation.get()
+			);
+	}
+	
 	ScaledInt<5, 16, -240>	m_direction;
 	ScaledInt<4, 16, -112>	m_elevation;
 	ScaledInt<3>			m_weapon;
@@ -631,16 +667,17 @@ public:
 
 	virtual ~CChipOption(){}
 
+	virtual std::string GetLayoutText(void){
+		return std::format("Option #{}", m_param.get());
+	}
+	
 	ScaledInt<2, 1, 1> m_param;
 };
 
-static void put_option_chip(UINT param){
+static void option(UINT param, LastLocationArg){
+	LastLocation();
 	g_pCurTree->add(new CChipOption(param));
 }
-
-static void option1(LastLocationArg){LastLocation(); put_option_chip(1);}
-static void option2(LastLocationArg){LastLocation(); put_option_chip(2);}
-static void option3(LastLocationArg){LastLocation(); put_option_chip(3);}
 
 //////////////////////////////////////////////////////////////////////////////
 // 近くの OKE を探索
@@ -699,6 +736,16 @@ public:
 		return CChipTree::CondChip2Tree(this);
 	}
 
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"?{} {}m\n{}{}{}\n{},{}",
+				(m_enemy.get() == ENEMY ? "敵" : "味方"), m_distance.get(),
+				OkeTypeStr[m_type.get()], (m_operator.get() == OP_GE ? "≧" : "≦"), m_num.get(),
+				m_angleCenter.get(), m_angleRange.get()
+			);
+	}
+	
 	ScaledInt<3>			m_type;
 	ScaledInt<1>		 	m_enemy;
 	ScaledInt<4, 20, 20>	m_distance;
@@ -820,10 +867,6 @@ struct Pos {
 		return y < other.y;
 	}
 };
-
-#include <map>
-#include <algorithm>
-#include <vector>
 
 struct PathNode {
     UINT id;
@@ -1570,9 +1613,9 @@ void CarnageSA::print_layout_svg(const char* filename) {
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void){
-	for(int i = 0; i < 10; ++i){
+	for(int i = 0; i < 1; ++i){
 		IF(enemy_num(0, 416, 160, OKE_ALL))
-			IF(enemy_num(0, 128, 320, OKE_ALL) && enemy_num(0, 128, 320, OKE_ALL))
+			IF(enemy_num(0, 128, 320, OKE_HOVER) && friendly_num(0, 128, 320, OKE_ALL))
 				turn_right();
 				jump_backward();
 			ELSE
@@ -1582,6 +1625,9 @@ void chip_main(void){
 		ELSE
 		ENDIF
 		guard();
+		fire(0, 416, 160, OKE_HOVER, 1, 8);
+		fire(128, 20, 1, 8);
+		option(1);
 	}
 }
 
