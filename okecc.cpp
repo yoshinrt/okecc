@@ -32,7 +32,22 @@ const char *OkeTypeStr[] = {
 	"車両",
 	"ホバー",
 	"飛行",
-	"ALL",
+	"全種",
+};
+
+enum {
+	P_ALL,
+	P_BULLET,
+	P_MISSILE,
+	P_BEAM,
+	P_ROCKET,
+	P_MINE,
+	P_FMINE,
+	P_HI_V
+};
+
+const char *ProjectileTypeStr[] = {
+	"危険物", "弾丸", "ミサイル", "ビーム", "ロケット", "地雷", "機雷", "高速"
 };
 
 enum {
@@ -48,7 +63,7 @@ enum {
 	CHIPID_FIRE_FIXED_DIR,
 	CHIPID_OPTION,
 	CHIPID_DET_OKE,
-	CHIPID_DET_OBSTACLE,
+	CHIPID_DET_BARRIER,
 	CHIPID_DET_PROJECTILE,
 	CHIPID_MAPPOINT,
 	CHIPID_SELF_STATUS,
@@ -705,8 +720,16 @@ static void option(UINT param, LastLocationArg){
 
 class CChipCond : public CChip {
 public:
-	static constexpr int OP_GE		= 0;
-	static constexpr int OP_LE		= 1;
+	enum {
+		OP_GE,
+		OP_LE,
+		OP_EQ,
+		OP_NE,
+	};
+	
+	static inline const char *m_operator_str[] = {
+		"≧", "≦", "=", "≠"
+	};
 	
 	virtual ~CChipCond(){}
 	
@@ -751,18 +774,62 @@ CChipTree operator&&(CChipCond& a, CChipCond& b){
 }
 
 //////////////////////////////////////////////////////////////////////////////
+// 残弾
+
+class CChipAmmoNum : public CChipCond {
+public:
+	
+	CChipAmmoNum(
+		int weapon
+	){
+		m_weapon	= weapon;
+		m_operator	= OP_GE;
+		m_num		= 1;
+		m_id		= CHIPID_AMMO;
+	}
+	
+	virtual ~CChipAmmoNum(){}
+
+	virtual void set_num(int num){m_num = num;}
+	virtual void set_operator(int opr){m_operator = opr;}
+	
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"{}#{}\n残数{}{}?",
+				(m_weapon.get() < 5 ? "武装" : "オプション"), (m_weapon.get() % 5 + 1),
+				m_operator_str[m_operator.get()], m_num.get()
+			);
+	}
+	
+	ScaledInt<3>		m_weapon;
+	ScaledInt<7, 1, 1>	m_num;
+	ScaledInt<1>		m_operator;
+};
+
+static CChipAmmoNum& ammo_num(
+	int weapon,
+	LastLocationArg
+){
+	LastLocation();
+	return *(new CChipAmmoNum(weapon - 1));
+}
+
+static CChipAmmoNum& option_num(
+	int weapon,
+	LastLocationArg
+){
+	LastLocation();
+	return *(new CChipAmmoNum(weapon + 4));
+}
+
+//////////////////////////////////////////////////////////////////////////////
 // 近くの OKE を探索
 
 class CChipOkeNum : public CChipCond {
 public:
 	static constexpr int ENEMY		= 0;
 	static constexpr int FRIENDLY	= 1;
-
-	CChipOkeNum(CChipOkeNum& src){
-		*this = src;
-	}
-
-	virtual ~CChipOkeNum(){}
 
 	CChipOkeNum(
 		int angleCenter,
@@ -781,26 +848,28 @@ public:
 		m_id			= CHIPID_DET_OKE;
 	}
 	
+	virtual ~CChipOkeNum(){}
+
 	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 	
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
-				"?{} {}m\n{}{}{}\n{},{}",
+				"{} {}m\n{}{}{}?\n{},{}",
 				(m_enemy.get() == ENEMY ? "敵" : "味方"), m_distance.get(),
-				OkeTypeStr[m_type.get()], (m_operator.get() == OP_GE ? "≧" : "≦"), m_num.get(),
+				OkeTypeStr[m_type.get()], m_operator_str[m_operator.get()], m_num.get(),
 				m_angleCenter.get(), m_angleRange.get()
 			);
 	}
 	
-	ScaledInt<3>			m_type;
-	ScaledInt<1>		 	m_enemy;
-	ScaledInt<4, 20, 20>	m_distance;
 	ScaledInt<5, 16, -240>	m_angleCenter;
 	ScaledInt<4, 32, 32>	m_angleRange;
-	ScaledInt<1>			m_operator;
+	ScaledInt<4, 20, 20>	m_distance;
+	ScaledInt<1>		 	m_enemy;
+	ScaledInt<3>			m_type;
 	ScaledInt<2, 1, 1>		m_num;
+	ScaledInt<1>			m_operator;
 };
 
 static CChipOkeNum& oke_num(
@@ -833,6 +902,206 @@ static CChipOkeNum& friendly_num(
 ){
 	LastLocation();
 	return oke_num(angleCenter, angleRange, distance, type, CChipOkeNum::FRIENDLY);
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// 近くの障害物を探索
+
+class CChipBarrier : public CChipCond {
+public:
+
+	CChipBarrier(
+		int angleCenter,
+		int angleRange,
+		int distance
+	){
+		m_angleCenter	= angleCenter;
+		m_angleRange	= angleRange;
+		m_distance		= distance;
+		m_operator		= OP_GE;
+		m_num			= 3;
+		m_id			= CHIPID_DET_BARRIER;
+	}
+	
+	virtual ~CChipBarrier(){}
+
+	virtual void set_num(int num){m_num = num;}
+	virtual void set_operator(int opr){m_operator = opr;}
+	
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"障害物\n高さ{}{}m?\n{}m\n{},{}",
+				m_operator_str[m_operator.get()], m_num.get(),
+				m_distance.get(),
+				m_angleCenter.get(), m_angleRange.get()
+			);
+	}
+	
+	ScaledInt<5, 16, -240>	m_angleCenter;
+	ScaledInt<4, 32, 32>	m_angleRange;
+	ScaledInt<4, 10, 10>	m_distance;
+	ScaledInt<3, 3, 3>		m_num;
+	ScaledInt<1>			m_operator;
+};
+
+static CChipBarrier& barrier_height(
+	int angleCenter,
+	int angleRange,
+	int distance,
+	LastLocationArg
+){
+	LastLocation();
+	return *(new CChipBarrier(angleCenter, angleRange, distance));
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// 近くの危険物を探索
+
+class CChipProjectileNum : public CChipCond {
+public:
+
+	CChipProjectileNum(
+		int angleCenter,
+		int angleRange,
+		int distance,
+		int type
+	){
+		m_angleCenter	= angleCenter;
+		m_angleRange	= angleRange;
+		m_distance		= distance;
+		m_type			= type;
+		m_operator		= OP_GE;
+		m_num			= 3;
+		m_id			= CHIPID_DET_BARRIER;
+	}
+	
+	virtual ~CChipProjectileNum(){}
+
+	virtual void set_num(int num){m_num = num;}
+	virtual void set_operator(int opr){m_operator = opr;}
+	
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"{} {}m\n{}{}?\n{},{}",
+				ProjectileTypeStr[m_type.get()], m_distance.get(),
+				m_operator_str[m_operator.get()], m_num.get(),
+				m_angleCenter.get(), m_angleRange.get()
+			);
+	}
+	
+	ScaledInt<5, 16, -240>	m_angleCenter;
+	ScaledInt<4, 32, 32>	m_angleRange;
+	ScaledInt<4, 10, 10>	m_distance;
+	ScaledInt<3>			m_type;
+	ScaledInt<3, 1, 1>		m_num;
+	ScaledInt<1>			m_operator;
+};
+
+static CChipProjectileNum& projectile_num(
+	int angleCenter,
+	int angleRange,
+	int distance,
+	int type,
+	LastLocationArg
+){
+	LastLocation();
+	return *(new CChipProjectileNum(angleCenter, angleRange, distance, type));
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+class CChipVal : public CChip {
+public:
+	~CChipVal(){}
+	
+	virtual void set_var(int var){}
+};
+
+//////////////////////////////////////////////////////////////////////////////
+// 変数
+
+class CCarnageVar {
+public:
+	CCarnageVar(UINT var) : m_var(var){}
+	UINT m_var;
+	
+	CCarnageVar& operator=(CChipVal& chip){
+		chip.set_var(this->m_var);
+		g_pCurTree->add(&chip);
+		return *this;
+	}
+};
+
+CCarnageVar A(0);
+CCarnageVar B(1);
+CCarnageVar C(2);
+CCarnageVar D(3);
+CCarnageVar E(4);
+CCarnageVar F(5);
+
+//////////////////////////////////////////////////////////////////////////////
+// カウンタに自機状態入力
+
+class CChipGetStatus : public CChipVal {
+public:
+	
+	enum {
+		HEAT,
+		FUEL,
+		DAMAGE,
+		AMMO,
+	};
+	
+	CChipGetStatus(
+		int param
+	){
+		m_param			= param;
+		m_var			= 0;
+		m_id			= CHIPID_DET_BARRIER;
+	}
+	
+	virtual ~CChipGetStatus(){}
+
+	virtual void set_var(int var){m_var = var;}
+	
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"{}←{}", std::string(1, 'A' + m_var.get()),
+				m_param.get() == HEAT   ? "熱量" :
+				m_param.get() == FUEL   ? "燃料" :
+				m_param.get() == DAMAGE ? "ダメージ" :
+										  std::format("残弾#{}", m_param.get() - DAMAGE)
+			);
+	}
+	
+	ScaledInt<3>			m_var;
+	ScaledInt<3>			m_param;
+};
+
+static CChipGetStatus& projectile_num(
+	int param,
+	LastLocationArg
+){
+	LastLocation();
+	return *(new CChipGetStatus(param));
+}
+
+static CChipGetStatus& heat(LastLocationArg){
+	LastLocation();
+	return *(new CChipGetStatus(CChipGetStatus::HEAT));
+}
+
+static CChipGetStatus& fuel(LastLocationArg){
+	LastLocation();
+	return *(new CChipGetStatus(CChipGetStatus::FUEL));
+}
+
+static CChipGetStatus& damage(LastLocationArg){
+	LastLocation();
+	return *(new CChipGetStatus(CChipGetStatus::DAMAGE));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1711,7 +1980,16 @@ void chip_main(void){
 		guard();
 		fire(0, 416, 160, OKE_HOVER, 1, 8);
 		fire(128, 20, 1, 8);
-		option(1);
+		
+		IF(option_num(1) >= 2)
+			IF(barrier_height(0, 32, 160) >= 24)
+				IF(projectile_num(0, 32, 160, P_HI_V))
+					option(1);
+				ENDIF
+			ENDIF
+		ENDIF
+		C = heat();
+		A = damage();
 	}
 #endif
 }
