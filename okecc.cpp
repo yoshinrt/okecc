@@ -1412,7 +1412,7 @@ void CarnageSA::run() {
     std::uniform_int_distribution<int> dist_rel(-1, 1);
     std::uniform_int_distribution<int> dist_abs(0, 14);
 
-    printf("Starting SA with GoTo Elimination... Initial Energy: %.2f\n", current_energy);
+    printf("Starting SA... Initial Energy: %.2f\n", current_energy);
 
     for (int step = 0; step < iterations; ++step) {
 		// 500回に1回、全てのGotoに対してバイパスと削除を試みる
@@ -1474,7 +1474,7 @@ void CarnageSA::run() {
 			print_layout_svg("chip.svg");
         }
     }
-    state = best_state;
+    state = std::move(best_state);
     finalize();
 }
 
@@ -1491,28 +1491,6 @@ void CarnageSA::finalize() {
             }
         }
     }
-
-    // 2. 残ったチップの接続先が nullptr (削除済み) を指していないか最終確認
-    // ※ SA 中にバイパスは完了しているはずだが、安全のためのクリーンアップ
-    for (int i = 0; i < n; ++i) {
-        if (pool.m_list[i] == nullptr) continue;
-
-        auto cleanup_connection = [&](UINT& next_idx) {
-            if (next_idx != IDX_EXIT && next_idx != IDX_NONE && next_idx < (UINT)n) {
-                if (pool.m_list[next_idx] == nullptr) {
-                    // 接続先が削除されていたら、接続を断つ (論理エラー防止)
-                    next_idx = IDX_NONE;
-                }
-            }
-        };
-
-        cleanup_connection(pool.m_list[i]->m_next_g);
-        if (pool.m_list[i]->valid_r()) {
-            cleanup_connection(pool.m_list[i]->m_next_r);
-        }
-    }
-
-    printf("Finalize: Cleanup complete. Remaining chips are valid in 15x15 grid.\n");
 }
 
 //////////////////////////////////////////////////////////////////////////////
