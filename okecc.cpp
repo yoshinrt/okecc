@@ -131,8 +131,8 @@ public:
 
 	virtual ~CChip(){}
 	
-	virtual std::string GetLayoutText(int line){
-		return line == 0 ? std::format("Type:{}", m_id.get()) : "";
+	virtual std::string GetLayoutText(void){
+		return "";
 	}
 	
 	bool valid_r(void){return m_next_r < IDX_EXIT;}
@@ -323,12 +323,11 @@ public:
 
 	virtual ~CChipNop(){}
 	
-	virtual std::string GetLayoutText(int line){
-		if(line == 0) return
+	virtual std::string GetLayoutText(void){
+		return
 			m_param.get() == 0 ? "NOP" :
 			m_param.get() == NOP_AE ? "Wait AE" :
 			std::format("Wait {:2d}", m_param.get());
-		else return "";
 	}
 	
 	ScaledInt<5,2> m_param;
@@ -365,16 +364,13 @@ public:
 
 	virtual ~CChipMove(){}
 
-	virtual std::string GetLayoutText(int line){
-		if(line == 0){
-			return
-				m_param.get() == FWD	? "前進" :
-				m_param.get() == BACK	? "後退" :
-				m_param.get() == LEFT	? "左移" :
-				m_param.get() == RIGHT	? "右移" :
-										  "停止";
-		}
-		else return "";
+	virtual std::string GetLayoutText(void){
+		return
+			m_param.get() == FWD	? "前進" :
+			m_param.get() == BACK	? "後退" :
+			m_param.get() == LEFT	? "左移" :
+			m_param.get() == RIGHT	? "右移" :
+									  "停止";
 	}
 	
 	ScaledInt<3> m_param;
@@ -407,9 +403,8 @@ public:
 
 	virtual ~CChipTurn(){}
 
-	virtual std::string GetLayoutText(int line){
-		if(line == 0) return m_param.get() == LEFT	? "旋左" : "旋右";
-		else return "";
+	virtual std::string GetLayoutText(void){
+		return m_param.get() == LEFT	? "旋左" : "旋右";
 	}
 	
 	ScaledInt<1> m_param;
@@ -441,14 +436,11 @@ public:
 
 	virtual ~CChipJump(){}
 
-	virtual std::string GetLayoutText(int line){
-		if(line == 0){
-			return
-				m_param.get() == FWD	? "跳前" :
-				m_param.get() == BACK	? "跳後" :
-				m_param.get() == LEFT	? "跳左" : "跳右";
-		}
-		else return "";
+	virtual std::string GetLayoutText(void){
+		return
+			m_param.get() == FWD	? "跳前" :
+			m_param.get() == BACK	? "跳後" :
+			m_param.get() == LEFT	? "跳左" : "跳右";
 	}
 	
 	ScaledInt<2> m_param;
@@ -484,16 +476,13 @@ public:
 
 	virtual ~CChipAction(){}
 
-	virtual std::string GetLayoutText(int line){
-		if(line == 0){
-			return
-				m_param.get() == FIGHT		? "格闘" :
-				m_param.get() == CROUCH		? "伏せ" :
-				m_param.get() == GUARD		? "防御" :
-				m_param.get() == ACTION1	? "Action1" :
-				m_param.get() == ACTION2	? "Action2" : "Action3";
-		}
-		else return "";
+	virtual std::string GetLayoutText(void){
+		return
+			m_param.get() == FIGHT		? "格闘" :
+			m_param.get() == CROUCH		? "伏せ" :
+			m_param.get() == GUARD		? "防御" :
+			m_param.get() == ACTION1	? "Action1" :
+			m_param.get() == ACTION2	? "Action2" : "Action3";
 	}
 	
 	ScaledInt<2> m_param;
@@ -900,6 +889,7 @@ public:
 	bool has_any_intersection();
 	bool is_invalid_layout(const std::vector<Pos>& current_state);
 	void finalize();
+	void print_layout_svg(const char* filename);
 	
 	const std::vector<Pos>& get_result() const { return state; }
 };
@@ -1417,35 +1407,30 @@ void CarnageSA::finalize() {
 
 //////////////////////////////////////////////////////////////////////////////
 
-void print_layout_svg(FILE *fp, const std::vector<Pos>& state, const CChipPool& pool) {
-    const int CELL_SIZE = 80;    // 1セルの大きさ
-    const int CHIP_SIZE = 50;    // チップ（箱）の大きさ
+void CarnageSA::print_layout_svg(const char* filename) {
+    const int CHIP_SIZE = 75;    // チップサイズ 1.5倍
+    const int GAP = 15;          // 隙間 15px
+    const int CELL_SIZE = CHIP_SIZE + GAP; 
     const int OFFSET = (CELL_SIZE - CHIP_SIZE) / 2;
-    const int VIEW_WIDTH = 800;  // ブラウザ等での表示幅
-    const int VIEW_HEIGHT = 800; // ブラウザ等での表示高さ
 
-    // 1. 有効なチップのみを対象に、全チップを包含する矩形を計算 (viewBox用)
+    FILE* fp = fopen(filename, "w");
+    if (!fp) return;
+
+    // 1. 範囲計算 (メンバ変数 state, pool を直接使用)
     int min_x = INT_MAX, min_y = INT_MAX;
     int max_x = INT_MIN, max_y = INT_MIN;
     bool has_valid_chip = false;
 
     for (int i = 0; i < (int)state.size(); ++i) {
-        // nullptr または POS_INVALID なチップは計算から除外
         if (pool[i] == nullptr || state[i].x == POS_INVALID) continue;
-        
         has_valid_chip = true;
-        const auto& p = state[i];
-        if (p.x < min_x) min_x = p.x;
-        if (p.y < min_y) min_y = p.y;
-        if (p.x > max_x) max_x = p.x;
-        if (p.y > max_y) max_y = p.y;
+        min_x = std::min(min_x, state[i].x);
+        min_y = std::min(min_y, state[i].y);
+        max_x = std::max(max_x, state[i].x);
+        max_y = std::max(max_y, state[i].y);
     }
     
-    // 有効なデータがない場合のガード
-    if (!has_valid_chip) {
-        min_x = min_y = 0;
-        max_x = max_y = 5;
-    }
+    if (!has_valid_chip) { min_x = min_y = 0; max_x = max_y = 5; }
 
     int grid_w = (max_x - min_x + 1);
     int grid_h = (max_y - min_y + 1);
@@ -1454,12 +1439,11 @@ void print_layout_svg(FILE *fp, const std::vector<Pos>& state, const CChipPool& 
     int vb_x = min_x * CELL_SIZE - 20;
     int vb_y = min_y * CELL_SIZE - 20;
 
-    // 2. ヘッダー出力
+    // 2. SVGヘッダーとマーカー定義
     fprintf(fp, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     fprintf(fp, "<svg width=\"%d\" height=\"%d\" viewBox=\"%d %d %d %d\" xmlns=\"http://www.w3.org/2000/svg\">\n", 
-            VIEW_WIDTH, VIEW_HEIGHT, vb_x, vb_y, vb_width, vb_height);
+            vb_width, vb_height, vb_x, vb_y, vb_width, vb_height);
     
-    // 矢印の定義 (marker)
     fprintf(fp, "  <defs>\n");
     fprintf(fp, "    <marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"3\" orient=\"auto\" markerUnits=\"strokeWidth\">\n");
     fprintf(fp, "      <path d=\"M0,0 L0,6 L9,3 z\" fill=\"context-stroke\" />\n");
@@ -1469,25 +1453,57 @@ void print_layout_svg(FILE *fp, const std::vector<Pos>& state, const CChipPool& 
     // 背景
     fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" fill=\"#f8f9fa\" />\n", vb_x, vb_y, vb_width, vb_height);
 
-    // 3. 接続線（エッジ）の描画
-    auto draw_edge = [&](int from_idx, UINT to_idx, const char* color) {
-        if (to_idx == IDX_NONE) return;
+    // 3. チップ（箱とテキスト）の描画
+    for (int i = 0; i < (int)state.size(); ++i) {
+        if (pool[i] == nullptr || state[i].x == POS_INVALID) continue;
+
+        int x = state[i].x * CELL_SIZE + OFFSET;
+        int y = state[i].y * CELL_SIZE + OFFSET;
+        int centerX = x + CHIP_SIZE / 2;
+
+        // 箱の描画
+        fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"white\" stroke=\"#343a40\" stroke-width=\"2\" />\n",
+                x, y, CHIP_SIZE, CHIP_SIZE);
         
-        // 元チップが無効なら描画しない
-        if (pool[from_idx] == nullptr || state[from_idx].x == POS_INVALID) return;
+        // テキストの描画
+        fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Meiryo, sans-serif\" text-anchor=\"middle\">\n", centerX, y + 25);
+
+        std::string txt = pool[i]->GetLayoutText();
+        if (txt.empty()) {
+            // テキスト空時はTypeIDを表示
+            fprintf(fp, "    <tspan x=\"%d\" dy=\"1.2em\" font-size=\"10\" fill=\"#6c757d\">Type:%u</tspan>\n", centerX, pool[i]->m_id.get());
+        } else {
+            // \n で改行
+            size_t s = 0, e = 0;
+            int line_count = 0;
+            while ((e = txt.find('\n', s)) != std::string::npos) {
+                fprintf(fp, "    <tspan x=\"%d\" dy=\"%s\" font-size=\"11\" fill=\"#333\">%s</tspan>\n",
+                        centerX, (line_count == 0 ? "0" : "1.2em"), txt.substr(s, e - s).c_str());
+                s = e + 1;
+                line_count++;
+            }
+            fprintf(fp, "    <tspan x=\"%d\" dy=\"%s\" font-size=\"11\" fill=\"#333\">%s</tspan>\n",
+                    centerX, (line_count == 0 ? "0" : "1.2em"), txt.substr(s).c_str());
+        }
+        fprintf(fp, "  </text>\n");
+    }
+
+    // 4. 接続線（エッジ）の描画（最後に描画することで最前面へ）
+    auto draw_edge = [&](int from_idx, UINT to_idx, const char* color) {
+        if (to_idx == IDX_NONE || pool[from_idx] == nullptr || state[from_idx].x == POS_INVALID) return;
         
         Pos p1 = state[from_idx];
         double x1 = p1.x * CELL_SIZE + CELL_SIZE / 2.0;
         double y1 = p1.y * CELL_SIZE + CELL_SIZE / 2.0;
 
+        // EXITへの線
         if (to_idx == IDX_EXIT) {
-            fprintf(fp, "  <line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"2\" stroke-dasharray=\"4\" marker-end=\"url(#arrow)\" />\n",
+            fprintf(fp, "  <line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"2.5\" stroke-dasharray=\"4\" marker-end=\"url(#arrow)\" />\n",
                     x1 + (CHIP_SIZE/2.0), y1, x1 + (CHIP_SIZE/2.0) + 20, y1, color);
             return;
         }
 
-        // 接続先チップが無効なら描画しない
-        if (to_idx >= state.size() || pool[to_idx] == nullptr || state[to_idx].x == POS_INVALID) return;
+        if (to_idx >= (UINT)state.size() || pool[to_idx] == nullptr || state[to_idx].x == POS_INVALID) return;
 
         Pos p2 = state[to_idx];
         double x2 = p2.x * CELL_SIZE + CELL_SIZE / 2.0;
@@ -1496,46 +1512,22 @@ void print_layout_svg(FILE *fp, const std::vector<Pos>& state, const CChipPool& 
         double dx = x2 - x1;
         double dy = y2 - y1;
         double dist = sqrt(dx*dx + dy*dy);
-        
-        if (dist < 0.1) return; // 同一座標
+        if (dist < 0.1) return;
 
+        // チップの縁で止まるように調整
         double ratio = (CHIP_SIZE / 2.0) / dist;
-        double ox = dx * ratio;
-        double oy = dy * ratio;
-
-        fprintf(fp, "  <line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"2\" marker-end=\"url(#arrow)\" />\n",
-                x1 + ox, y1 + oy, x2 - ox, y2 - oy, color);
+        fprintf(fp, "  <line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"2.5\" marker-end=\"url(#arrow)\" />\n",
+                x1 + dx * ratio, y1 + dy * ratio, x2 - dx * ratio, y2 - dy * ratio, color);
     };
 
     for (int i = 0; i < (int)state.size(); ++i) {
-        if (pool[i] == nullptr) continue; // 元チップが nullptr ならスキップ
-        
-        draw_edge(i, pool[i]->m_next_g, "#28a745"); // Green
-        if (pool[i]->valid_r()) {
-            draw_edge(i, pool[i]->m_next_r, "#dc3545"); // Red
-        }
-    }
-
-    // 4. チップ（箱）の描画
-    for (int i = 0; i < (int)state.size(); ++i) {
-        // nullptr または POS_INVALID なチップは描画をスキップ
-        if (pool[i] == nullptr || state[i].x == POS_INVALID) continue;
-
-        int x = state[i].x * CELL_SIZE + OFFSET;
-        int y = state[i].y * CELL_SIZE + OFFSET;
-
-        // 箱
-        fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"white\" stroke=\"#343a40\" stroke-width=\"2\" />\n",
-                x, y, CHIP_SIZE, CHIP_SIZE);
-        
-        // テキスト (Type と ID)
-        fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Consolas, monospace\" font-size=\"10\" text-anchor=\"middle\" fill=\"#6c757d\">Type:%u</text>\n",
-                x + CHIP_SIZE / 2, y + 20, pool[i]->m_id.get());
-        fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Consolas, monospace\" font-size=\"11\" text-anchor=\"middle\" font-weight=\"bold\">ID:%d</text>\n",
-                x + CHIP_SIZE / 2, y + 38, i);
+        if (pool[i] == nullptr) continue;
+        draw_edge(i, pool[i]->m_next_g, "#28a745");
+        if (pool[i]->valid_r()) draw_edge(i, pool[i]->m_next_r, "#dc3545");
     }
 
     fprintf(fp, "</svg>\n");
+    fclose(fp);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1609,10 +1601,8 @@ int main(void){
 	//exit(0);
 
 	CarnageSA sa(g_ChipPool);
-	sa.run();
-	FILE *fp = fopen("chip.svg", "w");
-	print_layout_svg(fp, sa.get_result(), g_ChipPool);
-	fclose(fp);
+	//sa.run();
+	sa.print_layout_svg("chip.svg");
 
 	return 0;
 }
