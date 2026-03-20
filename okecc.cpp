@@ -216,6 +216,32 @@ public:
 		return dst;
 	}
 	
+	void CleanupGoto(void){
+		// Goto 飛び先解決
+		std::vector<UINT> IdxOld2New;
+		std::vector<UINT> IdxNew2Old;
+		
+		for(UINT u = 0; u < m_list.size(); ++u){
+			if(m_list[u]->m_id.get() != CHIPID_GOTO){
+				m_list[u]->m_next_r = GetFinalDst(m_list[u]->m_next_r);
+				m_list[u]->m_next_g = GetFinalDst(m_list[u]->m_next_g);
+				IdxNew2Old.push_back(u);
+			}else{
+				delete m_list[u];
+			}
+			IdxOld2New.push_back((UINT)IdxNew2Old.size() - 1);
+		}
+		
+		//Goto 削除
+		for(UINT u = 0; u < IdxNew2Old.size(); ++u){
+			m_list[u] = m_list[IdxNew2Old[u]];
+			if(m_list[u]->valid_g()) m_list[u]->m_next_g = IdxOld2New[m_list[u]->m_next_g];
+			if(m_list[u]->valid_r()) m_list[u]->m_next_r = IdxOld2New[m_list[u]->m_next_r];
+		}
+		m_start = IdxOld2New[m_start];
+		m_list.resize(IdxNew2Old.size());
+	}
+	
 	void dump(void){
 		for(UINT u = 0; u < m_list.size(); ++u){
 			if(m_list[u]){
@@ -230,7 +256,7 @@ public:
 	}
 };
 
-CChipPool	g_ChipPool(15, 15);
+CChipPool	*g_pCurChipPool;
 
 //////////////////////////////////////////////////////////////////////////////
 // Chip tree
@@ -245,13 +271,13 @@ public:
 	// g, r を update
 	void set_g(UINT idx){
 		if(m_start == IDX_NONE) m_start = idx;
-		if(valid_g()) g_ChipPool[m_last_g]->m_next_g = idx;
+		if(valid_g()) (*g_pCurChipPool)[m_last_g]->m_next_g = idx;
 		m_last_g = idx;
 	}
 
 	void set_r(UINT idx){
 		if(m_start == IDX_NONE) m_start = idx;
-		if(valid_r()) g_ChipPool[m_last_r]->m_next_r = idx;
+		if(valid_r()) (*g_pCurChipPool)[m_last_r]->m_next_r = idx;
 		m_last_r = idx;
 	}
 
@@ -264,7 +290,7 @@ public:
 		CChipTree tree;
 
 		tree.m_start =
-		tree.m_last_g = g_ChipPool.add(pchip);
+		tree.m_last_g = g_pCurChipPool->add(pchip);
 
 		return tree;
 	}
@@ -275,17 +301,17 @@ public:
 
 		tree.m_start =
 		tree.m_last_g =
-		tree.m_last_r = g_ChipPool.add(pchip);
+		tree.m_last_r = g_pCurChipPool->add(pchip);
 
 		return tree;
 	}
 
 	// Tree にチップ追加
 	CChipTree& add(CChip *pchip){
-		UINT idx = g_ChipPool.add(pchip);		// チップ追加
+		UINT idx = g_pCurChipPool->add(pchip);		// チップ追加
 
 		if(valid_start()){
-			g_ChipPool[m_last_g]->m_next_g = idx;	// リスト後端に追加したチップをつなげる
+			(*g_pCurChipPool)[m_last_g]->m_next_g = idx;	// リスト後端に追加したチップをつなげる
 		}else{
 			m_start = idx;
 		}
@@ -309,9 +335,9 @@ CChipTree operator&&(const CChipTree& a, const CChipTree& b){
 	cc.set_r(b.m_start);
 
 	// False 側: GOTO を生成し this.g, b.g, tree.g はそれを指す
-	UINT idx = g_ChipPool.add(new CChipGoto);
+	UINT idx = g_pCurChipPool->add(new CChipGoto);
 	cc.set_g(idx);
-	g_ChipPool[b.m_last_g]->m_next_g = idx;
+	(*g_pCurChipPool)[b.m_last_g]->m_next_g = idx;
 
 	// True 側: tree.r は b.r になる
 	cc.m_last_r = b.m_last_r;
@@ -815,7 +841,7 @@ void if_statement(
 	g_pCurTree->set_g(cc.m_start);
 
 	// cc.r を GOTO に変換
-	UINT idx = g_ChipPool.add(new CChipGoto);
+	UINT idx = g_pCurChipPool->add(new CChipGoto);
 	cc.set_r(idx);
 	g_pCurTree->m_last_g = idx;
 
@@ -858,12 +884,12 @@ void endif_statement(
 	}
 
 	// 合流 GOTO 生成
-	UINT merge = g_ChipPool.add(new CChipGoto);
+	UINT merge = g_pCurChipPool->add(new CChipGoto);
 	g_pCurTree->set_g(merge);
 
 	// false 条件の飛び先合流
 	UINT idx = g_BlockStack.back(); g_BlockStack.pop_back();
-	g_ChipPool[idx]->m_next_g = merge;
+	(*g_pCurChipPool)[idx]->m_next_g = merge;
 }
 
 #define IF(cc)	if_statement(cc);
@@ -1682,49 +1708,29 @@ void chip_main(void){
 }
 
 //////////////////////////////////////////////////////////////////////////////
+
 int main(void){
-
-	CChipTree tree;
-	g_pCurTree = &tree;
-
+	g_pCurTree = new CChipTree;
+	g_pCurChipPool = new CChipPool(15, 15);
+	
 	try{
 		chip_main();
 	}catch(const OkeccError& e){
 		puts(e.what());
 		exit(0);
 	}
-
-	g_pCurTree->set_g(IDX_EXIT);
-	g_ChipPool.dump();
-
-	// Goto 飛び先解決
-	std::vector<UINT> IdxOld2New;
-	std::vector<UINT> IdxNew2Old;
-
-	for(UINT u = 0; u < g_ChipPool.m_list.size(); ++u){
-		if(g_ChipPool[u]->m_id.get() != CHIPID_GOTO){
-			g_ChipPool[u]->m_next_r = g_ChipPool.GetFinalDst(g_ChipPool[u]->m_next_r);
-			g_ChipPool[u]->m_next_g = g_ChipPool.GetFinalDst(g_ChipPool[u]->m_next_g);
-			IdxNew2Old.push_back(u);
-		}else{
-			delete g_ChipPool[u];
-		}
-		IdxOld2New.push_back((UINT)IdxNew2Old.size() - 1);
-	}
-
-	//Goto 削除
-	for(UINT u = 0; u < IdxNew2Old.size(); ++u){
-		g_ChipPool[u] = g_ChipPool[IdxNew2Old[u]];
-		if(g_ChipPool[u]->valid_g()) g_ChipPool[u]->m_next_g = IdxOld2New[g_ChipPool[u]->m_next_g];
-		if(g_ChipPool[u]->valid_r()) g_ChipPool[u]->m_next_r = IdxOld2New[g_ChipPool[u]->m_next_r];
-	}
-	g_ChipPool.m_start = IdxOld2New[tree.m_start];
-	g_ChipPool.m_list.resize(IdxNew2Old.size());
-
-	printf("Number of chip(s): %d\n", (UINT)g_ChipPool.m_list.size());
-	g_ChipPool.dump();
 	
-	CarnageSA sa(g_ChipPool);
+	g_pCurTree->set_g(IDX_EXIT);
+	g_pCurChipPool->m_start = g_pCurTree->m_start;
+	//g_pCurChipPool->dump();
+	
+	// Goto 最適化
+	g_pCurChipPool->CleanupGoto();
+	
+	printf("Number of chip(s): %d\n", (UINT)g_pCurChipPool->m_list.size());
+	//g_pCurChipPool->dump();
+	
+	CarnageSA sa(*g_pCurChipPool);
 	sa.run();
 	sa.print_layout_svg("chip.svg");
 
