@@ -1240,7 +1240,7 @@ double CarnageSA::calculate_energy() {
             // 通常の配線距離コスト
             int x2 = state[next_idx].x;
             int y2 = state[next_idx].y;
-            energy += (abs(x - x2) + abs(y - y2)) * COST_DISTANCE;
+            energy += (std::max(std::abs(x - x2), std::abs(y - y2)) - 1) * COST_DISTANCE;
         };
 
         evaluate_conn(pool.m_list[i]->m_next_g);
@@ -1395,7 +1395,7 @@ bool CarnageSA::cleanup_gotos() {
             total_changed = true;
         }
     }
-
+	
     return total_changed;
 }
 
@@ -1406,7 +1406,7 @@ void CarnageSA::run() {
 
     double T = 5000.0;
     const double alpha = 0.999995;
-    const int iterations = 2000000;
+    const int iterations = 4000000;
 
     std::uniform_real_distribution<double> dist_u(0.0, 1.0);
     std::uniform_int_distribution<int> dist_rel(-1, 1);
@@ -1420,8 +1420,6 @@ void CarnageSA::run() {
             if (cleanup_gotos()) {
                 best_energy = current_energy = calculate_energy();
                 best_state = state;
-                
-                while(pool.m_list.back() == nullptr) pool.m_list.pop_back();
             }
         }
         
@@ -1473,6 +1471,8 @@ void CarnageSA::run() {
         	printf("Step: %7d, T: %7.2f, Energy: %10.2f, Best: %10.2f\n", step, T, current_energy, best_energy);
 			print_layout_svg("chip.svg");
         }
+        
+        if(current_energy < 0.001) break;
     }
     state = std::move(best_state);
     finalize();
