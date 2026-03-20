@@ -155,11 +155,6 @@ public:
 	UINT			m_next_r = IDX_NONE;
 };
 
-class CChipCond : public CChip {
-public:
-	virtual ~CChipCond(){}
-};
-
 //////////////////////////////////////////////////////////////////////////////
 // ゲームには存在しない仮チップ
 
@@ -343,18 +338,6 @@ CChipTree operator&&(const CChipTree& a, const CChipTree& b){
 	cc.m_last_r = b.m_last_r;
 
 	return cc;
-}
-
-CChipTree operator&&(CChipCond& chip, const CChipTree& a){
-	return CChipTree::CondChip2Tree(&chip) && a;
-}
-
-CChipTree operator&&(const CChipTree& a, CChipCond& chip){
-	return a && CChipTree::CondChip2Tree(&chip);
-}
-
-CChipTree operator&&(CChipCond& a, CChipCond& b){
-	return CChipTree::CondChip2Tree(&a) && CChipTree::CondChip2Tree(&b);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -719,12 +702,59 @@ static void option(UINT param, LastLocationArg){
 }
 
 //////////////////////////////////////////////////////////////////////////////
+
+class CChipCond : public CChip {
+public:
+	static constexpr int OP_GE		= 0;
+	static constexpr int OP_LE		= 1;
+	
+	virtual ~CChipCond(){}
+	
+	virtual void set_num(int num){}
+	virtual void set_operator(int opr){}
+	
+	CChipTree operator>=(int num){
+		set_num(num);
+		set_operator(OP_GE);
+		return CChipTree::CondChip2Tree(this);
+	}
+
+	CChipTree operator>(int num){
+		set_num(num + 1);
+		set_operator(OP_GE);
+		return CChipTree::CondChip2Tree(this);
+	}
+
+	CChipTree operator<=(int num){
+		set_num(num);
+		set_operator(OP_LE);
+		return CChipTree::CondChip2Tree(this);
+	}
+
+	CChipTree operator<(int num){
+		set_num(num - 1);
+		set_operator(OP_LE);
+		return CChipTree::CondChip2Tree(this);
+	}
+};
+
+CChipTree operator&&(CChipCond& chip, const CChipTree& a){
+	return CChipTree::CondChip2Tree(&chip) && a;
+}
+
+CChipTree operator&&(const CChipTree& a, CChipCond& chip){
+	return a && CChipTree::CondChip2Tree(&chip);
+}
+
+CChipTree operator&&(CChipCond& a, CChipCond& b){
+	return CChipTree::CondChip2Tree(&a) && CChipTree::CondChip2Tree(&b);
+}
+
+//////////////////////////////////////////////////////////////////////////////
 // 近くの OKE を探索
 
 class CChipOkeNum : public CChipCond {
 public:
-	static constexpr int OP_GE		= 0;
-	static constexpr int OP_LE		= 1;
 	static constexpr int ENEMY		= 0;
 	static constexpr int FRIENDLY	= 1;
 
@@ -750,31 +780,10 @@ public:
 		m_num			= 1;
 		m_id			= CHIPID_DET_OKE;
 	}
-
-	CChipTree operator>=(int num){
-		m_num = num;
-		m_operator = OP_GE;
-		return CChipTree::CondChip2Tree(this);
-	}
-
-	CChipTree operator>(int num){
-		m_num = num + 1;
-		m_operator = OP_GE;
-		return CChipTree::CondChip2Tree(this);
-	}
-
-	CChipTree operator<=(int num){
-		m_num = num;
-		m_operator = OP_LE;
-		return CChipTree::CondChip2Tree(this);
-	}
-
-	CChipTree operator<(int num){
-		m_num = num - 1;
-		m_operator = OP_LE;
-		return CChipTree::CondChip2Tree(this);
-	}
-
+	
+	virtual void set_num(int num){m_num = num;}
+	virtual void set_operator(int opr){m_operator = opr;}
+	
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
