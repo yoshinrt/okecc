@@ -1187,43 +1187,76 @@ UINT CarnageSA::find_join_node(UINT start_idx, const std::vector<int>& dists) {
 double CarnageSA::calculate_energy() {
     double energy = 0.0;
     const int n = (int)state.size();
-    const int LIMIT = 15;
+    
+    // グリッドサイズを取得
+    const int width = pool.m_width;
+    const int height = pool.m_height;
 
     const double PENALTY_BASE_OUT = 20000.0;
+    const double PENALTY_CONSTRAINT = 15000.0; // 制約違反（START/EXIT）
     const double PENALTY_OVERLAP = 10000.0;
-    const double PENALTY_THROUGH_CHIP = 1000.0;
     const double COST_DISTANCE = 1.0;
 
     for (int i = 0; i < n; ++i) {
-        // 削除済みチップはスキップ
         if (state[i].x == POS_INVALID) continue;
 
-        // 1. 枠外ペナルティ
-        int dx = 0, dy = 0;
-        if (state[i].x < 0) dx = -state[i].x;
-        else if (state[i].x >= LIMIT) dx = state[i].x - (LIMIT - 1);
-        if (state[i].y < 0) dy = -state[i].y;
-        else if (state[i].y >= LIMIT) dy = state[i].y - (LIMIT - 1);
+        // --- 1. 枠外判定 & 基本配置制約 ---
+        int x = state[i].x;
+        int y = state[i].y;
 
-        if (dx > 0 || dy > 0) {
+        // 通常の枠外ペナルティ
+        if (x < 0 || x >= width || y < 0 || y >= height) {
+            int dx = (x < 0) ? -x : (x >= width ? x - (width - 1) : 0);
+            int dy = (y < 0) ? -y : (y >= height ? y - (height - 1) : 0);
             energy += PENALTY_BASE_OUT + (double)(dx * dx + dy * dy) * 5000.0;
         }
-        
-        // 3. 配線評価
+
+        // --- 2. STARTチップの制約 (Y=0でなければならない) ---
+        if ((UINT)i == pool.m_start) {
+            if (y != 0) {
+                energy += PENALTY_CONSTRAINT + (double)(y * y) * 2000.0;
+            }
+        }
+
+        // --- 3. 配線・EXIT制約の評価 ---
         auto evaluate_conn = [&](UINT next_idx) {
-            if (next_idx == IDX_EXIT || next_idx == IDX_NONE || next_idx >= (UINT)n) return;
-            // 接続先が削除済みの場合は計算しない
+            // EXITへの接続チェック
+            if (next_idx == IDX_EXIT) {
+                // EXITに繋がるチップは外枠(x=0, x=w-1, y=0, y=h-1)に接する必要がある
+                bool on_edge = (x == 0 || x == width - 1 || y == 0 || y == height - 1);
+                if (!on_edge) {
+                    // 外枠までの最短距離をペナルティに加算
+                    int dist_x = std::min(x, (width - 1) - x);
+                    int dist_y = std::min(y, (height - 1) - y);
+                    int edge_dist = std::min(dist_x, dist_y);
+                    energy += PENALTY_CONSTRAINT + (double)(edge_dist * edge_dist) * 2000.0;
+                }
+                return;
+            }
+
+            if (next_idx == IDX_NONE || next_idx >= (UINT)n) return;
             if (state[next_idx].x == POS_INVALID) return;
 
-            int x1 = state[i].x, y1 = state[i].y;
-            int x2 = state[next_idx].x, y2 = state[next_idx].y;
-            
-            energy += (abs(x1 - x2) + abs(y1 - y2)) * COST_DISTANCE;
+            // 通常の配線距離コスト
+            int x2 = state[next_idx].x;
+            int y2 = state[next_idx].y;
+            energy += (abs(x - x2) + abs(y - y2)) * COST_DISTANCE;
         };
 
         evaluate_conn(pool.m_list[i]->m_next_g);
-        if (pool.m_list[i]->valid_r()) evaluate_conn(pool.m_list[i]->m_next_r);
+        if (pool.m_list[i]->valid_r()) {
+            evaluate_conn(pool.m_list[i]->m_next_r);
+        }
+
+        // --- 4. 重なり判定 (既存ロジックがある場合) ---
+        for (int j = i + 1; j < n; ++j) {
+            if (state[j].x == POS_INVALID) continue;
+            if (state[i].x == state[j].x && state[i].y == state[j].y) {
+                energy += PENALTY_OVERLAP;
+            }
+        }
     }
+
     return energy;
 }
 
@@ -1613,7 +1646,7 @@ void CarnageSA::print_layout_svg(const char* filename) {
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void){
-	for(int i = 0; i < 1; ++i){
+	for(int i = 0; i < 10; ++i){
 		IF(enemy_num(0, 416, 160, OKE_ALL))
 			IF(enemy_num(0, 128, 320, OKE_HOVER) && friendly_num(0, 128, 320, OKE_ALL))
 				turn_right();
