@@ -215,6 +215,19 @@ public:
 
 		return dst;
 	}
+	
+	void dump(void){
+		for(UINT u = 0; u < m_list.size(); ++u){
+			if(m_list[u]){
+				printf("ID:%d: type:%d g:%d r:%d\n",
+					u,
+					m_list[u]->m_id.get(),
+					m_list[u]->m_next_g,
+					m_list[u]->m_next_r
+				);
+			}
+		}
+	}
 };
 
 CChipPool	g_ChipPool(15, 15);
@@ -858,6 +871,20 @@ void endif_statement(
 #define ENDIF	endif_statement();
 
 //////////////////////////////////////////////////////////////////////////////
+// end
+
+static void end(LastLocationArg){
+	LastLocation();
+	
+	// Goto chip * 2 を置き，1個目を Exit に向ける
+	CChip *p;
+	g_pCurTree->add((p = new CChipGoto()));
+	g_pCurTree->add(new CChipGoto());
+	
+	p->m_next_g = IDX_EXIT;
+}
+
+//////////////////////////////////////////////////////////////////////////////
 // 焼きなまし法
 
 struct Pos {
@@ -1121,8 +1148,7 @@ void CarnageSA::initialize() {
             }
 
             UINT join_node = find_join_node(task.target);
-            if (join_node == IDX_NONE) continue;
-
+ 
             int bx = state[task.parent].x + 1;
             
             // move_up の決定: 垂直衝突があれば上へ、なければランダム
@@ -1138,23 +1164,25 @@ void CarnageSA::initialize() {
             // 他のチップを押し出す
             shift_y_range(state, target_y, move_up ? -1 : 1);
 
-            int target_bx = state[join_node].x - 1;
-            int path_len = count_path_chips(task.target, join_node);
+ 			if (join_node != IDX_NONE) {	// IDX_NONE は，そのまま exit して合流点がないことを意味する
+				int target_bx = state[join_node].x - 1;
+				int path_len = count_path_chips(task.target, join_node);
 
-            if (path_len == 0) {
-                // 即時合流(0 chip): コの字迂回 GoTo 生成
-                UINT g1 = add_goto_chip(bx, target_y);
-                UINT g2 = add_goto_chip(std::max(bx, target_bx), target_y);
-                modify_next(task.parent, task.target, g1);
-                pool.m_list[g1]->m_next_g = g2;
-                pool.m_list[g2]->m_next_g = join_node;
-                continue; 
-            } else if (path_len == 1) {
-                // 1 chip: ターゲットチップ自体の配置後に GoTo で合流を補助
-                UINT g1 = add_goto_chip(std::max(bx + 1, target_bx), target_y);
-                pool.m_list[g1]->m_next_g = join_node;
-                modify_next(task.target, join_node, g1);
-            }
+				if (path_len == 0) {
+					// 即時合流(0 chip): コの字迂回 GoTo 生成
+					UINT g1 = add_goto_chip(bx, target_y);
+					UINT g2 = add_goto_chip(std::max(bx, target_bx), target_y);
+					modify_next(task.parent, task.target, g1);
+					pool.m_list[g1]->m_next_g = g2;
+					pool.m_list[g2]->m_next_g = join_node;
+					continue; 
+				} else if (path_len == 1) {
+					// 1 chip: ターゲットチップ自体の配置後に GoTo で合流を補助
+					UINT g1 = add_goto_chip(std::max(bx + 1, target_bx), target_y);
+					pool.m_list[g1]->m_next_g = join_node;
+					modify_next(task.target, join_node, g1);
+				}
+			}
 
             // 枝パスの再帰配置
             self(self, task.target, bx, target_y);
@@ -1406,7 +1434,7 @@ void CarnageSA::run() {
 
     double T = 5000.0;
     const double alpha = 0.999995;
-    const int iterations = 4000000;
+    const int iterations = 2000000;
 
     std::uniform_real_distribution<double> dist_u(0.0, 1.0);
     std::uniform_int_distribution<int> dist_rel(-1, 1);
@@ -1624,7 +1652,17 @@ void CarnageSA::print_layout_svg(const char* filename) {
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void){
-	for(int i = 0; i < 10; ++i){
+#if 0
+	IF(enemy_num(0, 416, 160, OKE_ALL))
+		jump_forward();
+		end();
+	ELSE
+		action1();
+	ENDIF
+#endif
+
+#if 1
+	for(int i = 0; i < 1; ++i){
 		IF(enemy_num(0, 416, 160, OKE_ALL))
 			IF(enemy_num(0, 128, 320, OKE_HOVER) && friendly_num(0, 128, 320, OKE_ALL))
 				turn_right();
@@ -1633,13 +1671,14 @@ void chip_main(void){
 				move_forward();
 			ENDIF
 			action1();
-		ELSE
+			end();
 		ENDIF
 		guard();
 		fire(0, 416, 160, OKE_HOVER, 1, 8);
 		fire(128, 20, 1, 8);
 		option(1);
 	}
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1656,6 +1695,7 @@ int main(void){
 	}
 
 	g_pCurTree->set_g(IDX_EXIT);
+	g_ChipPool.dump();
 
 	// Goto 飛び先解決
 	std::vector<UINT> IdxOld2New;
@@ -1682,18 +1722,8 @@ int main(void){
 	g_ChipPool.m_list.resize(IdxNew2Old.size());
 
 	printf("Number of chip(s): %d\n", (UINT)g_ChipPool.m_list.size());
-	for(UINT u = 0; u < g_ChipPool.m_list.size(); ++u){
-		if(g_ChipPool[u]){
-			printf("ID:%d: type:%d g:%d r:%d\n",
-				u,
-				g_ChipPool[u]->m_id.get(),
-				g_ChipPool[u]->m_next_g,
-				g_ChipPool[u]->m_next_r
-			);
-		}
-	}
-	//exit(0);
-
+	g_ChipPool.dump();
+	
 	CarnageSA sa(g_ChipPool);
 	sa.run();
 	sa.print_layout_svg("chip.svg");
