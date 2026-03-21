@@ -770,17 +770,67 @@ CChipTree operator&&(CChipCond& a, CChipCond& b){
 }
 
 //////////////////////////////////////////////////////////////////////////////
+
+class CChipVal {
+public:
+	enum {
+		WEAPON1,
+		WEAPON2,
+		WEAPON3,
+		WEAPON4,
+		WEAPON5,
+		HEAT,
+		FUEL,
+		DAMAGE,
+		TIME,
+		POS_X,
+		POS_Y,
+		POS_Z,
+	};
+	
+	CChipVal(UINT type) : m_type(type){}
+	
+	CChipCond& compare(int opr, int val);
+	CChipTree operator<=(int num);
+	CChipTree operator< (int num);
+	CChipTree operator>=(int num);
+	CChipTree operator> (int num);
+	
+	UINT m_type;
+};
+
+//////////////////////////////////////////////////////////////////////////////
+// 変数
+
+class CChipVar {
+public:
+	CChipVar(UINT var) : m_var(var){}
+	UINT m_var;
+	
+	CChipVar& operator=(const CChipVal& chip);
+};
+
+CChipVar A(0);
+CChipVar B(1);
+CChipVar C(2);
+CChipVar D(3);
+CChipVar E(4);
+CChipVar F(5);
+
+//////////////////////////////////////////////////////////////////////////////
 // 残弾
 
 class CChipAmmoNum : public CChipCond {
 public:
 	
 	CChipAmmoNum(
-		int weapon
+		int weapon,
+		int opr		= OP_GE,
+		int num		= 1
 	){
 		m_weapon	= weapon;
-		m_operator	= OP_GE;
-		m_num		= 1;
+		m_operator	= opr;
+		m_num		= num;
 		m_Id		= CHIPID_AMMO;
 	}
 	
@@ -803,13 +853,15 @@ public:
 	ScaledInt<1>		m_operator;
 };
 
-static CChipAmmoNum& ammo_num(
+/*
+static CChipAmmoNum ammo_num(
 	int weapon,
 	LastLocationArg
 ){
 	LastLocation();
-	return *(new CChipAmmoNum(weapon - 1));
+	return CChipVal(CChipVal::WEAPON1 + weapon - 1);
 }
+*/
 
 static CChipAmmoNum& option_num(
 	int weapon,
@@ -1010,40 +1062,9 @@ static CChipProjectileNum& projectile_num(
 }
 
 //////////////////////////////////////////////////////////////////////////////
-
-class CChipVal : public CChip {
-public:
-	~CChipVal(){}
-	
-	virtual void set_var(int var){}
-};
-
-//////////////////////////////////////////////////////////////////////////////
-// 変数
-
-class CCarnageVar {
-public:
-	CCarnageVar(UINT var) : m_var(var){}
-	UINT m_var;
-	
-	CCarnageVar& operator=(CChipVal& chip){
-		chip.set_var(this->m_var);
-		g_pCurTree->add(&chip);
-		return *this;
-	}
-};
-
-CCarnageVar A(0);
-CCarnageVar B(1);
-CCarnageVar C(2);
-CCarnageVar D(3);
-CCarnageVar E(4);
-CCarnageVar F(5);
-
-//////////////////////////////////////////////////////////////////////////////
 // カウンタに自機状態入力
 
-class CChipGetStatus : public CChipVal {
+class CChipGetStatus : public CChip {
 public:
 	
 	enum {
@@ -1053,12 +1074,10 @@ public:
 		AMMO,
 	};
 	
-	CChipGetStatus(
-		int param
-	){
-		m_param			= param;
-		m_var			= 0;
-		m_Id			= CHIPID_DET_BARRIER;
+	CChipGetStatus(int param, int var){
+		m_var	= var;
+		m_param	= param;
+		m_Id	= CHIPID_GET_STATUS;
 	}
 	
 	virtual ~CChipGetStatus(){}
@@ -1080,28 +1099,64 @@ public:
 	ScaledInt<3>			m_param;
 };
 
-static CChipGetStatus& projectile_num(
-	int param,
-	LastLocationArg
-){
-	LastLocation();
-	return *(new CChipGetStatus(param));
+//////////////////////////////////////////////////////////////////////////////
+// val 系
+
+CChipVal heat  (LastLocationArg){LastLocation(); return CChipVal(CChipVal::HEAT);}
+CChipVal fuel  (LastLocationArg){LastLocation(); return CChipVal(CChipVal::FUEL);}
+CChipVal damage(LastLocationArg){LastLocation(); return CChipVal(CChipVal::DAMAGE);}
+CChipVal time  (LastLocationArg){LastLocation(); return CChipVal(CChipVal::TIME);}
+CChipVal pos_x (LastLocationArg){LastLocation(); return CChipVal(CChipVal::POS_X);}
+CChipVal pos_y (LastLocationArg){LastLocation(); return CChipVal(CChipVal::POS_Y);}
+CChipVal pos_z (LastLocationArg){LastLocation(); return CChipVal(CChipVal::POS_Z);}
+
+CChipVal ammo_num(int weapon, LastLocationArg){
+	LastLocation(); return CChipVal(weapon - 1);
 }
 
-static CChipGetStatus& heat(LastLocationArg){
-	LastLocation();
-	return *(new CChipGetStatus(CChipGetStatus::HEAT));
+CChipVar& CChipVar::operator=(const CChipVal& val){
+	
+	CChip *p;
+	
+	switch(val.m_type){
+		case CChipVal::HEAT:	p = new CChipGetStatus(CChipGetStatus::HEAT, m_var); break;
+		case CChipVal::FUEL:	p = new CChipGetStatus(CChipGetStatus::FUEL, m_var); break;
+		case CChipVal::DAMAGE:	p = new CChipGetStatus(CChipGetStatus::DAMAGE, m_var); break;
+		case CChipVal::TIME:
+		case CChipVal::POS_X:
+		case CChipVal::POS_Y:
+		case CChipVal::POS_Z:
+		
+		default:				p = new CChipGetStatus(CChipGetStatus::AMMO + val.m_type, m_var); break;
+	}
+	
+	g_pCurTree->add(p);
+	return *this;
 }
 
-static CChipGetStatus& fuel(LastLocationArg){
-	LastLocation();
-	return *(new CChipGetStatus(CChipGetStatus::FUEL));
+CChipCond& CChipVal::compare(int opr, int val){
+	
+	CChipCond *p;
+	
+	switch(m_type){
+		case CChipVal::HEAT:	
+		case CChipVal::FUEL:	
+		case CChipVal::DAMAGE:	
+		case CChipVal::TIME:	
+		case CChipVal::POS_X:	
+		case CChipVal::POS_Y:	
+		case CChipVal::POS_Z:	
+		
+		default:				p = new CChipAmmoNum(m_type, opr, val); break;
+	}
+	
+	return *p;
 }
 
-static CChipGetStatus& damage(LastLocationArg){
-	LastLocation();
-	return *(new CChipGetStatus(CChipGetStatus::DAMAGE));
-}
+CChipTree CChipVal::operator<=(int num){return CChipTree::CondChip2Tree(&compare(CChipCond::OP_LE, num));}
+CChipTree CChipVal::operator< (int num){return CChipTree::CondChip2Tree(&compare(CChipCond::OP_LE, num + 1));}
+CChipTree CChipVal::operator>=(int num){return CChipTree::CondChip2Tree(&compare(CChipCond::OP_GE, num));}
+CChipTree CChipVal::operator> (int num){return CChipTree::CondChip2Tree(&compare(CChipCond::OP_GE, num - 1));}
 
 //////////////////////////////////////////////////////////////////////////////
 // if - else - endif
@@ -1131,6 +1186,13 @@ void if_statement(
 	LastLocationArg
 ){
 	if_statement(CChipTree::CondChip2Tree(&chip), location);
+}
+
+void if_statement(
+	CChipVal chip,
+	LastLocationArg
+){
+	if_statement(CChipTree::CondChip2Tree(&chip.compare(CChipCond::OP_GE, 1)), location);
 }
 
 void else_statement(
@@ -1987,6 +2049,12 @@ void chip_main(void){
 				ENDIF
 			ENDIF
 		ENDIF
+		IF(ammo_num(2) > 20)
+			B = ammo_num(2);
+		ENDIF
+		IF(ammo_num(1))
+			B = ammo_num(1);
+		ENDIF
 		C = heat();
 		A = damage();
 	}
@@ -2017,7 +2085,7 @@ int main(void){
 	//g_pCurChipPool->dump();
 	
 	CarnageSA sa(*g_pCurChipPool);
-	sa.run();
+	//sa.run();
 	sa.print_layout_svg("chip.svg");
 
 	return 0;
