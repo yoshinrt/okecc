@@ -46,10 +46,6 @@ enum {
 	P_HI_V
 };
 
-const char *ProjectileTypeStr[] = {
-	"危険物", "弾丸", "ミサイル", "ビーム", "ロケット", "地雷", "機雷", "高速"
-};
-
 enum {
 	CHIPID_NULL,
 	CHIPID_NOP,
@@ -150,7 +146,7 @@ private:
 class CChip {
 public:
 	CChip(){
-		m_id		= CHIPID_NULL;
+		m_Id		= CHIPID_NULL;
 	}
 
 	virtual ~CChip(){}
@@ -159,15 +155,15 @@ public:
 		return "";
 	}
 	
-	bool valid_r(void){return m_next_r < IDX_EXIT;}
-	bool valid_g(void){return m_next_g < IDX_EXIT;}
+	bool ValidG(void){return m_NextG < IDX_EXIT;}
+	bool ValidR(void){return m_NextR < IDX_EXIT;}
 
-	ScaledInt<6>	m_id;
-	ScaledInt<3>	m_raw_g;
-	ScaledInt<3>	m_raw_r;
+	ScaledInt<6>	m_Id;
+	ScaledInt<3>	m_RawG;
+	ScaledInt<3>	m_RawR;
 
-	UINT			m_next_g = IDX_NONE;
-	UINT			m_next_r = IDX_NONE;
+	UINT			m_NextG = IDX_NONE;
+	UINT			m_NextR = IDX_NONE;
 };
 
 //////////////////////////////////////////////////////////////////////////////
@@ -176,7 +172,7 @@ public:
 class CChipGoto : public CChip {
 public:
 	CChipGoto(){
-		m_id = CHIPID_GOTO;
+		m_Id = CHIPID_GOTO;
 	}
 
 	virtual ~CChipGoto(){}
@@ -214,12 +210,12 @@ public:
 		UINT dst = idx;
 
 		// 最終地点を取得
-		while(dst < m_list.size() && m_list[dst]->m_id.get() == CHIPID_GOTO) dst = m_list[dst]->m_next_g;
+		while(dst < m_list.size() && m_list[dst]->m_Id.get() == CHIPID_GOTO) dst = m_list[dst]->m_NextG;
 
 		// 最終地点までの Goto はすべて最終地点を指す
 		while(idx != dst){
-			UINT next = m_list[idx]->m_next_g;
-			m_list[idx]->m_next_g = dst;
+			UINT next = m_list[idx]->m_NextG;
+			m_list[idx]->m_NextG = dst;
 			idx = next;
 		}
 
@@ -232,9 +228,9 @@ public:
 		std::vector<UINT> IdxNew2Old;
 		
 		for(UINT u = 0; u < m_list.size(); ++u){
-			if(m_list[u]->m_id.get() != CHIPID_GOTO){
-				m_list[u]->m_next_r = GetFinalDst(m_list[u]->m_next_r);
-				m_list[u]->m_next_g = GetFinalDst(m_list[u]->m_next_g);
+			if(m_list[u]->m_Id.get() != CHIPID_GOTO){
+				m_list[u]->m_NextR = GetFinalDst(m_list[u]->m_NextR);
+				m_list[u]->m_NextG = GetFinalDst(m_list[u]->m_NextG);
 				IdxNew2Old.push_back(u);
 			}else{
 				delete m_list[u];
@@ -245,8 +241,8 @@ public:
 		//Goto 削除
 		for(UINT u = 0; u < IdxNew2Old.size(); ++u){
 			m_list[u] = m_list[IdxNew2Old[u]];
-			if(m_list[u]->valid_g()) m_list[u]->m_next_g = IdxOld2New[m_list[u]->m_next_g];
-			if(m_list[u]->valid_r()) m_list[u]->m_next_r = IdxOld2New[m_list[u]->m_next_r];
+			if(m_list[u]->ValidG()) m_list[u]->m_NextG = IdxOld2New[m_list[u]->m_NextG];
+			if(m_list[u]->ValidR()) m_list[u]->m_NextR = IdxOld2New[m_list[u]->m_NextR];
 		}
 		m_start = IdxOld2New[m_start];
 		m_list.resize(IdxNew2Old.size());
@@ -257,9 +253,9 @@ public:
 			if(m_list[u]){
 				printf("ID:%d: type:%d g:%d r:%d\n",
 					u,
-					m_list[u]->m_id.get(),
-					m_list[u]->m_next_g,
-					m_list[u]->m_next_r
+					m_list[u]->m_Id.get(),
+					m_list[u]->m_NextG,
+					m_list[u]->m_NextR
 				);
 			}
 		}
@@ -275,32 +271,32 @@ class CChipTree {
 public:
 
 	UINT m_start	= IDX_NONE;	// 開始 chip
-	UINT m_last_g	= IDX_NONE;	// 最後の緑矢印を出している chip
-	UINT m_last_r	= IDX_NONE; // 最後の赤矢印を出している chip
+	UINT m_LastG	= IDX_NONE;	// 最後の緑矢印を出している chip
+	UINT m_LastR	= IDX_NONE; // 最後の赤矢印を出している chip
 
 	// g, r を update
 	void set_g(UINT idx){
 		if(m_start == IDX_NONE) m_start = idx;
-		if(valid_g()) (*g_pCurChipPool)[m_last_g]->m_next_g = idx;
-		m_last_g = idx;
+		if(ValidG()) (*g_pCurChipPool)[m_LastG]->m_NextG = idx;
+		m_LastG = idx;
 	}
 
 	void set_r(UINT idx){
 		if(m_start == IDX_NONE) m_start = idx;
-		if(valid_r()) (*g_pCurChipPool)[m_last_r]->m_next_r = idx;
-		m_last_r = idx;
+		if(ValidR()) (*g_pCurChipPool)[m_LastR]->m_NextR = idx;
+		m_LastR = idx;
 	}
 
 	bool valid_start(void) const {return m_start  < IDX_EXIT;}
-	bool valid_g    (void) const {return m_last_g < IDX_EXIT;}
-	bool valid_r    (void) const {return m_last_r < IDX_EXIT;}
+	bool ValidG    (void) const {return m_LastG < IDX_EXIT;}
+	bool ValidR    (void) const {return m_LastR < IDX_EXIT;}
 
 	// チップ単体からツリーに変換
 	static CChipTree Chip2Tree(CChip *pchip){
 		CChipTree tree;
 
 		tree.m_start =
-		tree.m_last_g = g_pCurChipPool->add(pchip);
+		tree.m_LastG = g_pCurChipPool->add(pchip);
 
 		return tree;
 	}
@@ -310,8 +306,8 @@ public:
 		CChipTree tree;
 
 		tree.m_start =
-		tree.m_last_g =
-		tree.m_last_r = g_pCurChipPool->add(pchip);
+		tree.m_LastG =
+		tree.m_LastR = g_pCurChipPool->add(pchip);
 
 		return tree;
 	}
@@ -321,11 +317,11 @@ public:
 		UINT idx = g_pCurChipPool->add(pchip);		// チップ追加
 
 		if(valid_start()){
-			(*g_pCurChipPool)[m_last_g]->m_next_g = idx;	// リスト後端に追加したチップをつなげる
+			(*g_pCurChipPool)[m_LastG]->m_NextG = idx;	// リスト後端に追加したチップをつなげる
 		}else{
 			m_start = idx;
 		}
-		m_last_g = idx;
+		m_LastG = idx;
 
 		return *this;
 	}
@@ -337,7 +333,7 @@ CChipTree operator&&(const CChipTree& a, const CChipTree& b){
 	CChipTree cc = a;
 
 	// condition な tree か判定
-	if(!cc.valid_r() || !b.valid_r()){
+	if(!cc.ValidR() || !b.ValidR()){
 		throw OkeccError("Invalid use of && operator: Condition chip expected.");
 	}
 
@@ -347,10 +343,10 @@ CChipTree operator&&(const CChipTree& a, const CChipTree& b){
 	// False 側: GOTO を生成し this.g, b.g, tree.g はそれを指す
 	UINT idx = g_pCurChipPool->add(new CChipGoto);
 	cc.set_g(idx);
-	(*g_pCurChipPool)[b.m_last_g]->m_next_g = idx;
+	(*g_pCurChipPool)[b.m_LastG]->m_NextG = idx;
 
 	// True 側: tree.r は b.r になる
-	cc.m_last_r = b.m_last_r;
+	cc.m_LastR = b.m_LastR;
 
 	return cc;
 }
@@ -363,7 +359,7 @@ static constexpr UINT NOP_AE = 62;
 class CChipNop : public CChip {
 public:
 	CChipNop(UINT param){
-		m_id	= CHIPID_NOP;
+		m_Id	= CHIPID_NOP;
 		m_param	= param;
 	}
 
@@ -404,7 +400,7 @@ public:
 	};
 
 	CChipMove(UINT param){
-		m_id	= CHIPID_MOVE;
+		m_Id	= CHIPID_MOVE;
 		m_param	= param;
 	}
 
@@ -443,7 +439,7 @@ public:
 	};
 
 	CChipTurn(UINT param){
-		m_id	= CHIPID_TURN;
+		m_Id	= CHIPID_TURN;
 		m_param	= param;
 	}
 
@@ -476,7 +472,7 @@ public:
 	};
 
 	CChipJump(UINT param){
-		m_id	= CHIPID_JUMP;
+		m_Id	= CHIPID_JUMP;
 		m_param	= param;
 	}
 
@@ -516,7 +512,7 @@ public:
 	};
 
 	CChipAction(UINT param){
-		m_id	= CHIPID_ACTION;
+		m_Id	= CHIPID_ACTION;
 		m_param	= param;
 	}
 
@@ -557,7 +553,7 @@ public:
 	};
 
 	CChipAlt(UINT param){
-		m_id	= CHIPID_ALTITUDE;
+		m_Id	= CHIPID_ALTITUDE;
 		m_param	= param;
 	}
 
@@ -593,7 +589,7 @@ public:
 		int weapon,
 		int cnt
 	){
-		m_id			= CHIPID_FIRE_NEAREST;
+		m_Id			= CHIPID_FIRE_NEAREST;
 		m_angleCenter	= angleCenter;
 		m_angleRange	= angleRange;
 		m_distance		= distance;
@@ -651,7 +647,7 @@ public:
 		int weapon,
 		int cnt
 	){
-		m_id		= CHIPID_FIRE_FIXED_DIR;
+		m_Id		= CHIPID_FIRE_FIXED_DIR;
 		m_direction	= direction;
 		m_elevation	= elevation;
 		m_weapon	= weapon;
@@ -698,7 +694,7 @@ static void fire(
 class CChipOption : public CChip {
 public:
 	CChipOption(UINT param){
-		m_id	= CHIPID_OPTION;
+		m_Id	= CHIPID_OPTION;
 		m_param	= param;
 	}
 
@@ -785,7 +781,7 @@ public:
 		m_weapon	= weapon;
 		m_operator	= OP_GE;
 		m_num		= 1;
-		m_id		= CHIPID_AMMO;
+		m_Id		= CHIPID_AMMO;
 	}
 	
 	virtual ~CChipAmmoNum(){}
@@ -845,7 +841,7 @@ public:
 		m_enemy			= enemy;
 		m_operator		= OP_GE;
 		m_num			= 1;
-		m_id			= CHIPID_DET_OKE;
+		m_Id			= CHIPID_DET_OKE;
 	}
 	
 	virtual ~CChipOkeNum(){}
@@ -920,7 +916,7 @@ public:
 		m_distance		= distance;
 		m_operator		= OP_GE;
 		m_num			= 3;
-		m_id			= CHIPID_DET_BARRIER;
+		m_Id			= CHIPID_DET_BARRIER;
 	}
 	
 	virtual ~CChipBarrier(){}
@@ -960,7 +956,10 @@ static CChipBarrier& barrier_height(
 
 class CChipProjectileNum : public CChipCond {
 public:
-
+	static inline const char *m_ProjectileTypeStr[] = {
+		"危険物", "弾丸", "ミサイル", "ビーム", "ロケット", "地雷", "機雷", "高速"
+	};
+	
 	CChipProjectileNum(
 		int angleCenter,
 		int angleRange,
@@ -973,7 +972,7 @@ public:
 		m_type			= type;
 		m_operator		= OP_GE;
 		m_num			= 3;
-		m_id			= CHIPID_DET_BARRIER;
+		m_Id			= CHIPID_DET_BARRIER;
 	}
 	
 	virtual ~CChipProjectileNum(){}
@@ -985,7 +984,7 @@ public:
 		return
 			std::format(
 				"{} {}m\n{}{}?\n{},{}",
-				ProjectileTypeStr[m_type.get()], m_distance.get(),
+				m_ProjectileTypeStr[m_type.get()], m_distance.get(),
 				m_operator_str[m_operator.get()], m_num.get(),
 				m_angleCenter.get(), m_angleRange.get()
 			);
@@ -1059,7 +1058,7 @@ public:
 	){
 		m_param			= param;
 		m_var			= 0;
-		m_id			= CHIPID_DET_BARRIER;
+		m_Id			= CHIPID_DET_BARRIER;
 	}
 	
 	virtual ~CChipGetStatus(){}
@@ -1121,10 +1120,10 @@ void if_statement(
 	// cc.r を GOTO に変換
 	UINT idx = g_pCurChipPool->add(new CChipGoto);
 	cc.set_r(idx);
-	g_pCurTree->m_last_g = idx;
+	g_pCurTree->m_LastG = idx;
 
 	// false 飛び先を push
-	g_BlockStack.push_back(cc.m_last_g);
+	g_BlockStack.push_back(cc.m_LastG);
 }
 
 void if_statement(
@@ -1143,10 +1142,10 @@ void else_statement(
 		throw OkeccError("Unexpected ENDIF");
 	}
 
-	UINT idx = g_pCurTree->m_last_g;	// then 節の最後
+	UINT idx = g_pCurTree->m_LastG;	// then 節の最後
 
 	// else 節先頭は，BlockStack に積んでいた false 飛び先
-	g_pCurTree->m_last_g = g_BlockStack.back(); g_BlockStack.pop_back();
+	g_pCurTree->m_LastG = g_BlockStack.back(); g_BlockStack.pop_back();
 
 	// then 節の最後を block statck に積む
 	g_BlockStack.push_back(idx);
@@ -1167,7 +1166,7 @@ void endif_statement(
 
 	// false 条件の飛び先合流
 	UINT idx = g_BlockStack.back(); g_BlockStack.pop_back();
-	(*g_pCurChipPool)[idx]->m_next_g = merge;
+	(*g_pCurChipPool)[idx]->m_NextG = merge;
 }
 
 #define IF(cc)	if_statement(cc);
@@ -1185,7 +1184,7 @@ static void end(LastLocationArg){
 	g_pCurTree->add((p = new CChipGoto()));
 	g_pCurTree->add(new CChipGoto());
 	
-	p->m_next_g = IDX_EXIT;
+	p->m_NextG = IDX_EXIT;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1276,8 +1275,8 @@ std::vector<int> CarnageSA::calculate_max_distances() {
 
     // 1. 初期状態：EXIT に直接つながっているチップの距離を 1 とする
     for (int i = 0; i < num_chips; ++i) {
-        if (pool[i]->m_next_g == IDX_EXIT || 
-           (pool[i]->valid_r() && pool[i]->m_next_r == IDX_EXIT)) {
+        if (pool[i]->m_NextG == IDX_EXIT || 
+           (pool[i]->ValidR() && pool[i]->m_NextR == IDX_EXIT)) {
             dists[i] = 1;
         }
     }
@@ -1296,9 +1295,9 @@ std::vector<int> CarnageSA::calculate_max_distances() {
                 }
             };
 
-            update(pool[i]->m_next_g);
-            if (pool[i]->valid_r()) {
-                update(pool[i]->m_next_r);
+            update(pool[i]->m_NextG);
+            if (pool[i]->ValidR()) {
+                update(pool[i]->m_NextR);
             }
         }
         // 更新がなくなれば、すべての最短ではない「最長パス」が確定したことになる
@@ -1325,8 +1324,8 @@ void CarnageSA::initialize() {
     auto calculate_max_distances = [&]() {
         std::vector<int> dists(original_num_chips, -1);
         for (int i = 0; i < original_num_chips; ++i) {
-            if (pool.m_list[i]->m_next_g == IDX_EXIT || 
-               (pool.m_list[i]->valid_r() && pool.m_list[i]->m_next_r == IDX_EXIT)) {
+            if (pool.m_list[i]->m_NextG == IDX_EXIT || 
+               (pool.m_list[i]->ValidR() && pool.m_list[i]->m_NextR == IDX_EXIT)) {
                 dists[i] = 1;
             }
         }
@@ -1341,8 +1340,8 @@ void CarnageSA::initialize() {
                         }
                     }
                 };
-                update(i, pool.m_list[i]->m_next_g);
-                if (pool.m_list[i]->valid_r()) update(i, pool.m_list[i]->m_next_r);
+                update(i, pool.m_list[i]->m_NextG);
+                if (pool.m_list[i]->ValidR()) update(i, pool.m_list[i]->m_NextR);
             }
             if (!changed) break;
         }
@@ -1359,8 +1358,8 @@ void CarnageSA::initialize() {
     auto modify_next = [&](UINT from, UINT old_to, UINT new_to) {
         if (from >= (UINT)pool.m_list.size()) return;
         CChip* f = pool.m_list[from];
-        if (f->m_next_g == old_to) f->m_next_g = new_to;
-        else if (f->valid_r() && f->m_next_r == old_to) f->m_next_r = new_to;
+        if (f->m_NextG == old_to) f->m_NextG = new_to;
+        else if (f->ValidR() && f->m_NextR == old_to) f->m_NextR = new_to;
     };
 
     auto add_goto_chip = [&](int x, int y) -> UINT {
@@ -1374,10 +1373,10 @@ void CarnageSA::initialize() {
         UINT curr = start_idx;
         while (curr != IDX_EXIT && curr != IDX_NONE) {
             if (curr < (UINT)state.size() && state[curr].x != INT_MAX) return curr;
-            bool has_r = (curr < (UINT)original_num_chips) ? pool.m_list[curr]->valid_r() : false;
-            int dg = (curr < (UINT)original_num_chips) ? get_d(pool.m_list[curr]->m_next_g) : -100;
-            int dr = (curr < (UINT)original_num_chips && has_r) ? get_d(pool.m_list[curr]->m_next_r) : -100;
-            curr = (dg >= dr) ? pool.m_list[curr]->m_next_g : pool.m_list[curr]->m_next_r;
+            bool has_r = (curr < (UINT)original_num_chips) ? pool.m_list[curr]->ValidR() : false;
+            int dg = (curr < (UINT)original_num_chips) ? get_d(pool.m_list[curr]->m_NextG) : -100;
+            int dr = (curr < (UINT)original_num_chips && has_r) ? get_d(pool.m_list[curr]->m_NextR) : -100;
+            curr = (dg >= dr) ? pool.m_list[curr]->m_NextG : pool.m_list[curr]->m_NextR;
         }
         return IDX_NONE;
     };
@@ -1388,10 +1387,10 @@ void CarnageSA::initialize() {
         UINT curr = start;
         while (curr != goal && curr != IDX_EXIT && curr != IDX_NONE && count < 256) {
             count++;
-            bool has_r = (curr < (UINT)original_num_chips) ? pool.m_list[curr]->valid_r() : false;
-            int dg = (curr < (UINT)original_num_chips) ? get_d(pool.m_list[curr]->m_next_g) : -100;
-            int dr = (curr < (UINT)original_num_chips && has_r) ? get_d(pool.m_list[curr]->m_next_r) : -100;
-            curr = (dg >= dr) ? pool.m_list[curr]->m_next_g : pool.m_list[curr]->m_next_r;
+            bool has_r = (curr < (UINT)original_num_chips) ? pool.m_list[curr]->ValidR() : false;
+            int dg = (curr < (UINT)original_num_chips) ? get_d(pool.m_list[curr]->m_NextG) : -100;
+            int dr = (curr < (UINT)original_num_chips && has_r) ? get_d(pool.m_list[curr]->m_NextR) : -100;
+            curr = (dg >= dr) ? pool.m_list[curr]->m_NextG : pool.m_list[curr]->m_NextR;
         }
         return count;
     };
@@ -1419,26 +1418,26 @@ void CarnageSA::initialize() {
             UINT next_node = IDX_NONE;
             if (curr < (UINT)original_num_chips) {
                 CChip* chip = pool.m_list[curr];
-                if (chip->valid_r()) {
-                    int dg = get_d(chip->m_next_g);
-                    int dr = get_d(chip->m_next_r);
+                if (chip->ValidR()) {
+                    int dg = get_d(chip->m_NextG);
+                    int dr = get_d(chip->m_NextR);
                     UINT other;
                     if (dg >= dr) {
-                        next_node = chip->m_next_g;
-                        other = chip->m_next_r;
+                        next_node = chip->m_NextG;
+                        other = chip->m_NextR;
                     } else {
-                        next_node = chip->m_next_r;
-                        other = chip->m_next_g;
+                        next_node = chip->m_NextR;
+                        other = chip->m_NextG;
                     }
                     if (other != IDX_EXIT && other != IDX_NONE) {
                         // 未処理の分岐として保存
                         pending_tasks.push_back({curr, other});
                     }
                 } else {
-                    next_node = chip->m_next_g;
+                    next_node = chip->m_NextG;
                 }
             } else {
-                next_node = pool.m_list[curr]->m_next_g;
+                next_node = pool.m_list[curr]->m_NextG;
             }
             curr = next_node;
             cur_x++;
@@ -1477,13 +1476,13 @@ void CarnageSA::initialize() {
 					UINT g1 = add_goto_chip(bx, target_y);
 					UINT g2 = add_goto_chip(std::max(bx, target_bx), target_y);
 					modify_next(task.parent, task.target, g1);
-					pool.m_list[g1]->m_next_g = g2;
-					pool.m_list[g2]->m_next_g = join_node;
+					pool.m_list[g1]->m_NextG = g2;
+					pool.m_list[g2]->m_NextG = join_node;
 					continue; 
 				} else if (path_len == 1) {
 					// 1 chip: ターゲットチップ自体の配置後に GoTo で合流を補助
 					UINT g1 = add_goto_chip(std::max(bx + 1, target_bx), target_y);
-					pool.m_list[g1]->m_next_g = join_node;
+					pool.m_list[g1]->m_NextG = join_node;
 					modify_next(task.target, join_node, g1);
 				}
 			}
@@ -1505,13 +1504,13 @@ UINT CarnageSA::find_join_node(UINT start_idx, const std::vector<int>& dists) {
     while (curr != IDX_EXIT && curr != IDX_NONE) {
         if (state[curr].x != INT_MAX) return curr; // 合流点発見
 
-        bool has_r = pool[curr]->valid_r();
-        int d_g = (pool[curr]->m_next_g == IDX_EXIT) ? 0 : 
-                  (pool[curr]->m_next_g < (UINT)num_chips ? dists[pool[curr]->m_next_g] : -100);
-        int d_r = has_r ? ((pool[curr]->m_next_r == IDX_EXIT) ? 0 : 
-                  (pool[curr]->m_next_r < (UINT)num_chips ? dists[pool[curr]->m_next_r] : -100)) : -100;
+        bool has_r = pool[curr]->ValidR();
+        int d_g = (pool[curr]->m_NextG == IDX_EXIT) ? 0 : 
+                  (pool[curr]->m_NextG < (UINT)num_chips ? dists[pool[curr]->m_NextG] : -100);
+        int d_r = has_r ? ((pool[curr]->m_NextR == IDX_EXIT) ? 0 : 
+                  (pool[curr]->m_NextR < (UINT)num_chips ? dists[pool[curr]->m_NextR] : -100)) : -100;
 
-        curr = (d_g >= d_r) ? pool[curr]->m_next_g : pool[curr]->m_next_r;
+        curr = (d_g >= d_r) ? pool[curr]->m_NextG : pool[curr]->m_NextR;
     }
     return IDX_NONE;
 }
@@ -1575,9 +1574,9 @@ double CarnageSA::calculate_energy() {
             energy += (std::max(std::abs(x - x2), std::abs(y - y2)) - 1) * COST_DISTANCE;
         };
 
-        evaluate_conn(pool.m_list[i]->m_next_g);
-        if (pool.m_list[i]->valid_r()) {
-            evaluate_conn(pool.m_list[i]->m_next_r);
+        evaluate_conn(pool.m_list[i]->m_NextG);
+        if (pool.m_list[i]->ValidR()) {
+            evaluate_conn(pool.m_list[i]->m_NextR);
         }
 
         // --- 4. 重なり判定 (既存ロジックがある場合) ---
@@ -1654,8 +1653,8 @@ bool CarnageSA::is_invalid_layout(const std::vector<Pos>& current_state) {
             }
         };
         if(state[i].x != POS_INVALID){
-	        add_edge(pool.m_list[i]->m_next_g);
-	        if (pool.m_list[i]->valid_r()) add_edge(pool.m_list[i]->m_next_r);
+	        add_edge(pool.m_list[i]->m_NextG);
+	        if (pool.m_list[i]->ValidR()) add_edge(pool.m_list[i]->m_NextR);
 	    }
     }
 
@@ -1682,7 +1681,7 @@ bool CarnageSA::cleanup_gotos() {
     bool total_changed = false;
 
     for (int target = 0; target < (int)pool.m_list.size(); ++target) {
-        if (!pool[target] || pool[target]->m_id.get() != CHIPID_GOTO) continue;
+        if (!pool[target] || pool[target]->m_Id.get() != CHIPID_GOTO) continue;
         if (state[target].x == POS_INVALID) continue;
 
         // 1. このGotoを指している全ての親（接続元）を特定
@@ -1690,8 +1689,8 @@ bool CarnageSA::cleanup_gotos() {
         std::vector<Connection> parents;
         for (int i = 0; i < (int)pool.m_list.size(); ++i) {
             if (!pool[i] || state[i].x == POS_INVALID) continue;
-            if (pool[i]->m_next_g == (UINT)target) parents.push_back({i, false});
-            if (pool[i]->valid_r() && pool[i]->m_next_r == (UINT)target) parents.push_back({i, true});
+            if (pool[i]->m_NextG == (UINT)target) parents.push_back({i, false});
+            if (pool[i]->ValidR() && pool[i]->m_NextR == (UINT)target) parents.push_back({i, true});
         }
 
         if (parents.empty()) {
@@ -1701,17 +1700,17 @@ bool CarnageSA::cleanup_gotos() {
         }
 
         // 2. バックアップ
-        UINT next_of_goto = pool[target]->m_next_g;
+        UINT next_of_goto = pool[target]->m_NextG;
         Pos original_goto_pos = state[target];
         std::vector<UINT> original_conns;
         for(auto& p : parents) {
-            original_conns.push_back(p.is_r ? pool[p.idx]->m_next_r : pool[p.idx]->m_next_g);
+            original_conns.push_back(p.is_r ? pool[p.idx]->m_NextR : pool[p.idx]->m_NextG);
         }
         
         // 3. 全ての親をバイパス先に繋ぎ変え、Gotoを削除
         for (auto& p : parents) {
-            if (p.is_r) pool[p.idx]->m_next_r = next_of_goto;
-            else        pool[p.idx]->m_next_g = next_of_goto;
+            if (p.is_r) pool[p.idx]->m_NextR = next_of_goto;
+            else        pool[p.idx]->m_NextG = next_of_goto;
         }
         state[target] = { POS_INVALID, POS_INVALID };
 
@@ -1719,8 +1718,8 @@ bool CarnageSA::cleanup_gotos() {
         if (is_invalid_layout(state)) {
             // ロールバック
             for (size_t k = 0; k < parents.size(); ++k) {
-                if (parents[k].is_r) pool[parents[k].idx]->m_next_r = original_conns[k];
-                else                 pool[parents[k].idx]->m_next_g = original_conns[k];
+                if (parents[k].is_r) pool[parents[k].idx]->m_NextR = original_conns[k];
+                else                 pool[parents[k].idx]->m_NextG = original_conns[k];
             }
             state[target] = original_goto_pos;
         } else {
@@ -1882,7 +1881,7 @@ void CarnageSA::print_layout_svg(const char* filename) {
         int centerX = x + CHIP_SIZE / 2;
 
         // goto チップは薄いグレー背景、それ以外は白
-        const char* fill_color = (pool.m_list[i]->m_id.get() == CHIPID_GOTO) ? "#e9ecef" : "white";
+        const char* fill_color = (pool.m_list[i]->m_Id.get() == CHIPID_GOTO) ? "#e9ecef" : "white";
 
         // 箱
         fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"%s\" stroke=\"#343a40\" stroke-width=\"2\" />\n",
@@ -1894,7 +1893,7 @@ void CarnageSA::print_layout_svg(const char* filename) {
         std::string txt = pool[i]->GetLayoutText() + std::format("\n#{}", i);
         if (txt.empty()) {
             // テキスト空時はTypeIDを表示
-            fprintf(fp, "    <tspan x=\"%d\" dy=\"1.2em\" font-size=\"10\" fill=\"#6c757d\">Type:%u</tspan>\n", centerX, pool[i]->m_id.get());
+            fprintf(fp, "    <tspan x=\"%d\" dy=\"1.2em\" font-size=\"10\" fill=\"#6c757d\">Type:%u</tspan>\n", centerX, pool[i]->m_Id.get());
         } else {
             // \n で改行
             size_t s = 0, e = 0;
@@ -1945,8 +1944,8 @@ void CarnageSA::print_layout_svg(const char* filename) {
 
     for (int i = 0; i < (int)state.size(); ++i) {
         if (pool[i] == nullptr) continue;
-        draw_edge(i, pool[i]->m_next_g, "#28a745");
-        if (pool[i]->valid_r()) draw_edge(i, pool[i]->m_next_r, "#dc3545");
+        draw_edge(i, pool[i]->m_NextG, "#28a745");
+        if (pool[i]->ValidR()) draw_edge(i, pool[i]->m_NextR, "#dc3545");
     }
 
     fprintf(fp, "</svg>\n");
