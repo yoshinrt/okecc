@@ -1282,14 +1282,15 @@ class CarnageSA {
     int grid_height;
     std::vector<Pos> state;
     std::mt19937 gen;
+    const char *m_svg_file;
 
 	// 8方向のベクトル定義 (N, NE, E, SE, S, SW, W, NW)
 	inline static const int dx[] = { 0,  1,  1,  1,  0, -1, -1, -1};
 	inline static const int dy[] = {-1, -1,  0,  1,  1,  1,  0, -1};
 	
 public:
-    CarnageSA(CChipPool& p)
-        : pool(p), grid_width(p.m_width), grid_height(p.m_height), gen(std::random_device{}()) {
+    CarnageSA(CChipPool& p, const char *svg_file = nullptr)
+        : pool(p), grid_width(p.m_width), grid_height(p.m_height), gen(42/*std::random_device{}()*/), m_svg_file(svg_file){
         initialize();
     }
     
@@ -1324,7 +1325,7 @@ public:
 	bool has_any_intersection();
 	bool is_invalid_layout(const std::vector<Pos>& current_state);
 	void finalize();
-	void print_layout_svg(const char* filename);
+	void OutputSvg(const char* filename, const std::vector<Pos>& state_disp);
 	bool cleanup_gotos();
 	
 	const std::vector<Pos>& get_result() const { return state; }
@@ -1508,7 +1509,7 @@ void CarnageSA::initialize() {
         // STEP 2: 保存した分岐タスクの処理
         for (auto& task : pending_tasks) {
             // 他のパス（異なる y 座標）ですでに配置済みなら合流とみなしてスキップ
-            if (state[task.target].x != INT_MAX && state[task.target].y != start_y) {
+            if (state[task.target].x != INT_MAX && state[task.target].y != state[task.parent].y) {
                 continue; 
             }
 
@@ -1529,7 +1530,7 @@ void CarnageSA::initialize() {
             // 他のチップを押し出す
             shift_y_range(state, target_y, move_up ? -1 : 1);
 
- 			if (join_node != IDX_NONE) {	// IDX_NONE は，そのまま exit して合流点がないことを意味する
+			if (join_node != IDX_NONE) {	// IDX_NONE は，そのまま exit して合流点がないことを意味する
 				int target_bx = state[join_node].x - 1;
 				int path_len = count_path_chips(task.target, join_node);
 
@@ -1557,6 +1558,8 @@ void CarnageSA::initialize() {
     // 3. 実行
     place_path(place_path, 0, 0, 0);
     normalize_coordinates();
+    
+    if(m_svg_file) OutputSvg(m_svg_file, state);
 }
 
 UINT CarnageSA::find_join_node(UINT start_idx, const std::vector<int>& dists) {
@@ -1796,6 +1799,7 @@ void CarnageSA::run() {
     double current_energy = calculate_energy();
     double best_energy = current_energy;
     std::vector<Pos> best_state = state;
+    bool bUpdateBest = false;
 
     double T = 5000.0;
     const double alpha = 0.999995;
@@ -1813,6 +1817,7 @@ void CarnageSA::run() {
             if (cleanup_gotos()) {
                 best_energy = current_energy = calculate_energy();
                 best_state = state;
+				bUpdateBest = true;
             }
         }
         
@@ -1854,6 +1859,7 @@ void CarnageSA::run() {
             if (current_energy < best_energy) {
                 best_energy = current_energy;
                 best_state = state;
+				bUpdateBest = true;
             }
         } else {
             state[target] = old_pos;
@@ -1862,12 +1868,16 @@ void CarnageSA::run() {
         T *= alpha;
         if (step % 100000 == 0){
         	printf("Step: %7d, T: %7.2f, Energy: %10.2f, Best: %10.2f\n", step, T, current_energy, best_energy);
-			print_layout_svg("chip.svg");
+			if(bUpdateBest && m_svg_file){
+				OutputSvg(m_svg_file, best_state);
+				bUpdateBest = false;
+			}
         }
         
         if(current_energy < 0.001) break;
     }
     state = std::move(best_state);
+    if(m_svg_file)OutputSvg(m_svg_file, state);
     finalize();
 }
 
@@ -1888,7 +1898,7 @@ void CarnageSA::finalize() {
 
 //////////////////////////////////////////////////////////////////////////////
 
-void CarnageSA::print_layout_svg(const char* filename) {
+void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_disp) {
     const int CHIP_SIZE = 75;    // チップサイズ 1.5倍
     const int GAP = 15;          // 隙間 15px
     const int CELL_SIZE = CHIP_SIZE + GAP; 
@@ -1897,18 +1907,18 @@ void CarnageSA::print_layout_svg(const char* filename) {
     FILE* fp = fopen(filename, "w");
     if (!fp) return;
 
-    // 1. 範囲計算 (メンバ変数 state, pool を直接使用)
+    // 1. 範囲計算 (メンバ変数 state_disp, pool を直接使用)
     int min_x = INT_MAX, min_y = INT_MAX;
     int max_x = INT_MIN, max_y = INT_MIN;
     bool has_valid_chip = false;
 
-    for (int i = 0; i < (int)state.size(); ++i) {
-        if (pool[i] == nullptr || state[i].x == POS_INVALID) continue;
+    for (int i = 0; i < (int)state_disp.size(); ++i) {
+        if (pool[i] == nullptr || state_disp[i].x == POS_INVALID) continue;
         has_valid_chip = true;
-        min_x = std::min(min_x, state[i].x);
-        min_y = std::min(min_y, state[i].y);
-        max_x = std::max(max_x, state[i].x);
-        max_y = std::max(max_y, state[i].y);
+        min_x = std::min(min_x, state_disp[i].x);
+        min_y = std::min(min_y, state_disp[i].y);
+        max_x = std::max(max_x, state_disp[i].x);
+        max_y = std::max(max_y, state_disp[i].y);
     }
     
     if (!has_valid_chip) { min_x = min_y = 0; max_x = max_y = 5; }
@@ -1935,11 +1945,11 @@ void CarnageSA::print_layout_svg(const char* filename) {
     fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" fill=\"#f8f9fa\" />\n", vb_x, vb_y, vb_width, vb_height);
 
     // 3. チップ（箱とテキスト）の描画
-    for (int i = 0; i < (int)state.size(); ++i) {
-        if (pool[i] == nullptr || state[i].x == POS_INVALID) continue;
+    for (int i = 0; i < (int)state_disp.size(); ++i) {
+        if (pool[i] == nullptr || state_disp[i].x == POS_INVALID) continue;
 
-        int x = state[i].x * CELL_SIZE + OFFSET;
-        int y = state[i].y * CELL_SIZE + OFFSET;
+        int x = state_disp[i].x * CELL_SIZE + OFFSET;
+        int y = state_disp[i].y * CELL_SIZE + OFFSET;
         int centerX = x + CHIP_SIZE / 2;
 
         // goto チップは薄いグレー背景、それ以外は白
@@ -1974,9 +1984,9 @@ void CarnageSA::print_layout_svg(const char* filename) {
 
     // 4. 接続線（エッジ）の描画（最後に描画することで最前面へ）
     auto draw_edge = [&](int from_idx, UINT to_idx, const char* color) {
-        if (to_idx == IDX_NONE || pool[from_idx] == nullptr || state[from_idx].x == POS_INVALID) return;
+        if (to_idx == IDX_NONE || pool[from_idx] == nullptr || state_disp[from_idx].x == POS_INVALID) return;
         
-        Pos p1 = state[from_idx];
+        Pos p1 = state_disp[from_idx];
         double x1 = p1.x * CELL_SIZE + CELL_SIZE / 2.0;
         double y1 = p1.y * CELL_SIZE + CELL_SIZE / 2.0;
 
@@ -1987,9 +1997,9 @@ void CarnageSA::print_layout_svg(const char* filename) {
             return;
         }
 
-        if (to_idx >= (UINT)state.size() || pool[to_idx] == nullptr || state[to_idx].x == POS_INVALID) return;
+        if (to_idx >= (UINT)state_disp.size() || pool[to_idx] == nullptr || state_disp[to_idx].x == POS_INVALID) return;
 
-        Pos p2 = state[to_idx];
+        Pos p2 = state_disp[to_idx];
         double x2 = p2.x * CELL_SIZE + CELL_SIZE / 2.0;
         double y2 = p2.y * CELL_SIZE + CELL_SIZE / 2.0;
 
@@ -2004,7 +2014,7 @@ void CarnageSA::print_layout_svg(const char* filename) {
                 x1 + dx * ratio, y1 + dy * ratio, x2 - dx * ratio, y2 - dy * ratio, color);
     };
 
-    for (int i = 0; i < (int)state.size(); ++i) {
+    for (int i = 0; i < (int)state_disp.size(); ++i) {
         if (pool[i] == nullptr) continue;
         draw_edge(i, pool[i]->m_NextG, "#28a745");
         if (pool[i]->ValidR()) draw_edge(i, pool[i]->m_NextR, "#dc3545");
@@ -2026,7 +2036,7 @@ void chip_main(void){
 	ENDIF
 #endif
 
-#if 1
+#if 0
 	for(int i = 0; i < 1; ++i){
 		IF(enemy_num(0, 416, 160, OKE_ALL))
 			IF(enemy_num(0, 128, 320, OKE_HOVER) && friendly_num(0, 128, 320, OKE_ALL))
@@ -2059,6 +2069,37 @@ void chip_main(void){
 		A = damage();
 	}
 #endif
+#if 1
+	IF(enemy_num(0, 416, 160, OKE_ALL))
+		IF(enemy_num(0, 128, 320, OKE_HOVER) && friendly_num(0, 128, 320, OKE_ALL))
+			turn_right();
+			jump_backward();
+		ELSE
+			move_forward();
+		ENDIF
+		action1();
+		end();
+	ENDIF
+	guard();
+	fire(0, 416, 160, OKE_HOVER, 1, 8);
+	fire(128, 20, 1, 8);
+	
+	IF(option_num(1) >= 2)
+		IF(barrier_height(0, 32, 160) >= 24)
+			IF(projectile_num(0, 32, 160, P_HI_V))
+				option(1);
+			ENDIF
+		ENDIF
+	ENDIF
+	IF(ammo_num(2) > 20)
+		B = ammo_num(2);
+	ENDIF
+	IF(ammo_num(1))
+		B = ammo_num(1);
+	ENDIF
+	C = heat();
+	A = damage();
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2082,11 +2123,11 @@ int main(void){
 	g_pCurChipPool->CleanupGoto();
 	
 	printf("Number of chip(s): %d\n", (UINT)g_pCurChipPool->m_list.size());
-	//g_pCurChipPool->dump();
+	g_pCurChipPool->dump();
 	
-	CarnageSA sa(*g_pCurChipPool);
-	//sa.run();
-	sa.print_layout_svg("chip.svg");
+	CarnageSA sa(*g_pCurChipPool, "chip.svg");
+	sa.run();
+	sa.OutputSvg("chip.svg", sa.get_result());
 
 	return 0;
 }
