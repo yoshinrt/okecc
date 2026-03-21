@@ -1459,9 +1459,10 @@ void CarnageSA::initialize() {
 	};
 
 	// --- 2. 再帰配置関数 ---
-	auto place_path = [&](auto self, UINT start_idx, int start_x, int start_y) -> void {
-		struct BranchTask { UINT parent; UINT target; };
-		std::vector<BranchTask> pending_tasks;
+	struct BranchTask { UINT parent; UINT target; };
+	std::vector<BranchTask> pending_tasks;
+	
+	auto place_path = [&](UINT start_idx, int start_x, int start_y) -> void {
 		
 		UINT curr = start_idx;
 		int cur_x = start_x;
@@ -1505,79 +1506,74 @@ void CarnageSA::initialize() {
 			curr = next_node;
 			cur_x++;
 		}
+	};
+	
+	// 3. 実行
+	place_path(0, 0, 0);
+	
+	// STEP 2: 保存した分岐タスクの処理
+	for(int i = 0; i < pending_tasks.size(); ++i){
+		auto& task = pending_tasks[i];
+		
+		// 他のパス（異なる y 座標）ですでに配置済みなら合流とみなしてスキップ
+		if (state[task.target].x != INT_MAX && state[task.target].y != state[task.parent].y) {
+			continue; 
+		}
 
-		// STEP 2: 保存した分岐タスクの処理
-		for (auto& task : pending_tasks) {
-			// 他のパス（異なる y 座標）ですでに配置済みなら合流とみなしてスキップ
-			if (state[task.target].x != INT_MAX && state[task.target].y != state[task.parent].y) {
-				continue; 
-			}
+		UINT join_node = find_join_node(task.target);
 
-			UINT join_node = find_join_node(task.target);
+		int bx = state[task.parent].x + 1;
+		
+		// move_up の決定: 垂直衝突があれば上へ、なければランダム
+		bool move_up;
+		if (std::find(vertical_lines_x.begin(), vertical_lines_x.end(), bx) != vertical_lines_x.end()) {
+			move_up = true;
+		} else {
+			move_up = (coin_flip(this->gen) == 0); // メンバ変数の gen を明示的に使用
+		}
 
-			int bx = state[task.parent].x + 1;
-			
-			// move_up の決定: 垂直衝突があれば上へ、なければランダム
-			bool move_up;
-			if (std::find(vertical_lines_x.begin(), vertical_lines_x.end(), bx) != vertical_lines_x.end()) {
-				move_up = true;
-			} else {
-				move_up = (coin_flip(this->gen) == 0); // メンバ変数の gen を明示的に使用
-			}
+		int target_y = move_up ? state[task.parent].y - 1 : state[task.parent].y + 1;
 
-			int target_y = move_up ? state[task.parent].y - 1 : state[task.parent].y + 1;
+		// 他のチップを押し出す
+		shift_y_range(state, target_y, move_up ? -1 : 1);
 
-			// 他のチップを押し出す
-			shift_y_range(state, target_y, move_up ? -1 : 1);
+		if (join_node != IDX_NONE) {	// IDX_NONE は，そのまま exit して合流点がないことを意味する
+			int target_bx = state[join_node].x - 1;
+			int path_len = count_path_chips(task.target, join_node);
+			int other_path_len = target_bx - bx + 1;
 
-			if (join_node != IDX_NONE) {	// IDX_NONE は，そのまま exit して合流点がないことを意味する
-				int target_bx = state[join_node].x - 1;
-				int path_len = count_path_chips(task.target, join_node);
-
-				if (path_len == 0) {
+			if (path_len == 0) {
+				if(other_path_len < 2) {
+					// goto を 1個で迂回
+					UINT g = add_goto_chip(bx, target_y);
+					modify_next(task.parent, task.target, g);
+					pool.m_list[g]->m_NextG = join_node;
+				}else{
 					// 即時合流(0 chip): コの字迂回 GoTo 生成
 					UINT g1 = add_goto_chip(bx, target_y);
 					UINT g2 = add_goto_chip(std::max(bx, target_bx), target_y);
 					modify_next(task.parent, task.target, g1);
 					pool.m_list[g1]->m_NextG = g2;
 					pool.m_list[g2]->m_NextG = join_node;
-					continue; 
-				} else if (path_len == 1) {
-					// 1 chip: ターゲットチップ自体の配置後に GoTo で合流を補助
-					UINT g1 = add_goto_chip(std::max(bx + 1, target_bx), target_y);
-					pool.m_list[g1]->m_NextG = join_node;
-					modify_next(task.target, join_node, g1);
 				}
+				continue;
+			}else if(other_path_len > path_len) {
+				/*
+				// 1 chip: ターゲットチップ自体の配置後に GoTo で合流を補助
+				UINT g1 = add_goto_chip(std::max(bx + 1, target_bx), target_y);
+				pool.m_list[g1]->m_NextG = join_node;
+				modify_next(task.target, join_node, g1);
+				*/
 			}
-
-			// 枝パスの再帰配置
-			self(self, task.target, bx, target_y);
 		}
-	};
 
-	// 3. 実行
-	place_path(place_path, 0, 0, 0);
+		// 枝パスの再帰配置
+		place_path(task.target, bx, target_y);
+	}
+
 	normalize_coordinates();
 	
 	if(m_svg_file) OutputSvg(m_svg_file, state);
-}
-
-UINT CarnageSA::find_join_node(UINT start_idx, const std::vector<int>& dists) {
-	UINT curr = start_idx;
-	const int num_chips = (int)pool.size();
-
-	while (curr != IDX_EXIT && curr != IDX_NONE) {
-		if (state[curr].x != INT_MAX) return curr; // 合流点発見
-
-		bool has_r = pool[curr]->ValidR();
-		int d_g = (pool[curr]->m_NextG == IDX_EXIT) ? 0 : 
-				  (pool[curr]->m_NextG < (UINT)num_chips ? dists[pool[curr]->m_NextG] : -100);
-		int d_r = has_r ? ((pool[curr]->m_NextR == IDX_EXIT) ? 0 : 
-				  (pool[curr]->m_NextR < (UINT)num_chips ? dists[pool[curr]->m_NextR] : -100)) : -100;
-
-		curr = (d_g >= d_r) ? pool[curr]->m_NextG : pool[curr]->m_NextR;
-	}
-	return IDX_NONE;
 }
 
 double CarnageSA::calculate_energy() {
@@ -2069,7 +2065,7 @@ void chip_main(void){
 		A = damage();
 	}
 #endif
-#if 1
+#if 0
 	IF(enemy_num(0, 416, 160, OKE_ALL))
 		IF(enemy_num(0, 128, 320, OKE_HOVER) && friendly_num(0, 128, 320, OKE_ALL))
 			turn_right();
@@ -2100,6 +2096,49 @@ void chip_main(void){
 	C = heat();
 	A = damage();
 #endif
+	
+	IF(ammo_num(1))
+		option(1);
+	ELSE
+		jump_forward();
+		jump_forward();
+		jump_forward();
+	ENDIF
+	
+	IF(ammo_num(1))
+		option(1);
+		option(1);
+	ELSE
+		jump_forward();
+		jump_forward();
+		jump_forward();
+		jump_forward();
+		jump_forward();
+	ENDIF
+	
+	IF(ammo_num(1))
+		option(1);
+	ELSE
+		jump_forward();
+	ENDIF
+
+	IF(ammo_num(1))
+		jump_forward();
+		jump_forward();
+		jump_forward();
+	ENDIF
+
+	IF(ammo_num(1))
+		jump_forward();
+		jump_forward();
+	ENDIF
+
+	IF(ammo_num(1))
+		jump_forward();
+	ENDIF
+	
+	jump_backward();
+
 }
 
 //////////////////////////////////////////////////////////////////////////////
