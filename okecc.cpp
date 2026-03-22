@@ -157,6 +157,19 @@ public:
 		"≧", "≦", "=", "≠"
 	};
 	
+	static inline const char *m_StatusTypeStr[] = {
+		"熱量", "燃料", "ダメージ"
+	};
+	
+	enum {
+		ENEMY,
+		FRIENDLY
+	};
+	
+	static inline const char *m_EnemyFriendlyStr[] = {
+		"敵", "味方"
+	};
+	
 	CChip(){
 		m_Id		= CHIPID_NULL;
 	}
@@ -883,16 +896,6 @@ public:
 	ScaledInt<1>		m_operator;
 };
 
-/*
-static CChipAmmoNum ammo_num(
-	int weapon,
-	LastLocationArg
-){
-	LastLocation();
-	return CChipVal(CChipVal::WEAPON1 + weapon - 1);
-}
-*/
-
 static CChipCond option_num(
 	int weapon,
 	LastLocationArg
@@ -906,9 +909,6 @@ static CChipCond option_num(
 
 class CChipOkeNum : public CChip{
 public:
-	static constexpr int ENEMY		= 0;
-	static constexpr int FRIENDLY	= 1;
-
 	CChipOkeNum(
 		int angleCenter,
 		int angleRange,
@@ -935,7 +935,7 @@ public:
 		return
 			std::format(
 				"{} {}m\n{}{}{}?\n{},{}",
-				(m_enemy.get() == ENEMY ? "敵" : "味方"), m_distance.get(),
+				m_EnemyFriendlyStr[m_enemy.get()], m_distance.get(),
 				OkeTypeStr[m_type.get()], m_operator_str[m_operator.get()], m_num.get(),
 				m_angleCenter.get(), m_angleRange.get()
 			);
@@ -968,7 +968,7 @@ static CChipCond enemy_num(
 	LastLocationArg
 ){
 	LastLocation();
-	return oke_num(angleCenter, angleRange, distance, type, CChipOkeNum::ENEMY);
+	return oke_num(angleCenter, angleRange, distance, type, CChip::ENEMY);
 }
 
 static CChipCond friendly_num(
@@ -979,7 +979,7 @@ static CChipCond friendly_num(
 	LastLocationArg
 ){
 	LastLocation();
-	return oke_num(angleCenter, angleRange, distance, type, CChipOkeNum::FRIENDLY);
+	return oke_num(angleCenter, angleRange, distance, type, CChip::FRIENDLY);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1092,6 +1092,174 @@ static CChipCond projectile_num(
 }
 
 //////////////////////////////////////////////////////////////////////////////
+// マップポイント
+
+//////////////////////////////////////////////////////////////////////////////
+// 自機の状態確認
+
+class CChipSelfStatus : public CChip {
+public:
+	enum {
+		HEAT,
+		FUEL,
+		DAMAGE,
+	};
+	
+	CChipSelfStatus(
+		int type
+	){
+		m_type			= type;
+		m_operator		= OP_GE;
+		m_num			= 1;
+		m_Id			= CHIPID_SELF_STATUS;
+	}
+	
+	virtual ~CChipSelfStatus(){}
+
+	virtual void set_num(int num){m_num = num;}
+	virtual void set_operator(int opr){m_operator = opr;}
+	
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"{}{}{}?",
+				m_StatusTypeStr[m_type.get()],
+				m_operator_str[m_operator.get()], m_num.get()
+			);
+	}
+	
+	ScaledInt<2>			m_type;
+	ScaledInt<5, 5>			m_num;
+	ScaledInt<1>			m_operator;
+};
+
+//////////////////////////////////////////////////////////////////////////////
+// SUB1 / 2
+
+//////////////////////////////////////////////////////////////////////////////
+// 乱数
+
+//////////////////////////////////////////////////////////////////////////////
+// 時間
+
+class CChipTime : public CChip {
+public:
+	
+	CChipTime(void){
+		m_operator		= OP_GE;
+		m_num			= 1;
+		m_Id			= CHIPID_TIME;
+	}
+	
+	virtual ~CChipTime(){}
+
+	virtual void set_num(int num){m_num = num;}
+	virtual void set_operator(int opr){m_operator = opr;}
+	
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"時間{}{}?",
+				m_operator_str[m_operator.get()], m_num.get()
+			);
+	}
+	
+	ScaledInt<6, 5>			m_num;
+	ScaledInt<1>			m_operator;
+};
+
+//////////////////////////////////////////////////////////////////////////////
+// ターゲット指定
+
+class CChipLockon : public CChip{
+public:
+	CChipLockon(
+		int angleCenter,
+		int angleRange,
+		int distance,
+		int type,
+		int enemy
+	){
+		m_angleCenter	= angleCenter;
+		m_angleRange	= angleRange;
+		m_distance		= distance;
+		m_type			= type;
+		m_enemy			= enemy;
+		m_Id			= CHIPID_DET_OKE;
+	}
+	
+	virtual ~CChipLockon(){}
+
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"Lock\n{} {}m\n{},{}",
+				m_EnemyFriendlyStr[m_enemy.get()], m_distance.get(),
+				m_angleCenter.get(), m_angleRange.get()
+			);
+	}
+	
+	ScaledInt<5, 16, -240>	m_angleCenter;
+	ScaledInt<4, 32, 32>	m_angleRange;
+	ScaledInt<4, 20, 20>	m_distance;
+	ScaledInt<1>		 	m_enemy;
+	ScaledInt<3>			m_type;
+};
+
+static void lockon(
+	int angleCenter,
+	int angleRange,
+	int distance,
+	int type,
+	LastLocationArg
+){
+	LastLocation();
+	g_pCurTree->add(new CChipLockon(
+		angleCenter,
+		angleRange,
+		distance,
+		type,
+		CChip::ENEMY
+	));
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// ターゲット距離
+
+class CChipTgtDistance : public CChip {
+public:
+	
+	CChipTgtDistance(void){
+		m_operator		= OP_GE;
+		m_num			= 1;
+		m_Id			= CHIPID_TGT_DISTANCE;
+	}
+	
+	virtual ~CChipTgtDistance(){}
+
+	virtual void set_num(int num){m_num = num;}
+	virtual void set_operator(int opr){m_operator = opr;}
+	
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"ターゲット\n距離{}{}m?",
+				m_operator_str[m_operator.get()], m_num.get()
+			);
+	}
+	
+	ScaledInt<6, 20>		m_num;
+	ScaledInt<1>			m_operator;
+};
+
+static CChipCond target_distance(
+	LastLocationArg
+){
+	LastLocation();
+	return CChipCond(new CChipTgtDistance());
+}
+
+//////////////////////////////////////////////////////////////////////////////
 // カウンタに自機状態入力
 
 class CChipGetStatus : public CChip {
@@ -1118,9 +1286,7 @@ public:
 		return
 			std::format(
 				"{}←{}", std::string(1, 'A' + m_var.get()),
-				m_param.get() == HEAT   ? "熱量" :
-				m_param.get() == FUEL   ? "燃料" :
-				m_param.get() == DAMAGE ? "ダメージ" :
+				m_param.get() <= DAMAGE ? m_StatusTypeStr[m_param.get()] :
 										  std::format("残弾#{}", m_param.get() - DAMAGE)
 			);
 	}
@@ -1146,21 +1312,22 @@ CChipVal ammo_num(int weapon, LastLocationArg){
 
 CChipVar& CChipVar::operator=(const CChipVal& val){
 	
-	CChip *p;
+	CChip *pchip;
 	
 	switch(val.m_type){
-		case CChipVal::HEAT:	p = new CChipGetStatus(CChipGetStatus::HEAT, m_var); break;
-		case CChipVal::FUEL:	p = new CChipGetStatus(CChipGetStatus::FUEL, m_var); break;
-		case CChipVal::DAMAGE:	p = new CChipGetStatus(CChipGetStatus::DAMAGE, m_var); break;
+		case CChipVal::HEAT:
+		case CChipVal::FUEL:
+		case CChipVal::DAMAGE:	pchip = new CChipGetStatus(val.m_type - CChipVal::HEAT, m_var); break;
+		
 		case CChipVal::TIME:
 		case CChipVal::POS_X:
 		case CChipVal::POS_Y:
 		case CChipVal::POS_Z:
 		
-		default:				p = new CChipGetStatus(CChipGetStatus::AMMO + val.m_type, m_var); break;
+		default:				pchip = new CChipGetStatus(CChipGetStatus::AMMO + val.m_type, m_var); break;
 	}
 	
-	g_pCurTree->add(p);
+	g_pCurTree->add(pchip);
 	return *this;
 }
 
@@ -1171,8 +1338,10 @@ CChipCond CChipVal::GetCChipCond(void) const {
 	switch(m_type){
 		case CChipVal::HEAT:	
 		case CChipVal::FUEL:	
-		case CChipVal::DAMAGE:	
-		case CChipVal::TIME:	
+		case CChipVal::DAMAGE:	pchip = new CChipSelfStatus(m_type - CChipVal::HEAT); break;
+		
+		case CChipVal::TIME:	pchip = new CChipTime(); break;
+		
 		case CChipVal::POS_X:	
 		case CChipVal::POS_Y:	
 		case CChipVal::POS_Z:	
@@ -2049,6 +2218,22 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void){
+	option(1);
+	
+	IF(time() >= 60)
+		option(2);
+	ENDIF
+	
+	IF(damage() >= 50)
+		lockon(128, 128, 160, OKE_ALL);
+		A = heat();
+	ENDIF
+	
+	IF(target_distance() <= 160)
+		option(2);
+	ENDIF
+	
+	
 #if 0
 	IF(enemy_num(0, 416, 160, OKE_ALL))
 		jump_forward();
@@ -2132,6 +2317,7 @@ void chip_main(void){
 		option(3);
 	ENDIF
 #endif
+#if 0
 		option(1);
 		IF(
 			(enemy_num(0, 416, 160, OKE_ALL) >= 1 && enemy_num(16, 416, 160, OKE_ALL) >= 1) ||
@@ -2147,6 +2333,7 @@ void chip_main(void){
 		ELSE
 			A = ammo_num(1);
 		ENDIF
+#endif
 #if 0
 	IF(ammo_num(1))
 		option(1);
