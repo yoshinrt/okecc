@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 #include <wchar.h>
+#include <concepts>
 
 enum {
 	OKE_BIPED,
@@ -145,6 +146,17 @@ private:
 // Chip class
 class CChip {
 public:
+	enum {
+		OP_GE,
+		OP_LE,
+		OP_EQ,
+		OP_NE,
+	};
+	
+	static inline const char *m_operator_str[] = {
+		"≧", "≦", "=", "≠"
+	};
+	
 	CChip(){
 		m_Id		= CHIPID_NULL;
 	}
@@ -154,6 +166,9 @@ public:
 	virtual std::string GetLayoutText(void){
 		return "";
 	}
+	
+	virtual void set_num(int num){}
+	virtual void set_operator(int opr){}
 	
 	bool ValidG(void){return m_NextG < IDX_EXIT;}
 	bool ValidR(void){return m_NextR < IDX_EXIT;}
@@ -249,11 +264,12 @@ public:
 	}
 	
 	void dump(void){
+		printf("Start=%d\nTyp ID   G   R\n", m_start);
 		for(UINT u = 0; u < m_list.size(); ++u){
 			if(m_list[u]){
-				printf("ID:%d: type:%d g:%d r:%d\n",
-					u,
+				printf("%2d %3d %3d %3d\n",
 					m_list[u]->m_Id.get(),
+					u,
 					m_list[u]->m_NextG,
 					m_list[u]->m_NextR
 				);
@@ -275,48 +291,27 @@ public:
 	UINT m_LastR	= IDX_NONE; // 最後の赤矢印を出している chip
 
 	// g, r を update
-	void set_g(UINT idx){
+	void AddToG(UINT idx){
 		if(m_start == IDX_NONE) m_start = idx;
 		if(ValidG()) (*g_pCurChipPool)[m_LastG]->m_NextG = idx;
 		m_LastG = idx;
 	}
 
-	void set_r(UINT idx){
+	void AddToR(UINT idx){
 		if(m_start == IDX_NONE) m_start = idx;
-		if(ValidR()) (*g_pCurChipPool)[m_LastR]->m_NextR = idx;
+		if(ValidR()) (*g_pCurChipPool)[m_LastR]->m_NextG = idx;
 		m_LastR = idx;
 	}
 
-	bool valid_start(void) const {return m_start  < IDX_EXIT;}
+	bool ValidStart(void) const {return m_start < IDX_EXIT;}
 	bool ValidG    (void) const {return m_LastG < IDX_EXIT;}
 	bool ValidR    (void) const {return m_LastR < IDX_EXIT;}
-
-	// チップ単体からツリーに変換
-	static CChipTree Chip2Tree(CChip *pchip){
-		CChipTree tree;
-
-		tree.m_start =
-		tree.m_LastG = g_pCurChipPool->add(pchip);
-
-		return tree;
-	}
-
-	// チップ単体からツリーに変換 (Condition chip)
-	static CChipTree CondChip2Tree(CChip *pchip){
-		CChipTree tree;
-
-		tree.m_start =
-		tree.m_LastG =
-		tree.m_LastR = g_pCurChipPool->add(pchip);
-
-		return tree;
-	}
 
 	// Tree にチップ追加
 	CChipTree& add(CChip *pchip){
 		UINT idx = g_pCurChipPool->add(pchip);		// チップ追加
 
-		if(valid_start()){
+		if(ValidStart()){
 			(*g_pCurChipPool)[m_LastG]->m_NextG = idx;	// リスト後端に追加したチップをつなげる
 		}else{
 			m_start = idx;
@@ -330,25 +325,49 @@ public:
 CChipTree *g_pCurTree;
 
 CChipTree operator&&(const CChipTree& a, const CChipTree& b){
-	CChipTree cc = a;
-
 	// condition な tree か判定
-	if(!cc.ValidR() || !b.ValidR()){
+	if(!a.ValidR() || !b.ValidR()){
 		throw OkeccError("Invalid use of && operator: Condition chip expected.");
 	}
 
-	// this.r -> b.start を指す
-	cc.set_r(b.m_start);
+	CChipTree cc_a = a;
+	CChipTree cc_b = b;
 
-	// False 側: GOTO を生成し this.g, b.g, tree.g はそれを指す
+	// a.r -> cc_b.start を指す
+	cc_a.AddToR(cc_b.m_start);
+
+	// False 側: GOTO を生成し a.g, cc_b.g, tree.g はそれを指す
 	UINT idx = g_pCurChipPool->add(new CChipGoto);
-	cc.set_g(idx);
-	(*g_pCurChipPool)[b.m_LastG]->m_NextG = idx;
+	cc_a.AddToG(idx);
+	cc_b.AddToG(idx);
 
-	// True 側: tree.r は b.r になる
-	cc.m_LastR = b.m_LastR;
+	// True 側: tree.r は cc_b.r になる
+	cc_a.m_LastR = cc_b.m_LastR;
 
-	return cc;
+	return cc_a;
+}
+
+CChipTree operator||(const CChipTree& a, const CChipTree& b){
+	// condition な tree か判定
+	if(!a.ValidR() || !b.ValidR()){
+		throw OkeccError("Invalid use of || operator: Condition chip expected.");
+	}
+
+	CChipTree cc_a = a;
+	CChipTree cc_b = b;
+
+	// a.g -> cc_b.start を指す
+	cc_a.AddToG(cc_b.m_start);
+
+	// True 側: GOTO を生成し a.r, cc_r.g, tree.r はそれを指す
+	UINT idx = g_pCurChipPool->add(new CChipGoto);
+	cc_a.AddToR(idx);
+	cc_b.AddToR(idx);
+
+	// False 側: tree.g は cc_b.g になる
+	cc_a.m_LastG = cc_b.m_LastG;
+
+	return cc_a;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -714,59 +733,63 @@ static void option(UINT param, LastLocationArg){
 
 //////////////////////////////////////////////////////////////////////////////
 
-class CChipCond : public CChip {
+class CChipCond {
 public:
-	enum {
-		OP_GE,
-		OP_LE,
-		OP_EQ,
-		OP_NE,
-	};
 	
-	static inline const char *m_operator_str[] = {
-		"≧", "≦", "=", "≠"
-	};
+	CChipCond(CChip *pchip) : m_pchip(pchip){}
 	
-	virtual ~CChipCond(){}
+	CChip *m_pchip;
 	
-	virtual void set_num(int num){}
-	virtual void set_operator(int opr){}
+	CChipTree GetCChipTree(void) const {
+		CChipTree tree;
+		
+		// チップ単体からツリーに変換 (Condition chip)
+		// R 側に Goto を足して，常に m_NextG を触ればいいようにする
+		tree.m_start = 
+		tree.m_LastG = g_pCurChipPool->add(m_pchip);
+		
+		(*g_pCurChipPool)[tree.m_start]->m_NextR =
+		tree.m_LastR = g_pCurChipPool->add(new CChipGoto);
+		
+		return tree;
+	}
 	
-	CChipTree operator>=(int num){
-		set_num(num);
-		set_operator(OP_GE);
-		return CChipTree::CondChip2Tree(this);
+	operator CChipTree() const {
+		return GetCChipTree();
+	}
+	
+	CChipTree operator>=(int num) const {
+		m_pchip->set_num(num);
+		m_pchip->set_operator(CChip::OP_GE);
+		return GetCChipTree();
 	}
 
-	CChipTree operator>(int num){
-		set_num(num + 1);
-		set_operator(OP_GE);
-		return CChipTree::CondChip2Tree(this);
+	CChipTree operator>(int num) const {
+		return *this >= (num - 1);
 	}
 
-	CChipTree operator<=(int num){
-		set_num(num);
-		set_operator(OP_LE);
-		return CChipTree::CondChip2Tree(this);
+	CChipTree operator<=(int num) const {
+		m_pchip->set_num(num);
+		m_pchip->set_operator(CChip::OP_LE);
+		return GetCChipTree();
 	}
 
-	CChipTree operator<(int num){
-		set_num(num - 1);
-		set_operator(OP_LE);
-		return CChipTree::CondChip2Tree(this);
+	CChipTree operator<(int num) const {
+		return *this <= (num + 1);
 	}
 };
 
-CChipTree operator&&(CChipCond& chip, const CChipTree& a){
-	return CChipTree::CondChip2Tree(&chip) && a;
-}
+//////////////////////////////////////////////////////////////////////////////
 
-CChipTree operator&&(const CChipTree& a, CChipCond& chip){
-	return a && CChipTree::CondChip2Tree(&chip);
-}
+// CChipTree に変換可能な型を CChipTree として扱うテンプレート
+template <typename T>
+concept ChipLike = std::convertible_to<T, CChipTree>;
 
-CChipTree operator&&(CChipCond& a, CChipCond& b){
-	return CChipTree::CondChip2Tree(&a) && CChipTree::CondChip2Tree(&b);
+template <ChipLike T, ChipLike U>
+requires (!std::same_as<std::remove_cvref_t<T>, CChipTree> || !std::same_as<std::remove_cvref_t<U>, CChipTree>)
+CChipTree operator&&(T&& lhs, U&& rhs) {
+	return static_cast<CChipTree>(std::forward<T>(lhs)) && 
+		   static_cast<CChipTree>(std::forward<U>(rhs));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -790,11 +813,15 @@ public:
 	
 	CChipVal(UINT type) : m_type(type){}
 	
-	CChipCond& compare(int opr, int val);
-	CChipTree operator<=(int num);
-	CChipTree operator< (int num);
-	CChipTree operator>=(int num);
-	CChipTree operator> (int num);
+	operator CChipTree() const {
+		return *this >= 1;
+	}
+	
+	CChipCond GetCChipCond(void) const;
+	CChipTree operator<=(int num) const;
+	CChipTree operator< (int num) const;
+	CChipTree operator>=(int num) const;
+	CChipTree operator> (int num) const;
 	
 	UINT m_type;
 };
@@ -820,7 +847,7 @@ CChipVar F(5);
 //////////////////////////////////////////////////////////////////////////////
 // 残弾
 
-class CChipAmmoNum : public CChipCond {
+class CChipAmmoNum : public CChip {
 public:
 	
 	CChipAmmoNum(
@@ -863,18 +890,18 @@ static CChipAmmoNum ammo_num(
 }
 */
 
-static CChipAmmoNum& option_num(
+static CChipCond option_num(
 	int weapon,
 	LastLocationArg
 ){
 	LastLocation();
-	return *(new CChipAmmoNum(weapon + 4));
+	return CChipCond(new CChipAmmoNum(weapon + 4));
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // 近くの OKE を探索
 
-class CChipOkeNum : public CChipCond {
+class CChipOkeNum : public CChip{
 public:
 	static constexpr int ENEMY		= 0;
 	static constexpr int FRIENDLY	= 1;
@@ -920,17 +947,17 @@ public:
 	ScaledInt<1>			m_operator;
 };
 
-static CChipOkeNum& oke_num(
+static CChipCond oke_num(
 	int angleCenter,
 	int angleRange,
 	int distance,
 	int type,
 	int enemy
 ){
-	return *(new CChipOkeNum(angleCenter, angleRange, distance, type, enemy));
+	return CChipCond(new CChipOkeNum(angleCenter, angleRange, distance, type, enemy));
 }
 
-static CChipOkeNum& enemy_num(
+static CChipCond enemy_num(
 	int angleCenter,
 	int angleRange,
 	int distance,
@@ -941,7 +968,7 @@ static CChipOkeNum& enemy_num(
 	return oke_num(angleCenter, angleRange, distance, type, CChipOkeNum::ENEMY);
 }
 
-static CChipOkeNum& friendly_num(
+static CChipCond friendly_num(
 	int angleCenter,
 	int angleRange,
 	int distance,
@@ -955,7 +982,7 @@ static CChipOkeNum& friendly_num(
 //////////////////////////////////////////////////////////////////////////////
 // 近くの障害物を探索
 
-class CChipBarrier : public CChipCond {
+class CChipBarrier : public CChip {
 public:
 
 	CChipBarrier(
@@ -993,20 +1020,20 @@ public:
 	ScaledInt<1>			m_operator;
 };
 
-static CChipBarrier& barrier_height(
+static CChipCond barrier_height(
 	int angleCenter,
 	int angleRange,
 	int distance,
 	LastLocationArg
 ){
 	LastLocation();
-	return *(new CChipBarrier(angleCenter, angleRange, distance));
+	return CChipCond(new CChipBarrier(angleCenter, angleRange, distance));
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // 近くの危険物を探索
 
-class CChipProjectileNum : public CChipCond {
+class CChipProjectileNum : public CChip {
 public:
 	static inline const char *m_ProjectileTypeStr[] = {
 		"危険物", "弾丸", "ミサイル", "ビーム", "ロケット", "地雷", "機雷", "高速"
@@ -1050,7 +1077,7 @@ public:
 	ScaledInt<1>			m_operator;
 };
 
-static CChipProjectileNum& projectile_num(
+static CChipCond projectile_num(
 	int angleCenter,
 	int angleRange,
 	int distance,
@@ -1058,7 +1085,7 @@ static CChipProjectileNum& projectile_num(
 	LastLocationArg
 ){
 	LastLocation();
-	return *(new CChipProjectileNum(angleCenter, angleRange, distance, type));
+	return CChipCond(new CChipProjectileNum(angleCenter, angleRange, distance, type));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1134,9 +1161,9 @@ CChipVar& CChipVar::operator=(const CChipVal& val){
 	return *this;
 }
 
-CChipCond& CChipVal::compare(int opr, int val){
+CChipCond CChipVal::GetCChipCond(void) const {
 	
-	CChipCond *p;
+	CChip *pchip;
 	
 	switch(m_type){
 		case CChipVal::HEAT:	
@@ -1147,16 +1174,16 @@ CChipCond& CChipVal::compare(int opr, int val){
 		case CChipVal::POS_Y:	
 		case CChipVal::POS_Z:	
 		
-		default:				p = new CChipAmmoNum(m_type, opr, val); break;
+		default:				pchip = new CChipAmmoNum(m_type); break;
 	}
 	
-	return *p;
+	return CChipCond(pchip);
 }
 
-CChipTree CChipVal::operator<=(int num){return CChipTree::CondChip2Tree(&compare(CChipCond::OP_LE, num));}
-CChipTree CChipVal::operator< (int num){return CChipTree::CondChip2Tree(&compare(CChipCond::OP_LE, num + 1));}
-CChipTree CChipVal::operator>=(int num){return CChipTree::CondChip2Tree(&compare(CChipCond::OP_GE, num));}
-CChipTree CChipVal::operator> (int num){return CChipTree::CondChip2Tree(&compare(CChipCond::OP_GE, num - 1));}
+CChipTree CChipVal::operator<=(int num) const {return GetCChipCond() <= num;}
+CChipTree CChipVal::operator< (int num) const {return GetCChipCond() <  num;}
+CChipTree CChipVal::operator>=(int num) const {return GetCChipCond() >= num;}
+CChipTree CChipVal::operator> (int num) const {return GetCChipCond() >  num;}
 
 //////////////////////////////////////////////////////////////////////////////
 // if - else - endif
@@ -1170,12 +1197,8 @@ void if_statement(
 	LastLocation();
 
 	// CurTree に if 条件のツリーを接続
-	g_pCurTree->set_g(cc.m_start);
-
-	// cc.r を GOTO に変換
-	UINT idx = g_pCurChipPool->add(new CChipGoto);
-	cc.set_r(idx);
-	g_pCurTree->m_LastG = idx;
+	g_pCurTree->AddToG(cc.m_start);
+	g_pCurTree->m_LastG = cc.m_LastR;
 
 	// false 飛び先を push
 	g_BlockStack.push_back(cc.m_LastG);
@@ -1185,14 +1208,14 @@ void if_statement(
 	CChipCond &chip,
 	LastLocationArg
 ){
-	if_statement(CChipTree::CondChip2Tree(&chip), location);
+	if_statement(chip.GetCChipTree(), location);
 }
 
 void if_statement(
 	CChipVal chip,
 	LastLocationArg
 ){
-	if_statement(CChipTree::CondChip2Tree(&chip.compare(CChipCond::OP_GE, 1)), location);
+	if_statement(chip.GetCChipCond().GetCChipTree(), location);
 }
 
 void else_statement(
@@ -1224,7 +1247,7 @@ void endif_statement(
 
 	// 合流 GOTO 生成
 	UINT merge = g_pCurChipPool->add(new CChipGoto);
-	g_pCurTree->set_g(merge);
+	g_pCurTree->AddToG(merge);
 
 	// false 条件の飛び先合流
 	UINT idx = g_BlockStack.back(); g_BlockStack.pop_back();
@@ -2096,7 +2119,31 @@ void chip_main(void){
 	C = heat();
 	A = damage();
 #endif
-	
+#if 0
+	IF(
+		enemy_num(0, 416, 160, OKE_ALL) >= 1 && enemy_num(16, 416, 160, OKE_ALL) >= 1 ||
+		enemy_num(32, 416, 160, OKE_ALL) >= 1 && enemy_num(64, 416, 160, OKE_ALL) >= 1
+	)
+		option(1);
+	ELSE
+		option(3);
+	ENDIF
+#endif
+		IF(
+			(enemy_num(0, 416, 160, OKE_ALL) >= 1 && enemy_num(16, 416, 160, OKE_ALL) >= 1) ||
+			(enemy_num(0, 416, 160, OKE_ALL) >= 1 && enemy_num(16, 416, 160, OKE_ALL)) ||
+			(enemy_num(0, 416, 160, OKE_ALL) && enemy_num(16, 416, 160, OKE_ALL) >= 1) ||
+			(enemy_num(0, 416, 160, OKE_ALL) && enemy_num(16, 416, 160, OKE_ALL)) ||
+			(enemy_num(0, 416, 160, OKE_ALL)) ||
+			(ammo_num(1) >= 1) ||
+			(ammo_num(1)) ||
+			(ammo_num(1) && ammo_num(1))
+		)
+			option(1);
+		ELSE
+			A = ammo_num(1);
+		ENDIF
+#if 0
 	IF(ammo_num(1))
 		option(1);
 	ELSE
@@ -2138,7 +2185,7 @@ void chip_main(void){
 	ENDIF
 	
 	jump_backward();
-
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2154,9 +2201,9 @@ int main(void){
 		exit(0);
 	}
 	
-	g_pCurTree->set_g(IDX_EXIT);
+	g_pCurTree->AddToG(IDX_EXIT);
 	g_pCurChipPool->m_start = g_pCurTree->m_start;
-	//g_pCurChipPool->dump();
+	g_pCurChipPool->dump();
 	
 	// Goto 最適化
 	g_pCurChipPool->CleanupGoto();
@@ -2165,7 +2212,7 @@ int main(void){
 	g_pCurChipPool->dump();
 	
 	CarnageSA sa(*g_pCurChipPool, "chip.svg");
-	sa.run();
+	//sa.run();
 	sa.OutputSvg("chip.svg", sa.get_result());
 
 	return 0;
