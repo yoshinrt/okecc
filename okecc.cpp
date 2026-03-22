@@ -264,14 +264,17 @@ public:
 	}
 	
 	void dump(void){
-		printf("Start=%d\nTyp ID   G   R\n", m_start);
+		printf("Start=%d\n ID   G   R  Description\n", m_start);
 		for(UINT u = 0; u < m_list.size(); ++u){
 			if(m_list[u]){
-				printf("%2d %3d %3d %3d\n",
-					m_list[u]->m_Id.get(),
+				std::string s = m_list[u]->GetLayoutText();
+				std::replace(s.begin(), s.end(), '\n', ' ');
+
+				printf("%3d %3d %3d  %s\n",
 					u,
 					m_list[u]->m_NextG,
-					m_list[u]->m_NextR
+					m_list[u]->m_NextR,
+					s.c_str()
 				);
 			}
 		}
@@ -2129,6 +2132,7 @@ void chip_main(void){
 		option(3);
 	ENDIF
 #endif
+		option(1);
 		IF(
 			(enemy_num(0, 416, 160, OKE_ALL) >= 1 && enemy_num(16, 416, 160, OKE_ALL) >= 1) ||
 			(enemy_num(0, 416, 160, OKE_ALL) >= 1 && enemy_num(16, 416, 160, OKE_ALL)) ||
@@ -2212,7 +2216,7 @@ int main(void){
 	g_pCurChipPool->dump();
 	
 	CarnageSA sa(*g_pCurChipPool, "chip.svg");
-	//sa.run();
+	sa.run();
 	sa.OutputSvg("chip.svg", sa.get_result());
 
 	return 0;
