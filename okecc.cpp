@@ -521,17 +521,18 @@ public:
 	CChipVar& operator=(const CChipVal& chip);
 	
 	CChipVar& operator+=(const CChipVar& op2);
-	CChipVar& operator+=(const int op2);
 	CChipVar& operator-=(const CChipVar& op2);
-	CChipVar& operator-=(const int op2);
 	CChipVar& operator*=(const CChipVar& op2);
-	CChipVar& operator*=(const int op2);
 	CChipVar& operator/=(const CChipVar& op2);
-	CChipVar& operator/=(const int op2);
 	CChipVar& operator%=(const CChipVar& op2);
+	CChipVar& operator= (const CChipVar& op2);
+	
+	CChipVar& operator+=(const int op2);
+	CChipVar& operator-=(const int op2);
+	CChipVar& operator*=(const int op2);
+	CChipVar& operator/=(const int op2);
 	CChipVar& operator%=(const int op2);
-	CChipVar& operator=(const CChipVar& op2);
-	CChipVar& operator=(const int op2);
+	CChipVar& operator= (const int op2);
 	
 	CChipTree operator>=(const CChipVar& op2);
 	CChipTree operator<=(const CChipVar& op2);
@@ -2150,14 +2151,19 @@ CChipTree CChipVar::operator< (const int imm){return CChipCond(new CChipCmp(m_va
 //////////////////////////////////////////////////////////////////////////////
 // if - else - endif
 
+static constexpr UINT BLOCK_TOP = 0xFFFFFFFF;
 std::vector<UINT>	g_BlockStack;
 
-void if_statement(
-	CChipTree &&cc,
-	LastLocationArg
-){
-	LastLocation();
+static bool BlockStackUdf(void){
+	return g_BlockStack.size() < 1 || g_BlockStack.back() == BLOCK_TOP;
+}
 
+void if_statement(const CChipTree& cc, LastLocationArg, bool BlockStart = true){
+	LastLocation();
+	
+	// block top mark
+	if(BlockStart) g_BlockStack.push_back(BLOCK_TOP);
+	
 	// CurTree に if 条件のツリーを接続
 	g_pCurTree->AddToG(cc.m_start);
 	g_pCurTree->m_LastG = cc.m_LastR;
@@ -2166,27 +2172,16 @@ void if_statement(
 	g_BlockStack.push_back(cc.m_LastG);
 }
 
-void if_statement(
-	CChipCond &chip,
-	LastLocationArg
-){
-	if_statement(chip.GetCChipTree(), location);
-}
-
-void if_statement(
-	CChipVal chip,
-	LastLocationArg
-){
-	if_statement(chip.GetCChipCond().GetCChipTree(), location);
-}
+void if_statement(const CChipCond& chip, LastLocationArg){if_statement(chip.GetCChipTree(), location);}
+void if_statement(const CChipVal&  chip, LastLocationArg){if_statement(chip.GetCChipCond().GetCChipTree(), location);}
 
 void else_statement(
 	LastLocationArg
 ){
 	LastLocation();
 
-	if(g_BlockStack.size() < 1){
-		throw OkeccError("Unexpected endif");
+	if(BlockStackUdf()){
+		throw OkeccError("Unexpected else");
 	}
 
 	UINT idx = g_pCurTree->m_LastG;	// then 節の最後
@@ -2198,22 +2193,32 @@ void else_statement(
 	g_BlockStack.push_back(idx);
 }
 
+void elseif_statement(CChipTree &&cc, LastLocationArg){
+	LastLocation();
+	else_statement(location);
+	if_statement(cc, location, false);
+}
+
 void endif_statement(
 	LastLocationArg
 ){
 	LastLocation();
-
-	if(g_BlockStack.size() < 1){
+	
+	if(BlockStackUdf()){
 		throw OkeccError("Unexpected endif");
 	}
-
-	// 合流 GOTO 生成
-	UINT merge = g_pCurChipPool->add(new CChipGoto);
-	g_pCurTree->AddToG(merge);
-
-	// false 条件の飛び先合流
-	UINT idx = g_BlockStack.back(); g_BlockStack.pop_back();
-	(*g_pCurChipPool)[idx]->m_NextG = merge;
+	
+	while(1){
+		UINT idx = g_BlockStack.back(); g_BlockStack.pop_back();
+		if(idx == BLOCK_TOP) break;
+		
+		// 合流 GOTO 生成
+		UINT merge = g_pCurChipPool->add(new CChipGoto);
+		g_pCurTree->AddToG(merge);
+		
+		// false 条件の飛び先合流
+		(*g_pCurChipPool)[idx]->m_NextG = merge;
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -3004,9 +3009,10 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 //////////////////////////////////////////////////////////////////////////////
 // C との命名被り回避
 
-#define if(cc)	if_statement(cc);
-#define else	else_statement();
-#define endif	endif_statement();
+#define if(cc)		if_statement(cc);
+#define elseif(cc)	elseif_statement(cc);
+#define else		else_statement();
+#define endif		endif_statement();
 
 #define exit	okecc_exit
 #define rand	okecc_rand
@@ -3014,6 +3020,7 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void){
+#if 0
 	option(1);
 	
 	if(time() >= 60)
@@ -3071,13 +3078,17 @@ void chip_main(void){
 	B = ch_receive(7);
 	ch_send(1, F);
 	sub(2);
-#if 0
+#endif
+#if 1
+	nop();
 	if(enemy_num(0, 416, 160, OKE_ALL))
 		jump_forward();
-		end();
-	else
+	elseif(ammo_num(1) >= 1)
 		action1();
+	else
+		fire_target(1, 1);
 	endif
+	nop();
 #endif
 
 #if 0
