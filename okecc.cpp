@@ -64,7 +64,7 @@ enum {
 	CHIPID_DET_PROJECTILE,
 	CHIPID_MAPPOINT,
 	CHIPID_SELF_STATUS,
-	CHIPID_SUB,			// ★
+	CHIPID_SUB,
 	CHIPID_RAND,
 	CHIPID_TIME,
 	CHIPID_LOCKON,
@@ -176,7 +176,7 @@ public:
 	};
 	
 	static inline const char *m_SelfTgtTypeStr[] = {
-		"自機", "ターゲット"
+		"自機", "TGT"
 	};
 	
 	CChip(){
@@ -906,7 +906,7 @@ public:
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
-				"ターゲット射撃\n#{}x{}",
+				"TGT射撃\n#{}x{}",
 				m_weapon.get(),
 				m_cnt.get()
 			);
@@ -1495,7 +1495,7 @@ public:
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
-				"ターゲット\n距離{}{}m?",
+				"TGT\n距離{}{}m?",
 				m_operator_str[m_operator.get()], m_num.get()
 			);
 	}
@@ -1531,7 +1531,7 @@ public:
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
-				"ターゲット方向\n{},{}?",
+				"TGT方向\n{},{}?",
 				m_angleCenter.get(), m_angleRange.get()
 			);
 	}
@@ -1569,7 +1569,7 @@ public:
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
-				"ターゲット方向\n{} = 方向\n{} = 仰角",
+				"TGT方向\n{} = 方向\n{} = 仰角",
 				m_VarNameStr[m_var_dir.get()],
 				m_VarNameStr[m_var_elev.get()]
 			);
