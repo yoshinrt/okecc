@@ -64,22 +64,22 @@ enum {
 	CHIPID_DET_PROJECTILE,
 	CHIPID_MAPPOINT,
 	CHIPID_SELF_STATUS,
-	CHIPID_SUB,
+	CHIPID_SUB,			// ★
 	CHIPID_RAND,
 	CHIPID_TIME,
 	CHIPID_LOCKON,
 	CHIPID_TGT_DISTANCE,
 	CHIPID_TGT_DIR,
 	CHIPID_FIRE_TGT,
-	CHIPID_IS_POS,
+	CHIPID_IS_COORDINATE,
 	CHIPID_IS_ACTION,
 	CHIPID_SOUND,
 	CHIPID_GET_STATUS,
-	CHIPID_GET_POS,
+	CHIPID_GET_COORDINATE,
 	CHIPID_GET_TGT_DIR,
 	CHIPID_GET_MISC_NUM,
 	CHIPID_CALC,
-	CHIPID_TRUNCATE,
+	CHIPID_CLAMP,
 	CHIPID_CMP,
 	CHIPID_CH_SEND,
 	CHIPID_CH_RECV,
@@ -170,10 +170,31 @@ public:
 		"敵", "味方"
 	};
 	
+	enum {
+		SELF,
+		TARGET
+	};
+	
+	static inline const char *m_SelfTgtTypeStr[] = {
+		"自機", "ターゲット"
+	};
+	
 	CChip(){
 		m_Id		= CHIPID_NULL;
 	}
-
+	
+	enum {
+		X, Y, Z
+	};
+	
+	static inline const char *m_CoordinateStr[] = {
+		"X", "Y", "Z"
+	};
+	
+	static inline const char *m_VarNameStr[] = {
+		"A", "B", "C", "D", "E", "F"
+	};
+	
 	virtual ~CChip(){}
 	
 	virtual std::string GetLayoutText(void){
@@ -385,6 +406,152 @@ CChipTree operator||(const CChipTree& a, const CChipTree& b){
 
 	return cc_a;
 }
+
+//////////////////////////////////////////////////////////////////////////////
+
+class CChipCond {
+public:
+	
+	CChipCond(CChip *pchip) : m_pchip(pchip){}
+	
+	CChip *m_pchip;
+	
+	CChipTree GetCChipTree(void) const {
+		CChipTree tree;
+		
+		// チップ単体からツリーに変換 (Condition chip)
+		// R 側に Goto を足して，常に m_NextG を触ればいいようにする
+		tree.m_start = 
+		tree.m_LastG = g_pCurChipPool->add(m_pchip);
+		
+		(*g_pCurChipPool)[tree.m_start]->m_NextR =
+		tree.m_LastR = g_pCurChipPool->add(new CChipGoto);
+		
+		return tree;
+	}
+	
+	operator CChipTree() const {
+		return GetCChipTree();
+	}
+	
+	CChipTree operator>=(int num) const {
+		m_pchip->set_num(num);
+		m_pchip->set_operator(CChip::OP_GE);
+		return GetCChipTree();
+	}
+
+	CChipTree operator>(int num) const {
+		return *this >= (num - 1);
+	}
+
+	CChipTree operator<=(int num) const {
+		m_pchip->set_num(num);
+		m_pchip->set_operator(CChip::OP_LE);
+		return GetCChipTree();
+	}
+
+	CChipTree operator<(int num) const {
+		return *this <= (num + 1);
+	}
+};
+
+//////////////////////////////////////////////////////////////////////////////
+
+// CChipTree に変換可能な型を CChipTree として扱うテンプレート
+template <typename T>
+concept ChipLike = std::convertible_to<T, CChipTree>;
+
+template <ChipLike T, ChipLike U>
+requires (!std::same_as<std::remove_cvref_t<T>, CChipTree> || !std::same_as<std::remove_cvref_t<U>, CChipTree>)
+CChipTree operator&&(T&& lhs, U&& rhs) {
+	return static_cast<CChipTree>(std::forward<T>(lhs)) && 
+		   static_cast<CChipTree>(std::forward<U>(rhs));
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+class CChipVal {
+public:
+	enum {
+		WEAPON1,
+		WEAPON2,
+		WEAPON3,
+		WEAPON4,
+		WEAPON5,
+		HEAT,
+		FUEL,
+		DAMAGE,
+		TIME,
+		FRIENDLY,
+		ENEMY,
+		RAND,
+		CH_RECV,
+		SELF_POS_X,
+		SELF_POS_Y,
+		SELF_POS_Z,
+		TGT_POS_X,
+		TGT_POS_Y,
+		TGT_POS_Z,
+	};
+	
+	CChipVal(UINT type, int param = 0) : m_type(type), m_param(param){}
+	
+	operator CChipTree() const {
+		return *this >= 1;
+	}
+	
+	CChipCond GetCChipCond(void) const;
+	CChipTree operator<=(int num) const;
+	CChipTree operator< (int num) const;
+	CChipTree operator>=(int num) const;
+	CChipTree operator> (int num) const;
+	
+	UINT m_type;
+	int m_param;
+};
+
+//////////////////////////////////////////////////////////////////////////////
+// 変数
+
+class CChipVar {
+public:
+	CChipVar(UINT var) : m_var(var){}
+	UINT m_var;
+	
+	CChipVar& operator=(const CChipVal& chip);
+	
+	CChipVar& operator+=(const CChipVar& op2);
+	CChipVar& operator+=(const int op2);
+	CChipVar& operator-=(const CChipVar& op2);
+	CChipVar& operator-=(const int op2);
+	CChipVar& operator*=(const CChipVar& op2);
+	CChipVar& operator*=(const int op2);
+	CChipVar& operator/=(const CChipVar& op2);
+	CChipVar& operator/=(const int op2);
+	CChipVar& operator%=(const CChipVar& op2);
+	CChipVar& operator%=(const int op2);
+	CChipVar& operator=(const CChipVar& op2);
+	CChipVar& operator=(const int op2);
+	
+	CChipTree operator>=(const CChipVar& op2);
+	CChipTree operator<=(const CChipVar& op2);
+	CChipTree operator==(const CChipVar& op2);
+	CChipTree operator!=(const CChipVar& op2);
+	
+	CChipTree operator>=(const int imm);
+	CChipTree operator<=(const int imm);
+	CChipTree operator==(const int imm);
+	CChipTree operator!=(const int imm);
+	CChipTree operator> (const int imm);
+	CChipTree operator< (const int imm);
+};
+
+CChipVar A(0);
+CChipVar B(1);
+CChipVar C(2);
+CChipVar D(3);
+CChipVar E(4);
+CChipVar F(5);
 
 //////////////////////////////////////////////////////////////////////////////
 // NOP
@@ -707,7 +874,7 @@ public:
 	ScaledInt<3, 1, 1>		m_cnt;
 };
 
-static void fire(
+static void fire_direction(
 	int direction,
 	int elevation,
 	int weapon,
@@ -718,6 +885,96 @@ static void fire(
 	g_pCurTree->add(new CChipFireFixedDir(
 		direction,
 		elevation,
+		weapon,
+		cnt
+	));
+}
+
+class CChipFireTarget : public CChip {
+public:
+	CChipFireTarget(
+		int weapon,
+		int cnt
+	){
+		m_Id		= CHIPID_FIRE_TGT;
+		m_weapon	= weapon;
+		m_cnt		= cnt;
+	}
+
+	virtual ~CChipFireTarget(){}
+
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"ターゲット射撃\n#{}x{}",
+				m_weapon.get(),
+				m_cnt.get()
+			);
+	}
+	
+	ScaledInt<3>			m_weapon;
+	ScaledInt<3, 1, 1>		m_cnt;
+};
+
+static void fire_target(
+	int weapon,
+	int cnt,
+	LastLocationArg
+){
+	LastLocation();
+	g_pCurTree->add(new CChipFireTarget(
+		weapon,
+		cnt
+	));
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// カウンタ方位射撃
+
+class CChipFireCounter : public CChip {
+public:
+	CChipFireCounter(
+		int direction,
+		int elevation,
+		int weapon,
+		int cnt
+	){
+		m_Id		= CHIPID_FIRE_COUNTER;
+		m_direction	= direction;
+		m_elevation	= elevation;
+		m_weapon	= weapon;
+		m_cnt		= cnt;
+	}
+
+	virtual ~CChipFireCounter(){}
+
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"射撃 #{}x{}\n方位 {}\n角度 {}",
+				m_weapon.get(),
+				m_cnt.get(),
+				m_VarNameStr[m_direction.get()], m_VarNameStr[m_elevation.get()]
+			);
+	}
+	
+	ScaledInt<3>		m_direction;
+	ScaledInt<3>		m_elevation;
+	ScaledInt<3>		m_weapon;
+	ScaledInt<3, 1, 1>	m_cnt;
+};
+
+static void fire_direction(
+	CChipVar& direction,
+	CChipVar& elevation,
+	int weapon,
+	int cnt,
+	LastLocationArg
+){
+	LastLocation();
+	g_pCurTree->add(new CChipFireCounter(
+		direction.m_var,
+		elevation.m_var,
 		weapon,
 		cnt
 	));
@@ -746,119 +1003,6 @@ static void option(UINT param, LastLocationArg){
 	LastLocation();
 	g_pCurTree->add(new CChipOption(param));
 }
-
-//////////////////////////////////////////////////////////////////////////////
-
-class CChipCond {
-public:
-	
-	CChipCond(CChip *pchip) : m_pchip(pchip){}
-	
-	CChip *m_pchip;
-	
-	CChipTree GetCChipTree(void) const {
-		CChipTree tree;
-		
-		// チップ単体からツリーに変換 (Condition chip)
-		// R 側に Goto を足して，常に m_NextG を触ればいいようにする
-		tree.m_start = 
-		tree.m_LastG = g_pCurChipPool->add(m_pchip);
-		
-		(*g_pCurChipPool)[tree.m_start]->m_NextR =
-		tree.m_LastR = g_pCurChipPool->add(new CChipGoto);
-		
-		return tree;
-	}
-	
-	operator CChipTree() const {
-		return GetCChipTree();
-	}
-	
-	CChipTree operator>=(int num) const {
-		m_pchip->set_num(num);
-		m_pchip->set_operator(CChip::OP_GE);
-		return GetCChipTree();
-	}
-
-	CChipTree operator>(int num) const {
-		return *this >= (num - 1);
-	}
-
-	CChipTree operator<=(int num) const {
-		m_pchip->set_num(num);
-		m_pchip->set_operator(CChip::OP_LE);
-		return GetCChipTree();
-	}
-
-	CChipTree operator<(int num) const {
-		return *this <= (num + 1);
-	}
-};
-
-//////////////////////////////////////////////////////////////////////////////
-
-// CChipTree に変換可能な型を CChipTree として扱うテンプレート
-template <typename T>
-concept ChipLike = std::convertible_to<T, CChipTree>;
-
-template <ChipLike T, ChipLike U>
-requires (!std::same_as<std::remove_cvref_t<T>, CChipTree> || !std::same_as<std::remove_cvref_t<U>, CChipTree>)
-CChipTree operator&&(T&& lhs, U&& rhs) {
-	return static_cast<CChipTree>(std::forward<T>(lhs)) && 
-		   static_cast<CChipTree>(std::forward<U>(rhs));
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
-class CChipVal {
-public:
-	enum {
-		WEAPON1,
-		WEAPON2,
-		WEAPON3,
-		WEAPON4,
-		WEAPON5,
-		HEAT,
-		FUEL,
-		DAMAGE,
-		TIME,
-		POS_X,
-		POS_Y,
-		POS_Z,
-	};
-	
-	CChipVal(UINT type) : m_type(type){}
-	
-	operator CChipTree() const {
-		return *this >= 1;
-	}
-	
-	CChipCond GetCChipCond(void) const;
-	CChipTree operator<=(int num) const;
-	CChipTree operator< (int num) const;
-	CChipTree operator>=(int num) const;
-	CChipTree operator> (int num) const;
-	
-	UINT m_type;
-};
-
-//////////////////////////////////////////////////////////////////////////////
-// 変数
-
-class CChipVar {
-public:
-	CChipVar(UINT var) : m_var(var){}
-	UINT m_var;
-	
-	CChipVar& operator=(const CChipVal& chip);
-};
-
-CChipVar A(0);
-CChipVar B(1);
-CChipVar C(2);
-CChipVar D(3);
-CChipVar E(4);
-CChipVar F(5);
 
 //////////////////////////////////////////////////////////////////////////////
 // 残弾
@@ -1054,7 +1198,7 @@ public:
 		m_type			= type;
 		m_operator		= OP_GE;
 		m_num			= 3;
-		m_Id			= CHIPID_DET_BARRIER;
+		m_Id			= CHIPID_DET_PROJECTILE;
 	}
 	
 	virtual ~CChipProjectileNum(){}
@@ -1093,6 +1237,53 @@ static CChipCond projectile_num(
 
 //////////////////////////////////////////////////////////////////////////////
 // マップポイント
+
+class CChipMapPoint : public CChip {
+public:
+	CChipMapPoint(
+		int angleCenter,
+		int angleRange,
+		int distance,
+		int map_x,
+		int map_y
+	){
+		m_angleCenter	= angleCenter;
+		m_angleRange	= angleRange;
+		m_distance		= distance;
+		m_x				= map_x;
+		m_y				= map_y;
+		m_Id			= CHIPID_MAPPOINT;
+	}
+	
+	virtual ~CChipMapPoint(){}
+
+	virtual std::string GetLayoutText(void){
+		return std::format(
+			"MAP[{}{}]\n{}m?\n{},{}",
+			m_x.get(), std::string(1, 'A' + m_y.get()),
+			m_distance.get(),
+			m_angleCenter.get(), m_angleRange.get()
+		);
+	}
+	
+	ScaledInt<5, 16, -240>	m_angleCenter;
+	ScaledInt<4, 32, 32>	m_angleRange;
+	ScaledInt<4, 20, 20>	m_distance;
+	ScaledInt<3, 1, 1>		m_x;
+	ScaledInt<3>			m_y;
+};
+
+static CChipCond is_mappoint(
+	int angleCenter,
+	int angleRange,
+	int distance,
+	int map_x,
+	int map_y,
+	LastLocationArg
+){
+	LastLocation();
+	return CChipCond(new CChipMapPoint(angleCenter, angleRange, distance, map_x, map_y));
+}
 
 //////////////////////////////////////////////////////////////////////////////
 // 自機の状態確認
@@ -1136,8 +1327,69 @@ public:
 //////////////////////////////////////////////////////////////////////////////
 // SUB1 / 2
 
+class CChipSubroutine : public CChip {
+public:
+	CChipSubroutine(
+		int no
+	){
+		m_Id	= CHIPID_SUB;
+		m_no	= no;
+	}
+
+	virtual ~CChipSubroutine(){}
+	
+	virtual std::string GetLayoutText(void){
+		return std::format("SUB{}", m_no.get());
+	}
+	
+	ScaledInt<2,1,1> m_no;
+};
+
+static void sub(
+	int no,
+	LastLocationArg
+){
+	LastLocation();
+	g_pCurTree->add(new CChipSubroutine(no));
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // 乱数
+
+class CChipIsRand : public CChip {
+public:
+	
+	CChipIsRand(
+		int num1,
+		int num2
+	){
+		m_Id	= CHIPID_RAND;
+		m_num1	= num1;
+		m_num2	= num2;
+	}
+	
+	virtual ~CChipIsRand(){}
+	
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"乱数\n{}/{}?",
+				m_num1.get(), m_num2.get()
+			);
+	}
+	
+	ScaledInt<6, 1, 1>		m_num1;
+	ScaledInt<6, 1, 1>		m_num2;
+};
+
+static CChipTree is_rand(
+	int num1,
+	int num2,
+	LastLocationArg
+){
+	LastLocation();
+	return CChipCond(new CChipIsRand(num1, num2)).GetCChipTree();
+}
 
 //////////////////////////////////////////////////////////////////////////////
 // 時間
@@ -1185,7 +1437,7 @@ public:
 		m_distance		= distance;
 		m_type			= type;
 		m_enemy			= enemy;
-		m_Id			= CHIPID_DET_OKE;
+		m_Id			= CHIPID_LOCKON;
 	}
 	
 	virtual ~CChipLockon(){}
@@ -1260,6 +1512,252 @@ static CChipCond target_distance(
 }
 
 //////////////////////////////////////////////////////////////////////////////
+// ターゲット方向
+
+class CChipTgtDirection : public CChip {
+public:
+	
+	CChipTgtDirection(
+		int angleCenter,
+		int angleRange
+	){
+		m_angleCenter	= angleCenter;
+		m_angleRange	= angleRange;
+		m_Id			= CHIPID_TGT_DIR;
+	}
+	
+	virtual ~CChipTgtDirection(){}
+
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"ターゲット方向\n{},{}?",
+				m_angleCenter.get(), m_angleRange.get()
+			);
+	}
+	
+	ScaledInt<5, 16, -240>	m_angleCenter;
+	ScaledInt<4, 32, 32>	m_angleRange;
+};
+
+static CChipTree is_target_direction(
+	int angleCenter,
+	int angleRange,
+	LastLocationArg
+){
+	LastLocation();
+	return CChipCond(new CChipTgtDirection(angleCenter, angleRange)).GetCChipTree();
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// ターゲット方向
+
+class CChipGetTgtDirection : public CChip {
+public:
+	
+	CChipGetTgtDirection(
+		int var_dir,
+		int var_elev
+	){
+		m_var_dir		= var_dir;
+		m_var_elev		= var_elev;
+		m_Id			= CHIPID_GET_TGT_DIR;
+	}
+	
+	virtual ~CChipGetTgtDirection(){}
+
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"ターゲット方向\n{} = 方向\n{} = 仰角",
+				m_VarNameStr[m_var_dir.get()],
+				m_VarNameStr[m_var_elev.get()]
+			);
+	}
+	
+	ScaledInt<3>	m_var_dir;
+	ScaledInt<3>	m_var_elev;
+};
+
+static void get_target_direction(
+	CChipVar var_dir,
+	CChipVar var_elev,
+	LastLocationArg
+){
+	LastLocation();
+	g_pCurTree->add(new CChipGetTgtDirection(var_dir.m_var, var_elev.m_var));
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// ターゲット XYZ 座標
+
+class CChipIsCoordinate : public CChip{
+public:
+	
+	CChipIsCoordinate(
+		int self_tgt,
+		int param
+	){
+		m_self_tgt		= self_tgt;
+		m_param			= param;
+		m_operator		= OP_GE;
+		m_num			= 0;
+		m_Id			= CHIPID_IS_COORDINATE;
+	}
+	
+	virtual ~CChipIsCoordinate(){}
+
+	virtual void set_num(int num){m_num = num;}
+	virtual void set_operator(int opr){m_operator = opr;}
+	
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"{}\n{}{}{}m?",
+				m_SelfTgtTypeStr[m_self_tgt.get()],
+				m_CoordinateStr[m_param.get()], m_operator_str[m_operator.get()], m_num.get()
+			);
+	}
+	
+	ScaledInt<1>		 	m_self_tgt;
+	ScaledInt<2>			m_param;
+	ScaledInt<7, 3, -168>	m_num;
+	ScaledInt<1>			m_operator;
+};
+
+class CChipGetCoordinate : public CChip{
+public:
+	
+	CChipGetCoordinate(
+		int self_tgt,
+		int param,
+		int var
+	){
+		m_self_tgt		= self_tgt;
+		m_param			= param;
+		m_var			= var;
+		m_Id			= CHIPID_GET_COORDINATE;
+	}
+	
+	virtual ~CChipGetCoordinate(){}
+	
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"{} = {}{}",
+				m_VarNameStr[m_var.get()],
+				m_SelfTgtTypeStr[m_self_tgt.get()],
+				m_CoordinateStr[m_param.get()]
+			);
+	}
+	
+	ScaledInt<3>			m_var;
+	ScaledInt<1>			m_self_tgt;
+	ScaledInt<2>			m_param;
+};
+
+//////////////////////////////////////////////////////////////////////////////
+// ターゲット状態
+
+class CChipTgtAction : public CChip {
+public:
+	
+	enum {
+		STOP,
+		MOVE,
+		TURN,
+		JUMP,
+		FIRE,
+		ACTION,
+		STUN,
+	};
+	
+	static inline const char *m_StatusTypeStr[] = {
+		"静止", "移動", "旋回", "Jmp", "射撃", "アクション", "被弾"
+	};
+	
+	CChipTgtAction(
+		int self_tgt,
+		int param
+	){
+		m_self_tgt	= self_tgt;
+		m_param		= param;
+		m_Id		= CHIPID_IS_ACTION;
+	}
+	
+	virtual ~CChipTgtAction(){}
+
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"{}\n{}中?",
+				m_SelfTgtTypeStr[m_self_tgt.get()], m_StatusTypeStr[m_param.get()]
+			);
+	}
+	
+	ScaledInt<1>	m_self_tgt;
+	ScaledInt<3>	m_param;
+};
+
+static CChipTree is_self_target_status(
+	int self_tgt,
+	int param
+){
+	return CChipCond(new CChipTgtAction(self_tgt, param)).GetCChipTree();
+}
+
+static CChipTree is_self_stop   (LastLocationArg){LastLocation(); return is_self_target_status(CChip::SELF, CChipTgtAction::STOP);}
+static CChipTree is_self_moving (LastLocationArg){LastLocation(); return is_self_target_status(CChip::SELF, CChipTgtAction::MOVE);}
+static CChipTree is_self_turning(LastLocationArg){LastLocation(); return is_self_target_status(CChip::SELF, CChipTgtAction::TURN);}
+static CChipTree is_self_jumping(LastLocationArg){LastLocation(); return is_self_target_status(CChip::SELF, CChipTgtAction::JUMP);}
+static CChipTree is_self_firing (LastLocationArg){LastLocation(); return is_self_target_status(CChip::SELF, CChipTgtAction::FIRE);}
+static CChipTree is_self_acting (LastLocationArg){LastLocation(); return is_self_target_status(CChip::SELF, CChipTgtAction::ACTION);}
+static CChipTree is_self_stun   (LastLocationArg){LastLocation(); return is_self_target_status(CChip::SELF, CChipTgtAction::STUN);}
+
+static CChipTree is_target_stop   (LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::STOP);}
+static CChipTree is_target_moving (LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::MOVE);}
+static CChipTree is_target_turning(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::TURN);}
+static CChipTree is_target_jumping(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::JUMP);}
+static CChipTree is_target_firing (LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIRE);}
+static CChipTree is_target_acting (LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::ACTION);}
+static CChipTree is_target_stun   (LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::STUN);}
+
+//////////////////////////////////////////////////////////////////////////////
+// サウンド
+
+class CChipSound : public CChip {
+public:
+	CChipSound(
+		int snd,
+		int cnt
+	){
+		m_Id	= CHIPID_SOUND;
+		m_snd	= snd;
+		m_cnt	= cnt;
+	}
+
+	virtual ~CChipSound(){}
+	
+	virtual std::string GetLayoutText(void){
+		return std::format("♪\n#{}x{}",
+			m_snd.get(), m_cnt.get()
+		);
+	}
+	
+	ScaledInt<3,1,1> m_snd;
+	ScaledInt<3,1,1> m_cnt;
+};
+
+static void sound(
+	int snd,
+	int cnt,
+	LastLocationArg
+){
+	LastLocation();
+	g_pCurTree->add(new CChipSound(snd, cnt));
+}
+
+//////////////////////////////////////////////////////////////////////////////
 // カウンタに自機状態入力
 
 class CChipGetStatus : public CChip {
@@ -1279,13 +1777,12 @@ public:
 	}
 	
 	virtual ~CChipGetStatus(){}
-
-	virtual void set_var(int var){m_var = var;}
 	
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
-				"{}←{}", std::string(1, 'A' + m_var.get()),
+				"{} = {}",
+				m_VarNameStr[m_var.get()],
 				m_param.get() <= DAMAGE ? m_StatusTypeStr[m_param.get()] :
 										  std::format("残弾#{}", m_param.get() - DAMAGE)
 			);
@@ -1296,15 +1793,156 @@ public:
 };
 
 //////////////////////////////////////////////////////////////////////////////
+// カウンタに自機状態入力
+
+class CChipGetMiscNum : public CChip {
+public:
+	enum {
+		TIME,
+		RAND,
+		FRIENDLY_NUM,
+		ENEMY_NUM,
+	};
+	
+	static inline const char *m_TypeStr[] = {
+		"時間", "乱数", "味方機数", "敵機数"
+	};
+	
+	CChipGetMiscNum(int param, int var){
+		m_var	= var;
+		m_param	= param;
+		m_Id	= CHIPID_GET_MISC_NUM;
+	}
+	
+	virtual ~CChipGetMiscNum(){}
+	
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"{} = {}",
+				m_VarNameStr[m_var.get()],
+				m_TypeStr[m_param.get()]
+			);
+	}
+	
+	ScaledInt<3>			m_var;
+	ScaledInt<2>			m_param;
+};
+
+//////////////////////////////////////////////////////////////////////////////
+// clamp
+
+class CChipClamp : public CChip {
+public:
+	CChipClamp(
+		int var,
+		int min,
+		int max
+	){
+		m_Id	= CHIPID_CLAMP;
+		m_var	= var;
+		m_min	= min;
+		m_max	= max;
+	}
+
+	virtual ~CChipClamp(){}
+	
+	virtual std::string GetLayoutText(void){
+		return std::format("クランプ\n{}≦{}≦{}",
+			m_min.get(), m_VarNameStr[m_var.get()], m_max.get()
+		);
+	}
+	
+	ScaledInt<3> m_var;
+	ScaledInt<8, 1, -127> m_min;
+	ScaledInt<8, 1, -127> m_max;
+};
+
+static void clamp(
+	CChipVar &var,
+	int min,
+	int max,
+	LastLocationArg
+){
+	LastLocation();
+	g_pCurTree->add(new CChipClamp(var.m_var, min, max));
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// CH
+
+class CChipChSend : public CChip {
+public:
+	CChipChSend(int ch, int var){
+		m_var	= var;
+		m_ch	= ch;
+		m_Id	= CHIPID_CH_SEND;
+	}
+	
+	virtual ~CChipChSend(){}
+	
+	virtual std::string GetLayoutText(void){
+		return std::format(
+			"送信\nCH{}≪{}",
+			m_ch.get(),
+			m_VarNameStr[m_var.get()]
+		);
+	}
+	
+	ScaledInt<3>			m_var;
+	ScaledInt<3, 1, 1>		m_ch;
+};
+
+static void ch_send(
+	int ch,
+	CChipVar& var,
+	LastLocationArg
+){
+	LastLocation();
+	g_pCurTree->add(new CChipChSend(ch, var.m_var));
+}
+
+class CChipChReceive : public CChip {
+public:
+	CChipChReceive(int ch, int var){
+		m_var	= var;
+		m_ch	= ch;
+		m_Id	= CHIPID_CH_RECV;
+	}
+	
+	virtual ~CChipChReceive(){}
+	
+	virtual std::string GetLayoutText(void){
+		return std::format(
+			"受信\n{}≪CH{}",
+			m_VarNameStr[m_var.get()],
+			m_ch.get()
+		);
+	}
+	
+	ScaledInt<3>			m_var;
+	ScaledInt<3, 1, 1>		m_ch;
+};
+
+//////////////////////////////////////////////////////////////////////////////
 // val 系
 
 CChipVal heat  (LastLocationArg){LastLocation(); return CChipVal(CChipVal::HEAT);}
 CChipVal fuel  (LastLocationArg){LastLocation(); return CChipVal(CChipVal::FUEL);}
 CChipVal damage(LastLocationArg){LastLocation(); return CChipVal(CChipVal::DAMAGE);}
 CChipVal time  (LastLocationArg){LastLocation(); return CChipVal(CChipVal::TIME);}
-CChipVal pos_x (LastLocationArg){LastLocation(); return CChipVal(CChipVal::POS_X);}
-CChipVal pos_y (LastLocationArg){LastLocation(); return CChipVal(CChipVal::POS_Y);}
-CChipVal pos_z (LastLocationArg){LastLocation(); return CChipVal(CChipVal::POS_Z);}
+CChipVal self_x(LastLocationArg){LastLocation(); return CChipVal(CChipVal::SELF_POS_X);}
+CChipVal self_y(LastLocationArg){LastLocation(); return CChipVal(CChipVal::SELF_POS_Y);}
+CChipVal self_z(LastLocationArg){LastLocation(); return CChipVal(CChipVal::SELF_POS_Z);}
+CChipVal target_x(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_X);}
+CChipVal target_y(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_Y);}
+CChipVal target_z(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_Z);}
+
+CChipVal friendly_num(LastLocationArg){LastLocation(); return CChipVal(CChipVal::FRIENDLY);}
+CChipVal enemy_num(LastLocationArg){LastLocation(); return CChipVal(CChipVal::ENEMY);}
+CChipVal okecc_rand(LastLocationArg){LastLocation(); return CChipVal(CChipVal::RAND);}
+
+CChipVal ch_receive(int ch, LastLocationArg){LastLocation(); return CChipVal(CChipVal::CH_RECV, ch);}
 
 CChipVal ammo_num(int weapon, LastLocationArg){
 	LastLocation(); return CChipVal(weapon - 1);
@@ -1317,14 +1955,45 @@ CChipVar& CChipVar::operator=(const CChipVal& val){
 	switch(val.m_type){
 		case CChipVal::HEAT:
 		case CChipVal::FUEL:
-		case CChipVal::DAMAGE:	pchip = new CChipGetStatus(val.m_type - CChipVal::HEAT, m_var); break;
+		case CChipVal::DAMAGE:
+			pchip = new CChipGetStatus(val.m_type - CChipVal::HEAT, m_var);
+			break;
 		
 		case CChipVal::TIME:
-		case CChipVal::POS_X:
-		case CChipVal::POS_Y:
-		case CChipVal::POS_Z:
+			pchip = new CChipGetMiscNum(CChipGetMiscNum::TIME, m_var);
+			break;
+			
+		case CChipVal::FRIENDLY:
+			pchip = new CChipGetMiscNum(CChipGetMiscNum::FRIENDLY_NUM, m_var);
+			break;
+			
+		case CChipVal::ENEMY:
+			pchip = new CChipGetMiscNum(CChipGetMiscNum::ENEMY_NUM, m_var);
+			break;
+			
+		case CChipVal::RAND:
+			pchip = new CChipGetMiscNum(CChipGetMiscNum::RAND, m_var);
+			break;
 		
-		default:				pchip = new CChipGetStatus(CChipGetStatus::AMMO + val.m_type, m_var); break;
+		case CChipVal::CH_RECV:
+			pchip = new CChipChReceive(val.m_param, m_var);
+			break;
+		
+		case CChipVal::SELF_POS_X:
+		case CChipVal::SELF_POS_Y:
+		case CChipVal::SELF_POS_Z:
+		case CChipVal::TGT_POS_X:
+		case CChipVal::TGT_POS_Y:
+		case CChipVal::TGT_POS_Z:
+			pchip = new CChipGetCoordinate(
+				val.m_type >= CChipVal::TGT_POS_X ? CChip::TARGET : CChip::SELF,
+				(val.m_type - CChipVal::SELF_POS_X) % 3,
+				m_var
+			);
+			break;
+		
+		default:
+			pchip = new CChipGetStatus(CChipGetStatus::AMMO + val.m_type, m_var);
 	}
 	
 	g_pCurTree->add(pchip);
@@ -1336,17 +2005,40 @@ CChipCond CChipVal::GetCChipCond(void) const {
 	CChip *pchip;
 	
 	switch(m_type){
-		case CChipVal::HEAT:	
-		case CChipVal::FUEL:	
-		case CChipVal::DAMAGE:	pchip = new CChipSelfStatus(m_type - CChipVal::HEAT); break;
+		case CChipVal::HEAT:
+		case CChipVal::FUEL:
+		case CChipVal::DAMAGE:
+			pchip = new CChipSelfStatus(m_type - CChipVal::HEAT);
+			break;
 		
-		case CChipVal::TIME:	pchip = new CChipTime(); break;
+		case CChipVal::TIME:
+			pchip = new CChipTime();
+			break;
 		
-		case CChipVal::POS_X:	
-		case CChipVal::POS_Y:	
-		case CChipVal::POS_Z:	
+		case CChipVal::FRIENDLY:
+		case CChipVal::ENEMY:
+		case CChipVal::RAND:
+			throw OkeccError("Invalid parameter");
+			break;
+			
+		case CChipVal::CH_RECV:
+			throw OkeccError("Invalid use of ch_receive()");
+			break;
+			
+		case CChipVal::SELF_POS_X:
+		case CChipVal::SELF_POS_Y:
+		case CChipVal::SELF_POS_Z:
+		case CChipVal::TGT_POS_X:
+		case CChipVal::TGT_POS_Y:
+		case CChipVal::TGT_POS_Z:
+			pchip = new CChipIsCoordinate(
+				m_type >= CChipVal::TGT_POS_X ? CChip::TARGET : CChip::SELF,
+				(m_type - CChipVal::SELF_POS_X) % 3
+			);
+			break;
 		
-		default:				pchip = new CChipAmmoNum(m_type); break;
+		default:
+			pchip = new CChipAmmoNum(m_type);
 	}
 	
 	return CChipCond(pchip);
@@ -1356,6 +2048,104 @@ CChipTree CChipVal::operator<=(int num) const {return GetCChipCond() <= num;}
 CChipTree CChipVal::operator< (int num) const {return GetCChipCond() <  num;}
 CChipTree CChipVal::operator>=(int num) const {return GetCChipCond() >= num;}
 CChipTree CChipVal::operator> (int num) const {return GetCChipCond() >  num;}
+
+//////////////////////////////////////////////////////////////////////////////
+// 算術演算
+
+class CChipCalc : public CChip {
+public:
+	enum {
+		ADD, SUB, MUL, DIV, MOD, MOV
+	};
+	
+	static inline const char *m_OprStr[] = {
+		"+", "-", "*", "/", "%", ""
+	};
+	
+	CChipCalc(
+		int op1,
+		int opr,
+		int immxvar,
+		int op2
+	){
+		m_op1		= op1;
+		m_operator	= opr;
+		m_immxvar	= immxvar;
+		m_op2		= op2;
+		m_Id		= CHIPID_CALC;
+	}
+	
+	virtual ~CChipCalc(){}
+	
+	virtual std::string GetLayoutText(void){
+		return m_immxvar.get() ?
+			std::format("{} {}= {}", m_VarNameStr[m_op1.get()], m_OprStr[m_operator.get()], m_op2.get()) :
+			std::format("{} {}= {}", m_VarNameStr[m_op1.get()], m_OprStr[m_operator.get()], m_VarNameStr[m_op2.get()]);
+	}
+	
+	ScaledInt<3>	m_op1;
+	ScaledInt<3>	m_operator;
+	ScaledInt<1>	m_immxvar;
+	ScaledInt<8>	m_op2;
+};
+
+CChipVar& CChipVar::operator+=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::ADD, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator-=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::SUB, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator*=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MUL, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator/=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::DIV, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator%=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOD, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator= (const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOV, 0, op2.m_var)); return *this;}
+
+CChipVar& CChipVar::operator+=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::ADD, 1, imm)); return *this;}
+CChipVar& CChipVar::operator-=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::SUB, 1, imm)); return *this;}
+CChipVar& CChipVar::operator*=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MUL, 1, imm)); return *this;}
+CChipVar& CChipVar::operator/=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::DIV, 1, imm)); return *this;}
+CChipVar& CChipVar::operator%=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOD, 1, imm)); return *this;}
+CChipVar& CChipVar::operator= (const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOV, 1, imm)); return *this;}
+
+//////////////////////////////////////////////////////////////////////////////
+// 算術比較
+
+class CChipCmp : public CChip {
+public:
+	CChipCmp(
+		int op1,
+		int opr,
+		int immxvar,
+		int op2
+	){
+		m_op1		= op1;
+		m_operator	= opr;
+		m_immxvar	= immxvar;
+		m_op2		= op2;
+		m_Id		= CHIPID_CMP;
+	}
+	
+	virtual ~CChipCmp(){}
+	
+	virtual std::string GetLayoutText(void){
+		return m_immxvar.get() ?
+			std::format("{}{}{}", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_op2.get()) :
+			std::format("{}{}{}", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_VarNameStr[m_op2.get()]);
+	}
+	
+	ScaledInt<3>	m_op1;
+	ScaledInt<1>	m_immxvar;
+	ScaledInt<8>	m_op2;
+	ScaledInt<3>	m_operator;
+};
+
+CChipTree CChipVar::operator>=(const CChipVar& op2){return CChipCond(new CChipCmp(m_var, CChip::OP_GE, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator<=(const CChipVar& op2){return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator==(const CChipVar& op2){return CChipCond(new CChipCmp(m_var, CChip::OP_EQ, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator!=(const CChipVar& op2){return CChipCond(new CChipCmp(m_var, CChip::OP_NE, 0, op2.m_var)).GetCChipTree();}
+
+CChipTree CChipVar::operator>=(const int imm){return CChipCond(new CChipCmp(m_var, CChip::OP_GE, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator<=(const int imm){return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator==(const int imm){return CChipCond(new CChipCmp(m_var, CChip::OP_EQ, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator!=(const int imm){return CChipCond(new CChipCmp(m_var, CChip::OP_NE, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator> (const int imm){return CChipCond(new CChipCmp(m_var, CChip::OP_GE, 1, imm - 1)).GetCChipTree();}
+CChipTree CChipVar::operator< (const int imm){return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm + 1)).GetCChipTree();}
 
 //////////////////////////////////////////////////////////////////////////////
 // if - else - endif
@@ -1396,7 +2186,7 @@ void else_statement(
 	LastLocation();
 
 	if(g_BlockStack.size() < 1){
-		throw OkeccError("Unexpected ENDIF");
+		throw OkeccError("Unexpected endif");
 	}
 
 	UINT idx = g_pCurTree->m_LastG;	// then 節の最後
@@ -1414,7 +2204,7 @@ void endif_statement(
 	LastLocation();
 
 	if(g_BlockStack.size() < 1){
-		throw OkeccError("Unexpected ENDIF");
+		throw OkeccError("Unexpected endif");
 	}
 
 	// 合流 GOTO 生成
@@ -1426,14 +2216,10 @@ void endif_statement(
 	(*g_pCurChipPool)[idx]->m_NextG = merge;
 }
 
-#define IF(cc)	if_statement(cc);
-#define ELSE	else_statement();
-#define ENDIF	endif_statement();
-
 //////////////////////////////////////////////////////////////////////////////
 // end
 
-static void end(LastLocationArg){
+static void okecc_exit(LastLocationArg){
 	LastLocation();
 	
 	// Goto chip * 2 を置き，1個目を Exit に向ける
@@ -2216,110 +3002,161 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 }
 
 //////////////////////////////////////////////////////////////////////////////
+// C との命名被り回避
+
+#define if(cc)	if_statement(cc);
+#define else	else_statement();
+#define endif	endif_statement();
+
+#define exit	okecc_exit
+#define rand	okecc_rand
+
+//////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void){
 	option(1);
 	
-	IF(time() >= 60)
-		option(2);
-	ENDIF
+	if(time() >= 60)
+		F = time();
+	endif
 	
-	IF(damage() >= 50)
+	if(damage() >= 50)
 		lockon(128, 128, 160, OKE_ALL);
-		A = heat();
-	ENDIF
+		C = heat();
+	endif
 	
-	IF(target_distance() <= 160)
+	if(target_distance() <= 160)
 		option(2);
-	ENDIF
+	endif
 	
+	if(is_target_direction(-128, 128))
+		fire_target(1, 8);
+	endif
 	
+	if(target_y() >= 0)
+		F = target_y();
+	endif
+	
+	if(self_z() >= 0)
+		B = self_z();
+	endif
+	
+	if(is_self_stop())
+		option(1);
+	endif
+	if(is_target_stun())
+		get_target_direction(A, F);
+	endif
+	if(enemy_num(0, 416, 160, OKE_ALL))
+		A = friendly_num();
+	endif
+	D = rand();
+	B += F;
+	if(F <= 2)
+		F += 255;
+	endif
+	if(B != A)
+		A = 0;
+		(B = time()) += 3;
+	endif
+	fire_direction(0, 0, 1, 1);
+	fire_direction(A, B, 1, 1);
+	clamp(C, -127, 127);
+	if(is_rand(49, 50))
+		sound(1, 1);
+	endif
+	if(is_mappoint(-128, 128, 320, 1, 1))
+		sound(5, 5);
+	endif
+	B = ch_receive(7);
+	ch_send(1, F);
+	sub(2);
 #if 0
-	IF(enemy_num(0, 416, 160, OKE_ALL))
+	if(enemy_num(0, 416, 160, OKE_ALL))
 		jump_forward();
 		end();
-	ELSE
+	else
 		action1();
-	ENDIF
+	endif
 #endif
 
 #if 0
 	for(int i = 0; i < 1; ++i){
-		IF(enemy_num(0, 416, 160, OKE_ALL))
-			IF(enemy_num(0, 128, 320, OKE_HOVER) && friendly_num(0, 128, 320, OKE_ALL))
+		if(enemy_num(0, 416, 160, OKE_ALL))
+			if(enemy_num(0, 128, 320, OKE_HOVER) && friendly_num(0, 128, 320, OKE_ALL))
 				turn_right();
 				jump_backward();
-			ELSE
+			else
 				move_forward();
-			ENDIF
+			endif
 			action1();
 			end();
-		ENDIF
+		endif
 		guard();
 		fire(0, 416, 160, OKE_HOVER, 1, 8);
 		fire(128, 20, 1, 8);
 		
-		IF(option_num(1) >= 2)
-			IF(barrier_height(0, 32, 160) >= 24)
-				IF(projectile_num(0, 32, 160, P_HI_V))
+		if(option_num(1) >= 2)
+			if(barrier_height(0, 32, 160) >= 24)
+				if(projectile_num(0, 32, 160, P_HI_V))
 					option(1);
-				ENDIF
-			ENDIF
-		ENDIF
-		IF(ammo_num(2) > 20)
+				endif
+			endif
+		endif
+		if(ammo_num(2) > 20)
 			B = ammo_num(2);
-		ENDIF
-		IF(ammo_num(1))
+		endif
+		if(ammo_num(1))
 			B = ammo_num(1);
-		ENDIF
+		endif
 		C = heat();
 		A = damage();
 	}
 #endif
 #if 0
-	IF(enemy_num(0, 416, 160, OKE_ALL))
-		IF(enemy_num(0, 128, 320, OKE_HOVER) && friendly_num(0, 128, 320, OKE_ALL))
+	if(enemy_num(0, 416, 160, OKE_ALL))
+		if(enemy_num(0, 128, 320, OKE_HOVER) && friendly_num(0, 128, 320, OKE_ALL))
 			turn_right();
 			jump_backward();
-		ELSE
+		else
 			move_forward();
-		ENDIF
+		endif
 		action1();
 		end();
-	ENDIF
+	endif
 	guard();
 	fire(0, 416, 160, OKE_HOVER, 1, 8);
 	fire(128, 20, 1, 8);
 	
-	IF(option_num(1) >= 2)
-		IF(barrier_height(0, 32, 160) >= 24)
-			IF(projectile_num(0, 32, 160, P_HI_V))
+	if(option_num(1) >= 2)
+		if(barrier_height(0, 32, 160) >= 24)
+			if(projectile_num(0, 32, 160, P_HI_V))
 				option(1);
-			ENDIF
-		ENDIF
-	ENDIF
-	IF(ammo_num(2) > 20)
+			endif
+		endif
+	endif
+	if(ammo_num(2) > 20)
 		B = ammo_num(2);
-	ENDIF
-	IF(ammo_num(1))
+	endif
+	if(ammo_num(1))
 		B = ammo_num(1);
-	ENDIF
+	endif
 	C = heat();
 	A = damage();
 #endif
 #if 0
-	IF(
+	if(
 		enemy_num(0, 416, 160, OKE_ALL) >= 1 && enemy_num(16, 416, 160, OKE_ALL) >= 1 ||
 		enemy_num(32, 416, 160, OKE_ALL) >= 1 && enemy_num(64, 416, 160, OKE_ALL) >= 1
 	)
 		option(1);
-	ELSE
+	else
 		option(3);
-	ENDIF
+	endif
 #endif
 #if 0
 		option(1);
-		IF(
+		if(
 			(enemy_num(0, 416, 160, OKE_ALL) >= 1 && enemy_num(16, 416, 160, OKE_ALL) >= 1) ||
 			(enemy_num(0, 416, 160, OKE_ALL) >= 1 && enemy_num(16, 416, 160, OKE_ALL)) ||
 			(enemy_num(0, 416, 160, OKE_ALL) && enemy_num(16, 416, 160, OKE_ALL) >= 1) ||
@@ -2330,50 +3167,50 @@ void chip_main(void){
 			(ammo_num(1) && ammo_num(1))
 		)
 			option(1);
-		ELSE
+		else
 			A = ammo_num(1);
-		ENDIF
+		endif
 #endif
 #if 0
-	IF(ammo_num(1))
+	if(ammo_num(1))
 		option(1);
-	ELSE
+	else
 		jump_forward();
 		jump_forward();
 		jump_forward();
-	ENDIF
+	endif
 	
-	IF(ammo_num(1))
+	if(ammo_num(1))
 		option(1);
 		option(1);
-	ELSE
+	else
 		jump_forward();
 		jump_forward();
 		jump_forward();
 		jump_forward();
 		jump_forward();
-	ENDIF
+	endif
 	
-	IF(ammo_num(1))
+	if(ammo_num(1))
 		option(1);
-	ELSE
+	else
 		jump_forward();
-	ENDIF
+	endif
 
-	IF(ammo_num(1))
+	if(ammo_num(1))
 		jump_forward();
 		jump_forward();
 		jump_forward();
-	ENDIF
+	endif
 
-	IF(ammo_num(1))
+	if(ammo_num(1))
 		jump_forward();
 		jump_forward();
-	ENDIF
+	endif
 
-	IF(ammo_num(1))
+	if(ammo_num(1))
 		jump_forward();
-	ENDIF
+	endif
 	
 	jump_backward();
 #endif
@@ -2389,7 +3226,7 @@ int main(void){
 		chip_main();
 	}catch(const OkeccError& e){
 		puts(e.what());
-		exit(0);
+		return 0;
 	}
 	
 	g_pCurTree->AddToG(IDX_EXIT);
@@ -2403,7 +3240,7 @@ int main(void){
 	g_pCurChipPool->dump();
 	
 	CarnageSA sa(*g_pCurChipPool, "chip.svg");
-	sa.run();
+	//sa.run();
 	sa.OutputSvg("chip.svg", sa.get_result());
 
 	return 0;
