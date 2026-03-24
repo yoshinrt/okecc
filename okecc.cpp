@@ -154,7 +154,7 @@ public:
 	};
 	
 	static inline const char *m_operator_str[] = {
-		"≧", "≦", "=", "≠"
+		"≧", "≦", "==", "≠"
 	};
 	
 	static inline const char *m_StatusTypeStr[] = {
@@ -357,6 +357,16 @@ public:
 
 		return *this;
 	}
+	
+	CChipTree operator!(void) const {
+		CChipTree tree = CChipTree();
+		
+		tree.m_start = m_start;
+		tree.m_LastG = m_LastR;
+		tree.m_LastR = m_LastG;
+		
+		return tree;
+	}
 };
 
 CChipTree *g_pCurTree;
@@ -434,6 +444,10 @@ public:
 		return GetCChipTree();
 	}
 	
+	CChipTree operator!(void) const {
+		return !GetCChipTree();
+	}
+	
 	CChipTree operator>=(int num) const {
 		m_pchip->set_num(num);
 		m_pchip->set_operator(CChip::OP_GE);
@@ -496,6 +510,10 @@ public:
 	
 	CChipVal(UINT type, int param = 0) : m_type(type), m_param(param){}
 	
+	CChipTree operator!(void) const {
+		return !(*this >= 1);
+	}
+	
 	operator CChipTree() const {
 		return *this >= 1;
 	}
@@ -520,31 +538,35 @@ public:
 	
 	CChipVar& operator=(const CChipVal& chip);
 	
-	CChipVar& operator+=(const CChipVar& op2);
-	CChipVar& operator-=(const CChipVar& op2);
-	CChipVar& operator*=(const CChipVar& op2);
-	CChipVar& operator/=(const CChipVar& op2);
-	CChipVar& operator%=(const CChipVar& op2);
-	CChipVar& operator= (const CChipVar& op2);
+	CChipTree operator!(void) const {
+		return *this == 0;
+	}
 	
-	CChipVar& operator+=(const int op2);
-	CChipVar& operator-=(const int op2);
-	CChipVar& operator*=(const int op2);
-	CChipVar& operator/=(const int op2);
-	CChipVar& operator%=(const int op2);
-	CChipVar& operator= (const int op2);
+	CChipVar operator+=(const CChipVar& op2) const;
+	CChipVar operator-=(const CChipVar& op2) const;
+	CChipVar operator*=(const CChipVar& op2) const;
+	CChipVar operator/=(const CChipVar& op2) const;
+	CChipVar operator%=(const CChipVar& op2) const;
+	CChipVar operator= (const CChipVar& op2) const;
 	
-	CChipTree operator>=(const CChipVar& op2);
-	CChipTree operator<=(const CChipVar& op2);
-	CChipTree operator==(const CChipVar& op2);
-	CChipTree operator!=(const CChipVar& op2);
+	CChipVar operator+=(const int op2) const;
+	CChipVar operator-=(const int op2) const;
+	CChipVar operator*=(const int op2) const;
+	CChipVar operator/=(const int op2) const;
+	CChipVar operator%=(const int op2) const;
+	CChipVar operator= (const int op2) const;
 	
-	CChipTree operator>=(const int imm);
-	CChipTree operator<=(const int imm);
-	CChipTree operator==(const int imm);
-	CChipTree operator!=(const int imm);
-	CChipTree operator> (const int imm);
-	CChipTree operator< (const int imm);
+	CChipTree operator>=(const CChipVar& op2) const;
+	CChipTree operator<=(const CChipVar& op2) const;
+	CChipTree operator==(const CChipVar& op2) const;
+	CChipTree operator!=(const CChipVar& op2) const;
+	
+	CChipTree operator>=(const int imm) const;
+	CChipTree operator<=(const int imm) const;
+	CChipTree operator==(const int imm) const;
+	CChipTree operator!=(const int imm) const;
+	CChipTree operator> (const int imm) const;
+	CChipTree operator< (const int imm) const;
 };
 
 CChipVar A(0);
@@ -2090,19 +2112,19 @@ public:
 	ScaledInt<8>	m_op2;
 };
 
-CChipVar& CChipVar::operator+=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::ADD, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator-=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::SUB, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator*=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MUL, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator/=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::DIV, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator%=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOD, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator= (const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOV, 0, op2.m_var)); return *this;}
+CChipVar CChipVar::operator+=(const CChipVar& op2) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::ADD, 0, op2.m_var)); return *this;}
+CChipVar CChipVar::operator-=(const CChipVar& op2) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::SUB, 0, op2.m_var)); return *this;}
+CChipVar CChipVar::operator*=(const CChipVar& op2) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MUL, 0, op2.m_var)); return *this;}
+CChipVar CChipVar::operator/=(const CChipVar& op2) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::DIV, 0, op2.m_var)); return *this;}
+CChipVar CChipVar::operator%=(const CChipVar& op2) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOD, 0, op2.m_var)); return *this;}
+CChipVar CChipVar::operator= (const CChipVar& op2) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOV, 0, op2.m_var)); return *this;}
 
-CChipVar& CChipVar::operator+=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::ADD, 1, imm)); return *this;}
-CChipVar& CChipVar::operator-=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::SUB, 1, imm)); return *this;}
-CChipVar& CChipVar::operator*=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MUL, 1, imm)); return *this;}
-CChipVar& CChipVar::operator/=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::DIV, 1, imm)); return *this;}
-CChipVar& CChipVar::operator%=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOD, 1, imm)); return *this;}
-CChipVar& CChipVar::operator= (const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOV, 1, imm)); return *this;}
+CChipVar CChipVar::operator+=(const int imm) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::ADD, 1, imm)); return *this;}
+CChipVar CChipVar::operator-=(const int imm) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::SUB, 1, imm)); return *this;}
+CChipVar CChipVar::operator*=(const int imm) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MUL, 1, imm)); return *this;}
+CChipVar CChipVar::operator/=(const int imm) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::DIV, 1, imm)); return *this;}
+CChipVar CChipVar::operator%=(const int imm) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOD, 1, imm)); return *this;}
+CChipVar CChipVar::operator= (const int imm) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOV, 1, imm)); return *this;}
 
 //////////////////////////////////////////////////////////////////////////////
 // 算術比較
@@ -2126,8 +2148,8 @@ public:
 	
 	virtual std::string GetLayoutText(void){
 		return m_immxvar.get() ?
-			std::format("{}{}{}", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_op2.get()) :
-			std::format("{}{}{}", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_VarNameStr[m_op2.get()]);
+			std::format("{}{}{}?", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_op2.get()) :
+			std::format("{}{}{}?", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_VarNameStr[m_op2.get()]);
 	}
 	
 	ScaledInt<3>	m_op1;
@@ -2136,17 +2158,17 @@ public:
 	ScaledInt<3>	m_operator;
 };
 
-CChipTree CChipVar::operator>=(const CChipVar& op2){return CChipCond(new CChipCmp(m_var, CChip::OP_GE, 0, op2.m_var)).GetCChipTree();}
-CChipTree CChipVar::operator<=(const CChipVar& op2){return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 0, op2.m_var)).GetCChipTree();}
-CChipTree CChipVar::operator==(const CChipVar& op2){return CChipCond(new CChipCmp(m_var, CChip::OP_EQ, 0, op2.m_var)).GetCChipTree();}
-CChipTree CChipVar::operator!=(const CChipVar& op2){return CChipCond(new CChipCmp(m_var, CChip::OP_NE, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator>=(const CChipVar& op2) const {return CChipCond(new CChipCmp(m_var, CChip::OP_GE, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator<=(const CChipVar& op2) const {return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator==(const CChipVar& op2) const {return CChipCond(new CChipCmp(m_var, CChip::OP_EQ, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator!=(const CChipVar& op2) const {return CChipCond(new CChipCmp(m_var, CChip::OP_NE, 0, op2.m_var)).GetCChipTree();}
 
-CChipTree CChipVar::operator>=(const int imm){return CChipCond(new CChipCmp(m_var, CChip::OP_GE, 1, imm)).GetCChipTree();}
-CChipTree CChipVar::operator<=(const int imm){return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm)).GetCChipTree();}
-CChipTree CChipVar::operator==(const int imm){return CChipCond(new CChipCmp(m_var, CChip::OP_EQ, 1, imm)).GetCChipTree();}
-CChipTree CChipVar::operator!=(const int imm){return CChipCond(new CChipCmp(m_var, CChip::OP_NE, 1, imm)).GetCChipTree();}
-CChipTree CChipVar::operator> (const int imm){return CChipCond(new CChipCmp(m_var, CChip::OP_GE, 1, imm - 1)).GetCChipTree();}
-CChipTree CChipVar::operator< (const int imm){return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm + 1)).GetCChipTree();}
+CChipTree CChipVar::operator>=(const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_GE, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator<=(const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator==(const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_EQ, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator!=(const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_NE, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator> (const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_GE, 1, imm - 1)).GetCChipTree();}
+CChipTree CChipVar::operator< (const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm + 1)).GetCChipTree();}
 
 //////////////////////////////////////////////////////////////////////////////
 // if - else - endif
@@ -2173,7 +2195,8 @@ void if_statement(const CChipTree& cc, LastLocationArg, bool BlockStart = true){
 }
 
 void if_statement(const CChipCond& chip, LastLocationArg){if_statement(chip.GetCChipTree(), location);}
-void if_statement(const CChipVal&  chip, LastLocationArg){if_statement(chip.GetCChipCond().GetCChipTree(), location);}
+void if_statement(const CChipVal&  chip, LastLocationArg){if_statement(chip >= 1, location);}
+void if_statement(const CChipVar&  chip, LastLocationArg){if_statement(chip != 0, location);}
 
 void else_statement(
 	LastLocationArg
@@ -3014,8 +3037,8 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 #define else		else_statement();
 #define endif		endif_statement();
 
-#define exit	okecc_exit
-#define rand	okecc_rand
+#define exit		okecc_exit
+#define rand		okecc_rand
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -3081,7 +3104,23 @@ void chip_main(void){
 #endif
 #if 1
 	nop();
-	if(enemy_num(0, 416, 160, OKE_ALL))
+	
+	if(A)
+		option(1);
+	endif
+	if(!A)
+		option(1);
+	endif
+	if(ammo_num(1))
+		option(1);
+	endif
+	if(!ammo_num(1))
+		option(1);
+	endif
+	
+	if((enemy_num(0, 416, 160, OKE_ALL) >= 1))
+		jump_forward();
+	elseif(!(enemy_num(0, 416, 160, OKE_ALL) >= 1))
 		jump_forward();
 	elseif(ammo_num(1) >= 1)
 		action1();
