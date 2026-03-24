@@ -560,6 +560,8 @@ public:
 	CChipTree operator<=(const CChipVar& op2) const;
 	CChipTree operator==(const CChipVar& op2) const;
 	CChipTree operator!=(const CChipVar& op2) const;
+	CChipTree operator> (const CChipVar& op2) const;
+	CChipTree operator< (const CChipVar& op2) const;
 	
 	CChipTree operator>=(const int imm) const;
 	CChipTree operator<=(const int imm) const;
@@ -2162,6 +2164,8 @@ CChipTree CChipVar::operator>=(const CChipVar& op2) const {return CChipCond(new 
 CChipTree CChipVar::operator<=(const CChipVar& op2) const {return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 0, op2.m_var)).GetCChipTree();}
 CChipTree CChipVar::operator==(const CChipVar& op2) const {return CChipCond(new CChipCmp(m_var, CChip::OP_EQ, 0, op2.m_var)).GetCChipTree();}
 CChipTree CChipVar::operator!=(const CChipVar& op2) const {return CChipCond(new CChipCmp(m_var, CChip::OP_NE, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator> (const CChipVar& op2) const {return !(*this <= op2);}
+CChipTree CChipVar::operator< (const CChipVar& op2) const {return !(*this >= op2);}
 
 CChipTree CChipVar::operator>=(const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_GE, 1, imm)).GetCChipTree();}
 CChipTree CChipVar::operator<=(const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm)).GetCChipTree();}
@@ -3105,10 +3109,10 @@ void chip_main(void){
 #if 1
 	nop();
 	
-	if(A)
+	if(A > B)
 		option(1);
 	endif
-	if(!A)
+	if(A < B)
 		option(1);
 	endif
 	if(ammo_num(1))
