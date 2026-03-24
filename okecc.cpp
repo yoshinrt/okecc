@@ -179,10 +179,6 @@ public:
 		"自機", "TGT"
 	};
 	
-	CChip(){
-		m_Id		= CHIPID_NULL;
-	}
-	
 	enum {
 		X, Y, Z
 	};
@@ -194,6 +190,10 @@ public:
 	static inline const char *m_VarNameStr[] = {
 		"A", "B", "C", "D", "E", "F"
 	};
+	
+	CChip(){
+		m_Id		= CHIPID_NULL;
+	}
 	
 	virtual ~CChip(){}
 	
@@ -358,6 +358,42 @@ public:
 		return *this;
 	}
 	
+	CChipTree operator&&(const CChipTree& b) const {
+		CChipTree cc_a = *this;
+		CChipTree cc_b = b;
+	
+		// a.r -> cc_b.start を指す
+		cc_a.AddToR(cc_b.m_start);
+	
+		// False 側: GOTO を生成し a.g, cc_b.g, tree.g はそれを指す
+		UINT idx = g_pCurChipPool->add(new CChipGoto);
+		cc_a.AddToG(idx);
+		cc_b.AddToG(idx);
+	
+		// True 側: tree.r は cc_b.r になる
+		cc_a.m_LastR = cc_b.m_LastR;
+	
+		return cc_a;
+	}
+	
+	CChipTree operator||(const CChipTree& b) const {
+		CChipTree cc_a = *this;
+		CChipTree cc_b = b;
+	
+		// a.g -> cc_b.start を指す
+		cc_a.AddToG(cc_b.m_start);
+	
+		// True 側: GOTO を生成し a.r, cc_r.g, tree.r はそれを指す
+		UINT idx = g_pCurChipPool->add(new CChipGoto);
+		cc_a.AddToR(idx);
+		cc_b.AddToR(idx);
+	
+		// False 側: tree.g は cc_b.g になる
+		cc_a.m_LastG = cc_b.m_LastG;
+	
+		return cc_a;
+	}
+	
 	CChipTree operator!(void) const {
 		CChipTree tree = CChipTree();
 		
@@ -371,50 +407,24 @@ public:
 
 CChipTree *g_pCurTree;
 
-CChipTree operator&&(const CChipTree& a, const CChipTree& b){
-	// condition な tree か判定
-	if(!a.ValidR() || !b.ValidR()){
-		throw OkeccError("Invalid use of && operator: Condition chip expected.");
-	}
+//////////////////////////////////////////////////////////////////////////////
 
-	CChipTree cc_a = a;
-	CChipTree cc_b = b;
+// CChipTree に変換可能な型を CChipTree として扱うテンプレート
+template <typename T>
+concept ChipLike = std::convertible_to<T, CChipTree>;
 
-	// a.r -> cc_b.start を指す
-	cc_a.AddToR(cc_b.m_start);
-
-	// False 側: GOTO を生成し a.g, cc_b.g, tree.g はそれを指す
-	UINT idx = g_pCurChipPool->add(new CChipGoto);
-	cc_a.AddToG(idx);
-	cc_b.AddToG(idx);
-
-	// True 側: tree.r は cc_b.r になる
-	cc_a.m_LastR = cc_b.m_LastR;
-
-	return cc_a;
+template <ChipLike T, ChipLike U>
+requires (!std::same_as<std::remove_cvref_t<T>, CChipTree> || !std::same_as<std::remove_cvref_t<U>, CChipTree>)
+CChipTree operator&&(T&& lhs, U&& rhs) {
+	return static_cast<CChipTree>(std::forward<T>(lhs)) && 
+		   static_cast<CChipTree>(std::forward<U>(rhs));
 }
 
-CChipTree operator||(const CChipTree& a, const CChipTree& b){
-	// condition な tree か判定
-	if(!a.ValidR() || !b.ValidR()){
-		throw OkeccError("Invalid use of || operator: Condition chip expected.");
-	}
-
-	CChipTree cc_a = a;
-	CChipTree cc_b = b;
-
-	// a.g -> cc_b.start を指す
-	cc_a.AddToG(cc_b.m_start);
-
-	// True 側: GOTO を生成し a.r, cc_r.g, tree.r はそれを指す
-	UINT idx = g_pCurChipPool->add(new CChipGoto);
-	cc_a.AddToR(idx);
-	cc_b.AddToR(idx);
-
-	// False 側: tree.g は cc_b.g になる
-	cc_a.m_LastG = cc_b.m_LastG;
-
-	return cc_a;
+template <ChipLike T, ChipLike U>
+requires (!std::same_as<std::remove_cvref_t<T>, CChipTree> || !std::same_as<std::remove_cvref_t<U>, CChipTree>)
+CChipTree operator||(T&& lhs, U&& rhs) {
+	return static_cast<CChipTree>(std::forward<T>(lhs)) || 
+		   static_cast<CChipTree>(std::forward<U>(rhs));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -468,19 +478,6 @@ public:
 		return *this <= (num + 1);
 	}
 };
-
-//////////////////////////////////////////////////////////////////////////////
-
-// CChipTree に変換可能な型を CChipTree として扱うテンプレート
-template <typename T>
-concept ChipLike = std::convertible_to<T, CChipTree>;
-
-template <ChipLike T, ChipLike U>
-requires (!std::same_as<std::remove_cvref_t<T>, CChipTree> || !std::same_as<std::remove_cvref_t<U>, CChipTree>)
-CChipTree operator&&(T&& lhs, U&& rhs) {
-	return static_cast<CChipTree>(std::forward<T>(lhs)) && 
-		   static_cast<CChipTree>(std::forward<U>(rhs));
-}
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -3208,7 +3205,7 @@ void chip_main(void){
 		option(3);
 	endif
 #endif
-#if 0
+#if 1
 		option(1);
 		if(
 			(enemy_num(0, 416, 160, OKE_ALL) >= 1 && enemy_num(16, 416, 160, OKE_ALL) >= 1) ||
