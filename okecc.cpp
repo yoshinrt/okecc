@@ -535,23 +535,27 @@ public:
 	
 	CChipVar& operator=(const CChipVal& chip);
 	
+	operator CChipTree() const {
+		return *this != 0;
+	}
+	
 	CChipTree operator!(void) const {
 		return *this == 0;
 	}
 	
-	CChipVar operator+=(const CChipVar& op2) const;
-	CChipVar operator-=(const CChipVar& op2) const;
-	CChipVar operator*=(const CChipVar& op2) const;
-	CChipVar operator/=(const CChipVar& op2) const;
-	CChipVar operator%=(const CChipVar& op2) const;
-	CChipVar operator= (const CChipVar& op2) const;
+	CChipVar& operator+=(const CChipVar& op2);
+	CChipVar& operator-=(const CChipVar& op2);
+	CChipVar& operator*=(const CChipVar& op2);
+	CChipVar& operator/=(const CChipVar& op2);
+	CChipVar& operator%=(const CChipVar& op2);
+	CChipVar& operator= (const CChipVar& op2);
 	
-	CChipVar operator+=(const int op2) const;
-	CChipVar operator-=(const int op2) const;
-	CChipVar operator*=(const int op2) const;
-	CChipVar operator/=(const int op2) const;
-	CChipVar operator%=(const int op2) const;
-	CChipVar operator= (const int op2) const;
+	CChipVar& operator+=(const int op2);
+	CChipVar& operator-=(const int op2);
+	CChipVar& operator*=(const int op2);
+	CChipVar& operator/=(const int op2);
+	CChipVar& operator%=(const int op2);
+	CChipVar& operator= (const int op2);
 	
 	CChipTree operator>=(const CChipVar& op2) const;
 	CChipTree operator<=(const CChipVar& op2) const;
@@ -2111,19 +2115,19 @@ public:
 	ScaledInt<8>	m_op2;
 };
 
-CChipVar CChipVar::operator+=(const CChipVar& op2) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::ADD, 0, op2.m_var)); return *this;}
-CChipVar CChipVar::operator-=(const CChipVar& op2) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::SUB, 0, op2.m_var)); return *this;}
-CChipVar CChipVar::operator*=(const CChipVar& op2) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MUL, 0, op2.m_var)); return *this;}
-CChipVar CChipVar::operator/=(const CChipVar& op2) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::DIV, 0, op2.m_var)); return *this;}
-CChipVar CChipVar::operator%=(const CChipVar& op2) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOD, 0, op2.m_var)); return *this;}
-CChipVar CChipVar::operator= (const CChipVar& op2) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOV, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator+=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::ADD, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator-=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::SUB, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator*=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MUL, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator/=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::DIV, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator%=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOD, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator= (const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOV, 0, op2.m_var)); return *this;}
 
-CChipVar CChipVar::operator+=(const int imm) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::ADD, 1, imm)); return *this;}
-CChipVar CChipVar::operator-=(const int imm) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::SUB, 1, imm)); return *this;}
-CChipVar CChipVar::operator*=(const int imm) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MUL, 1, imm)); return *this;}
-CChipVar CChipVar::operator/=(const int imm) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::DIV, 1, imm)); return *this;}
-CChipVar CChipVar::operator%=(const int imm) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOD, 1, imm)); return *this;}
-CChipVar CChipVar::operator= (const int imm) const {g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOV, 1, imm)); return *this;}
+CChipVar& CChipVar::operator+=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::ADD, 1, imm)); return *this;}
+CChipVar& CChipVar::operator-=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::SUB, 1, imm)); return *this;}
+CChipVar& CChipVar::operator*=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MUL, 1, imm)); return *this;}
+CChipVar& CChipVar::operator/=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::DIV, 1, imm)); return *this;}
+CChipVar& CChipVar::operator%=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOD, 1, imm)); return *this;}
+CChipVar& CChipVar::operator= (const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOV, 1, imm)); return *this;}
 
 //////////////////////////////////////////////////////////////////////////////
 // 算術比較
@@ -3101,7 +3105,75 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void){
-#if 1
+	// 格闘
+	if(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
+		fight();
+		exit();
+	endif
+	
+	// 冷却
+	if(heat() >= 65)
+		if(option_num(1))
+			option(1);
+		else
+			option(2);
+		endif
+		
+		if(heat() >= 70) option(3); endif
+	endif
+	
+	lockon(0, 512, 320, OKE_ALL);
+	
+	if(barrier_height(0, 128, 20) >= 3 || projectile_num(0, 32, 160, P_ALL) || friendly_num(0, 128, 20, OKE_ALL))
+		turn_left();
+	endif
+	
+	// 方向転換
+	if(barrier_height(0, 160, 40) >= 24 || target_distance() >= 140)
+		if(is_target_direction(-128, 256))
+			turn_left();
+		else
+			turn_right();
+		endif
+		exit();
+	endif
+	
+	// 前進
+	move_forward();
+	
+	if(target_distance() >= 50) exit(); endif
+	
+	// 飛行型には積極的には撃たない
+	if(target_z() >= 6 || heat() >= 50) exit(); endif
+	
+	loop
+		B = ammo_num(1);
+		if(A != B || !is_self_firing()) break; endif
+	endloop
+	
+	fire(0, 448, 160, OKE_ALL, 3, 1);
+	fire(0, 448, 160, OKE_ALL, 1, 1);
+	A = ammo_num(1);
+	
+	// 140m 以上離れた敵にはミサイルを打ちやすくする
+	if(target_distance() >= 140)
+		D = 1;
+	endif
+	
+	B = time();
+	C = ch_receive(1);
+	
+	// ミサイルタイマを過ぎるか，破損が多ければミサイルを撃つ
+	if(!(B >= C || damage() >= 60 || D)) exit(); endif
+	
+	// ミサイル射撃
+	ch_send(1, B += 3);
+	
+	if(ammo_num(2)) fire(0, 512, 320, OKE_ALL, 1, 3); endif
+	wait_ae();
+	if(ammo_num(3)) fire(0, 512, 320, OKE_ALL, 3, 3); endif
+	
+#if 0
 	option(1);
 	
 	loop
@@ -3358,7 +3430,7 @@ int main(void){
 	g_pCurChipPool->dump();
 	
 	CarnageSA sa(*g_pCurChipPool, "chip.svg");
-	//sa.run();
+	sa.run();
 	sa.OutputSvg("chip.svg", sa.get_result());
 
 	return 0;
