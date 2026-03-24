@@ -2441,14 +2441,9 @@ public:
 	
 	void initialize(void);
 	std::vector<int> calculate_max_distances(void);
-	UINT find_join_node(UINT start_idx, const std::vector<int>& dists);
 	void run();
-	double calculate_energy();
-	bool has_any_intersection();
-	bool is_invalid_layout(const std::vector<Pos>& current_state);
-	void finalize();
+	double calculate_energy(const std::vector<Pos>& current_state);
 	void OutputSvg(const char* filename, const std::vector<Pos>& state_disp);
-	bool cleanup_gotos();
 	
 	const std::vector<Pos>& get_result() const { return state; }
 };
@@ -2493,525 +2488,424 @@ std::vector<int> CarnageSA::calculate_max_distances() {
 }
 
 void CarnageSA::initialize() {
-	// 0. 準備
-	const int original_num_chips = (int)pool.m_list.size();
-	state.assign(original_num_chips, {INT_MAX, INT_MAX});
+	for (UINT i = 0; i < (UINT)pool.size(); ++i) {
+		int row = (int)i / grid_width;
+		int col = (int)i % grid_width;
+		int x = (row % 2 == 0) ? col : (grid_width - 1 - col);
+		int y = grid_height - 1 - (row % grid_height);
+		state.push_back({x, y});
+	}
 	
-	// 垂直方向の接続線が存在する X 座標を記録（衝突回避用）
-	std::vector<int> vertical_lines_x;
+	OutputSvg(m_svg_file, state);
+}
+
+double CarnageSA::calculate_energy(const std::vector<Pos>& current_state) {
+	double base_energy = 0.0;
+	double cohesion_energy = 0.0;
 	
-	// 乱数分布の定義 (0か1)
-	std::uniform_int_distribution<int> coin_flip(0, 1);
+	// 1. 占有状況の高速検索用マップ
+	std::vector<int> grid_occupancy(grid_width * grid_height, -1);
+	std::map<Pos, int> overlap_count; // 重なりペナルティ用
 
-	// --- 1. ヘルパー関数 ---
+	const size_t N = current_state.size();
 
-	// EXIT までの最長ステップ数を計算
-	auto calculate_max_distances = [&]() {
-		std::vector<int> dists(original_num_chips, -1);
-		for (int i = 0; i < original_num_chips; ++i) {
-			if (pool.m_list[i]->m_NextG == IDX_EXIT || 
-			   (pool.m_list[i]->ValidR() && pool.m_list[i]->m_NextR == IDX_EXIT)) {
-				dists[i] = 1;
-			}
+	for (UINT i = 0; i < (UINT)current_state.size(); ++i) {
+		Pos p = current_state[i];
+		if (p.x >= 0 && p.x < grid_width && p.y >= 0 && p.y < grid_height) {
+			grid_occupancy[p.y * grid_width + p.x] = (int)i;
 		}
-		for (int iter = 0; iter < original_num_chips; ++iter) {
-			bool changed = false;
-			for (int i = 0; i < original_num_chips; ++i) {
-				auto update = [&](UINT from, UINT next) {
-					if (next < (UINT)original_num_chips && dists[next] != -1) {
-						if (dists[from] < dists[next] + 1) {
-							dists[from] = dists[next] + 1;
-							changed = true;
+		overlap_count[p]++;
+	}
+
+	// 重心計算
+	double avg_x = 0, avg_y = 0;
+	for (const auto& p : current_state) {
+		avg_x += p.x; avg_y += p.y;
+	}
+	avg_x /= current_state.size();
+	avg_y /= current_state.size();
+
+	// 隣接リスト（outgoing / incoming）構築
+	std::vector<std::vector<UINT>> adj_out(N), adj_in(N);
+	for (UINT u = 0; u < N; ++u) {
+		if (pool[u]->m_NextG != IDX_NONE && pool[u]->m_NextG < N) {
+			adj_out[u].push_back(pool[u]->m_NextG);
+			adj_in[pool[u]->m_NextG].push_back(u);
+		}
+		if (pool[u]->m_NextR != IDX_NONE && pool[u]->m_NextR < N) {
+			adj_out[u].push_back(pool[u]->m_NextR);
+			adj_in[pool[u]->m_NextR].push_back(u);
+		}
+	}
+
+	// パラメータ（調整可能）
+	const int hop_k = 2;                      // ホップ幅
+	const double weight_out = 0.25;           // outgoing に対する重み
+	const double weight_in  = 0.12;           // incoming に対する重み（小さめ）
+	const double max_local_penalty = 300.0;   // 局所ペナルティ上限
+
+	for (UINT i = 0; i < (UINT)current_state.size(); ++i) {
+		Pos p = current_state[i];
+		CChip* chip = pool[i];
+
+		// 物理制約
+		if (p.x < 0 || p.x >= grid_width || p.y < 0 || p.y >= grid_height) base_energy += 5000.0;
+
+		// 凝集コスト（全体的な重心への寄せ）
+		cohesion_energy += (std::abs(p.x - avg_x) + std::abs(p.y - avg_y)) * 0.05;
+
+		// Startチップ制約
+		if (i == pool.m_start && p.y != 0) base_energy += (double)std::abs(p.y) * 200.0;
+
+		// 接続コスト（NOP経路検証付き）
+		auto eval_link = [&](UINT next_idx) {
+			if (next_idx == IDX_NONE) return 0.0;
+			if (next_idx == IDX_EXIT) {
+				int dx_edge = std::min(p.x, (grid_width - 1) - p.x);
+				int dy_edge = std::min(p.y, (grid_height - 1) - p.y);
+				return (double)std::min(dx_edge, dy_edge) * 150.0;
+			}
+
+			assert(next_idx < current_state.size());
+			Pos target = current_state[next_idx];
+			
+			int diff_x = target.x - p.x;
+			int diff_y = target.y - p.y;
+			int abs_dx = std::abs(diff_x);
+			int abs_dy = std::abs(diff_y);
+			int dist = std::max(abs_dx, abs_dy);
+
+			if (dist <= 1) return 0.0; // 隣接
+
+			double route_penalty = 0.0;
+			Pos check = p;
+
+			// dist 回（NOPの必要数分）ステップを繰り返す
+			for (int step = 1; step < dist; ++step) {
+				bool found_step = false;
+				
+				if (abs_dx == abs_dy) {
+					check.x += (diff_x > 0) ? 1 : -1;
+					check.y += (diff_y > 0) ? 1 : -1;
+					found_step = true;
+				} else {
+					int main_step_x = 0, main_step_y = 0;
+					bool x_is_main = (abs_dx > abs_dy);
+					if (x_is_main) {
+						main_step_x = (diff_x > 0) ? 1 : -1;
+					} else {
+						main_step_y = (diff_y > 0) ? 1 : -1;
+					}
+
+					int sub_dir = x_is_main ? ((diff_y > 0) ? 1 : (diff_y < 0 ? -1 : 0))
+											: ((diff_x > 0) ? 1 : (diff_x < 0 ? -1 : 0));
+					
+					int candidates[] = { sub_dir, 0, -sub_dir };
+
+					for (int c : candidates) {
+						Pos next_p = check;
+						if (x_is_main) {
+							next_p.x += main_step_x;
+							next_p.y += c;
+						} else {
+							next_p.x += c;
+							next_p.y += main_step_y;
+						}
+
+						// 条件：ターゲットとの残り距離が、ステップ数を超えない（遠ざかりすぎない）
+						int remaining_dist = std::max(std::abs(target.x - next_p.x), std::abs(target.y - next_p.y));
+						if (remaining_dist <= (dist - step)) {
+							// 空き地チェック
+							if (next_p.x >= 0 && next_p.x < grid_width && next_p.y >= 0 && next_p.y < grid_height) {
+								int occupant = grid_occupancy[next_p.y * grid_width + next_p.x];
+								if (occupant == -1) {
+									check = next_p;
+									found_step = true;
+									break;
+								}
+							}
 						}
 					}
-				};
-				update(i, pool.m_list[i]->m_NextG);
-				if (pool.m_list[i]->ValidR()) update(i, pool.m_list[i]->m_NextR);
-			}
-			if (!changed) break;
-		}
-		return dists;
-	};
-	std::vector<int> dists = calculate_max_distances();
 
-	auto get_d = [&](UINT idx) -> int {
-		if (idx == IDX_EXIT) return 0;
-		if (idx >= (UINT)dists.size() || dists[idx] == -1) return -100;
-		return dists[idx];
-	};
-
-	auto modify_next = [&](UINT from, UINT old_to, UINT new_to) {
-		if (from >= (UINT)pool.m_list.size()) return;
-		CChip* f = pool.m_list[from];
-		if (f->m_NextG == old_to) f->m_NextG = new_to;
-		else if (f->ValidR() && f->m_NextR == old_to) f->m_NextR = new_to;
-	};
-
-	auto add_goto_chip = [&](int x, int y) -> UINT {
-		UINT new_id = (UINT)pool.m_list.size();
-		pool.m_list.push_back(new CChipGoto()); 
-		state.push_back({x, y});
-		return new_id;
-	};
-
-	auto find_join_node = [&](UINT start_idx) -> UINT {
-		UINT curr = start_idx;
-		while (curr != IDX_EXIT && curr != IDX_NONE) {
-			if (curr < (UINT)state.size() && state[curr].x != INT_MAX) return curr;
-			bool has_r = (curr < (UINT)original_num_chips) ? pool.m_list[curr]->ValidR() : false;
-			int dg = (curr < (UINT)original_num_chips) ? get_d(pool.m_list[curr]->m_NextG) : -100;
-			int dr = (curr < (UINT)original_num_chips && has_r) ? get_d(pool.m_list[curr]->m_NextR) : -100;
-			curr = (dg >= dr) ? pool.m_list[curr]->m_NextG : pool.m_list[curr]->m_NextR;
-		}
-		return IDX_NONE;
-	};
-
-	auto count_path_chips = [&](UINT start, UINT goal) -> int {
-		if (start == goal) return 0;
-		int count = 0;
-		UINT curr = start;
-		while (curr != goal && curr != IDX_EXIT && curr != IDX_NONE && count < 256) {
-			count++;
-			bool has_r = (curr < (UINT)original_num_chips) ? pool.m_list[curr]->ValidR() : false;
-			int dg = (curr < (UINT)original_num_chips) ? get_d(pool.m_list[curr]->m_NextG) : -100;
-			int dr = (curr < (UINT)original_num_chips && has_r) ? get_d(pool.m_list[curr]->m_NextR) : -100;
-			curr = (dg >= dr) ? pool.m_list[curr]->m_NextG : pool.m_list[curr]->m_NextR;
-		}
-		return count;
-	};
-
-	// --- 2. 再帰配置関数 ---
-	struct BranchTask { UINT parent; UINT target; };
-	std::vector<BranchTask> pending_tasks;
-	
-	auto place_path = [&](UINT start_idx, int start_x, int start_y) -> void {
-		
-		UINT curr = start_idx;
-		int cur_x = start_x;
-
-		// STEP 1: 現在の行に沿って主軸を配置
-		while (curr != IDX_EXIT && curr != IDX_NONE) {
-			// 合流判定: 既に座標があるチップに到達したらこのパスの配置は終了
-			if (curr < (UINT)state.size() && state[curr].x != INT_MAX) {
-				// 必要ならここで GoTo による水平接続の延長を行う
-				vertical_lines_x.push_back(cur_x - 1);
-				break;
-			}
-
-			if (curr >= (UINT)state.size()) state.resize(curr + 1, {INT_MAX, INT_MAX});
-			state[curr] = {cur_x, start_y};
-
-			UINT next_node = IDX_NONE;
-			if (curr < (UINT)original_num_chips) {
-				CChip* chip = pool.m_list[curr];
-				if (chip->ValidR()) {
-					int dg = get_d(chip->m_NextG);
-					int dr = get_d(chip->m_NextR);
-					UINT other;
-					if (dg >= dr) {
-						next_node = chip->m_NextG;
-						other = chip->m_NextR;
-					} else {
-						next_node = chip->m_NextR;
-						other = chip->m_NextG;
+					// どこも空いていなければ、仕方なく「近づく」方向へ進みペナルティ
+					if (!found_step) {
+						if (x_is_main) {
+							check.x += main_step_x;
+							check.y += sub_dir;
+						} else {
+							check.x += sub_dir;
+							check.y += main_step_y;
+						}
+						route_penalty += 50.0;
 					}
-					if (other != IDX_EXIT && other != IDX_NONE) {
-						// 未処理の分岐として保存
-						pending_tasks.push_back({curr, other});
-					}
-				} else {
-					next_node = chip->m_NextG;
 				}
-			} else {
-				next_node = pool.m_list[curr]->m_NextG;
-			}
-			curr = next_node;
-			cur_x++;
-		}
-	};
-	
-	// 3. 実行
-	place_path(0, 0, 0);
-	
-	// STEP 2: 保存した分岐タスクの処理
-	for(int i = 0; i < pending_tasks.size(); ++i){
-		auto& task = pending_tasks[i];
-		
-		// 他のパス（異なる y 座標）ですでに配置済みなら合流とみなしてスキップ
-		if (state[task.target].x != INT_MAX && state[task.target].y != state[task.parent].y) {
-			continue; 
-		}
 
-		UINT join_node = find_join_node(task.target);
-
-		int bx = state[task.parent].x + 1;
-		
-		// move_up の決定: 垂直衝突があれば上へ、なければランダム
-		bool move_up;
-		if (std::find(vertical_lines_x.begin(), vertical_lines_x.end(), bx) != vertical_lines_x.end()) {
-			move_up = true;
-		} else {
-			move_up = (coin_flip(this->gen) == 0); // メンバ変数の gen を明示的に使用
-		}
-
-		int target_y = move_up ? state[task.parent].y - 1 : state[task.parent].y + 1;
-
-		// 他のチップを押し出す
-		shift_y_range(state, target_y, move_up ? -1 : 1);
-
-		if (join_node != IDX_NONE) {	// IDX_NONE は，そのまま exit して合流点がないことを意味する
-			int target_bx = state[join_node].x - 1;
-			int path_len = count_path_chips(task.target, join_node);
-			int other_path_len = target_bx - bx + 1;
-
-			if (path_len == 0) {
-				if(other_path_len < 2) {
-					// goto を 1個で迂回
-					UINT g = add_goto_chip(bx, target_y);
-					modify_next(task.parent, task.target, g);
-					pool.m_list[g]->m_NextG = join_node;
-				}else{
-					// 即時合流(0 chip): コの字迂回 GoTo 生成
-					UINT g1 = add_goto_chip(bx, target_y);
-					UINT g2 = add_goto_chip(std::max(bx, target_bx), target_y);
-					modify_next(task.parent, task.target, g1);
-					pool.m_list[g1]->m_NextG = g2;
-					pool.m_list[g2]->m_NextG = join_node;
+				// 枠外ペナルティ（found_step で空き地が見つからなかった場合も含む）
+				if (check.x < 0 || check.x >= grid_width || check.y < 0 || check.y >= grid_height) {
+					route_penalty += 100.0;
 				}
-				continue;
-			}else if(other_path_len > path_len) {
-				/*
-				// 1 chip: ターゲットチップ自体の配置後に GoTo で合流を補助
-				UINT g1 = add_goto_chip(std::max(bx + 1, target_bx), target_y);
-				pool.m_list[g1]->m_NextG = join_node;
-				modify_next(task.target, join_node, g1);
-				*/
-			}
-		}
-
-		// 枝パスの再帰配置
-		place_path(task.target, bx, target_y);
-	}
-
-	normalize_coordinates();
-	
-	if(m_svg_file) OutputSvg(m_svg_file, state);
-}
-
-double CarnageSA::calculate_energy() {
-	double energy = 0.0;
-	const int n = (int)state.size();
-	
-	// グリッドサイズを取得
-	const int width = pool.m_width;
-	const int height = pool.m_height;
-
-	const double PENALTY_BASE_OUT = 20000.0;
-	const double PENALTY_CONSTRAINT = 15000.0; // 制約違反（START/EXIT）
-	const double PENALTY_OVERLAP = 10000.0;
-	const double COST_DISTANCE = 1.0;
-
-	for (int i = 0; i < n; ++i) {
-		if (state[i].x == POS_INVALID) continue;
-
-		// --- 1. 枠外判定 & 基本配置制約 ---
-		int x = state[i].x;
-		int y = state[i].y;
-
-		// 通常の枠外ペナルティ
-		if (x < 0 || x >= width || y < 0 || y >= height) {
-			int dx = (x < 0) ? -x : (x >= width ? x - (width - 1) : 0);
-			int dy = (y < 0) ? -y : (y >= height ? y - (height - 1) : 0);
-			energy += PENALTY_BASE_OUT + (double)(dx * dx + dy * dy) * 5000.0;
-		}
-
-		// --- 2. STARTチップの制約 (Y=0でなければならない) ---
-		if ((UINT)i == pool.m_start) {
-			if (y != 0) {
-				energy += PENALTY_CONSTRAINT + (double)(y * y) * 2000.0;
-			}
-		}
-
-		// --- 3. 配線・EXIT制約の評価 ---
-		auto evaluate_conn = [&](UINT next_idx) {
-			// EXITへの接続チェック
-			if (next_idx == IDX_EXIT) {
-				// EXITに繋がるチップは外枠(x=0, x=w-1, y=0, y=h-1)に接する必要がある
-				bool on_edge = (x == 0 || x == width - 1 || y == 0 || y == height - 1);
-				if (!on_edge) {
-					// 外枠までの最短距離をペナルティに加算
-					int dist_x = std::min(x, (width - 1) - x);
-					int dist_y = std::min(y, (height - 1) - y);
-					int edge_dist = std::min(dist_x, dist_y);
-					energy += PENALTY_CONSTRAINT + (double)(edge_dist * edge_dist) * 2000.0;
-				}
-				return;
 			}
 
-			if (next_idx == IDX_NONE || next_idx >= (UINT)n) return;
-			if (state[next_idx].x == POS_INVALID) return;
-
-			// 通常の配線距離コスト
-			int x2 = state[next_idx].x;
-			int y2 = state[next_idx].y;
-			energy += (std::max(std::abs(x - x2), std::abs(y - y2)) - 1) * COST_DISTANCE;
+			return (double)(dist - 1) + route_penalty;
 		};
 
-		evaluate_conn(pool.m_list[i]->m_NextG);
-		if (pool.m_list[i]->ValidR()) {
-			evaluate_conn(pool.m_list[i]->m_NextR);
-		}
+		base_energy += eval_link(chip->m_NextG);
+		if (chip->ValidR()) base_energy += eval_link(chip->m_NextR);
 
-		// --- 4. 重なり判定 (既存ロジックがある場合) ---
-		for (int j = i + 1; j < n; ++j) {
-			if (state[j].x == POS_INVALID) continue;
-			if (state[i].x == state[j].x && state[i].y == state[j].y) {
-				energy += PENALTY_OVERLAP;
+		// ホップ版局所平均距離を計算（outgoing と incoming を別個に BFS）
+		auto bfs_mean_dist = [&](UINT src, bool use_out, bool use_in) -> double {
+			std::vector<int> dist(N, -1);
+			std::vector<UINT> q;
+			dist[src] = 0;
+			q.push_back(src);
+			size_t qhead = 0;
+			while (qhead < q.size()) {
+				UINT v = q[qhead++];
+				if (dist[v] >= hop_k) continue;
+				if (use_out) {
+					for (UINT w : adj_out[v]) {
+						if (dist[w] == -1) { dist[w] = dist[v] + 1; q.push_back(w); }
+					}
+				}
+				if (use_in) {
+					for (UINT w : adj_in[v]) {
+						if (dist[w] == -1) { dist[w] = dist[v] + 1; q.push_back(w); }
+					}
+				}
 			}
-		}
-	}
-
-	return energy;
-}
-
-// 線分(p1-p2)と(p3-p4)が交差するか判定（端点の共有は交差とみなさない）
-bool is_intersect(Pos p1, Pos p2, Pos p3, Pos p4) {
-	auto ccw = [](Pos a, Pos b, Pos c) {
-		long long val = (long long)(b.x - a.x) * (c.y - a.y) - (long long)(b.y - a.y) * (c.x - a.x);
-		if (val == 0) return 0; // 共線
-		return (val > 0) ? 1 : 2; // 時計回り or 反時計回り
-	};
-
-	int d1 = ccw(p1, p2, p3);
-	int d2 = ccw(p1, p2, p4);
-	int d3 = ccw(p3, p4, p1);
-	int d4 = ccw(p3, p4, p2);
-
-	// 標準的な線分交差判定
-	if (d1 != d2 && d3 != d4) return true;
-	return false;
-}
-
-// 単一のエッジ(u, v)に対して、他のチップkがその線分上に居座っていないか（貫通）を判定
-bool is_penetrating(int u, int v, const std::vector<Pos>& current_state) {
-	Pos p1 = current_state[u];
-	Pos p2 = current_state[v];
-
-	// 水平接続のチェック
-	if (p1.y == p2.y) {
-		int min_x = std::min(p1.x, p2.x);
-		int max_x = std::max(p1.x, p2.x);
-		for (int k = 0; k < (int)current_state.size(); ++k) {
-			if (k == u || k == v) continue;
-			if (current_state[k].y == p1.y && current_state[k].x > min_x && current_state[k].x < max_x) {
-				return true; // チップkが水平線上に存在する
+			double sumd = 0.0;
+			int cnt = 0;
+			for (UINT j = 0; j < N; ++j) {
+				if (j == src) continue;
+				if (dist[j] > 0 && dist[j] <= hop_k) {
+					sumd += (double)(std::abs(current_state[j].x - p.x) + std::abs(current_state[j].y - p.y)); // Manhattan
+					++cnt;
+				}
 			}
-		}
-	}
-	// 垂直接続のチェック
-	else if (p1.x == p2.x) {
-		int min_y = std::min(p1.y, p2.y);
-		int max_y = std::max(p1.y, p2.y);
-		for (int k = 0; k < (int)current_state.size(); ++k) {
-			if (k == u || k == v) continue;
-			if (current_state[k].x == p1.x && current_state[k].y > min_y && current_state[k].y < max_y) {
-				return true; // チップkが垂直線上に存在する
-			}
-		}
-	}
-	return false;
-}
-
-// 現在の全チップ配置において「交差」または「貫通」があるか一括判定（ハード制約用）
-bool CarnageSA::is_invalid_layout(const std::vector<Pos>& current_state) {
-	const int n = (int)current_state.size();
-	struct Edge { int u, v; };
-	std::vector<Edge> edges;
-
-	// 1. 全接続（エッジ）をリストアップ
-	for (int i = 0; i < n; ++i) {
-		auto add_edge = [&](UINT next) {
-			if (next != IDX_EXIT && next != IDX_NONE && next < (UINT)n) {
-				edges.push_back({ i, (int)next });
-			}
+			return cnt > 0 ? (sumd / cnt) : 0.0;
 		};
-		if(state[i].x != POS_INVALID){
-			add_edge(pool.m_list[i]->m_NextG);
-			if (pool.m_list[i]->ValidR()) add_edge(pool.m_list[i]->m_NextR);
-		}
+
+		double mean_out = bfs_mean_dist(i, true, false);
+		double mean_in  = bfs_mean_dist(i, false, true);
+
+		// 局所ペナルティは「遠いほど正のペナルティ」
+		double local_pen_out = (mean_out > 0.0) ? (weight_out * mean_out) : 0.0;
+		double local_pen_in  = (mean_in  > 0.0) ? (weight_in  * mean_in)  : 0.0;
+		double local_pen = local_pen_out + local_pen_in;
+		if (local_pen > max_local_penalty) local_pen = max_local_penalty;
+
+		base_energy += local_pen;
 	}
 
-	// 2. 貫通チェック
-	for (const auto& edge : edges) {
-		if (is_penetrating(edge.u, edge.v, current_state)) return true;
+	// 重なりペナルティ（通常は swap により 0 だが防御的に残す）
+	for (auto const& kv : overlap_count) {
+		int count = kv.second;
+		if (count > 1) base_energy += (double)count * 1000.0;
 	}
 
-	// 3. 交差チェック
-	for (size_t i = 0; i < edges.size(); ++i) {
-		for (size_t j = i + 1; j < edges.size(); ++j) {
-			int u1 = edges[i].u, v1 = edges[i].v;
-			int u2 = edges[j].u, v2 = edges[j].v;
-			// 端点を共有（接続されている）チップ同士の線は交差判定から除外
-			if (u1 == u2 || u1 == v2 || v1 == u2 || v1 == v2) continue;
-			if (is_intersect(current_state[u1], current_state[v1], current_state[u2], current_state[v2])) return true;
-		}
-	}
-
-	return false;
-}
-
-bool CarnageSA::cleanup_gotos() {
-	bool total_changed = false;
-
-	for (int target = 0; target < (int)pool.m_list.size(); ++target) {
-		if (!pool[target] || pool[target]->m_Id.get() != CHIPID_GOTO) continue;
-		if (state[target].x == POS_INVALID) continue;
-
-		// 1. このGotoを指している全ての親（接続元）を特定
-		struct Connection { int idx; bool is_r; };
-		std::vector<Connection> parents;
-		for (int i = 0; i < (int)pool.m_list.size(); ++i) {
-			if (!pool[i] || state[i].x == POS_INVALID) continue;
-			if (pool[i]->m_NextG == (UINT)target) parents.push_back({i, false});
-			if (pool[i]->ValidR() && pool[i]->m_NextR == (UINT)target) parents.push_back({i, true});
-		}
-
-		if (parents.empty()) {
-			state[target] = { POS_INVALID, POS_INVALID };
-			total_changed = true;
-			continue;
-		}
-
-		// 2. バックアップ
-		UINT next_of_goto = pool[target]->m_NextG;
-		Pos original_goto_pos = state[target];
-		std::vector<UINT> original_conns;
-		for(auto& p : parents) {
-			original_conns.push_back(p.is_r ? pool[p.idx]->m_NextR : pool[p.idx]->m_NextG);
-		}
-		
-		// 3. 全ての親をバイパス先に繋ぎ変え、Gotoを削除
-		for (auto& p : parents) {
-			if (p.is_r) pool[p.idx]->m_NextR = next_of_goto;
-			else        pool[p.idx]->m_NextG = next_of_goto;
-		}
-		state[target] = { POS_INVALID, POS_INVALID };
-
-		// 4. バリデーション (引数に state を渡す)
-		if (is_invalid_layout(state)) {
-			// ロールバック
-			for (size_t k = 0; k < parents.size(); ++k) {
-				if (parents[k].is_r) pool[parents[k].idx]->m_NextR = original_conns[k];
-				else                 pool[parents[k].idx]->m_NextG = original_conns[k];
-			}
-			state[target] = original_goto_pos;
-		} else {
-			total_changed = true;
-		}
-	}
-	
-	return total_changed;
+	if (base_energy <= 0.0) return 0.0;
+	return base_energy + cohesion_energy;
 }
 
 void CarnageSA::run() {
-	double current_energy = calculate_energy();
-	double best_energy = current_energy;
-	std::vector<Pos> best_state = state;
-	bool bUpdateBest = false;
+	// 改良版 SA:
+	// - 隣接スワップ中心（局所探索）
+	// - 低確率で任意2点スワップ（global）とランダムジャンプ
+	// - k個のインデックスを回転させる multi-rotate operator
+	// - 停滞検出によるリヒート（温度を復元して探索幅を一時拡大）
+	double T0 = 100.0;
+	double T = T0;
+	double cooling = 0.99997; // 既定より少し緩やかに
+	double current_E = calculate_energy(state);
+	auto best_state = state;
+	double best_E = current_E;
+	bool UpdateBest = false;
 
-	double T = 5000.0;
-	const double alpha = 0.999995;
-	const int iterations = 2000000;
+	std::uniform_int_distribution<UINT> dist_idx(0, (UINT)pool.size() - 1);
+	std::uniform_int_distribution<int> dist_dir(0, 7);
+	std::uniform_real_distribution<double> dist_prob(0.0, 1.0);
+	std::uniform_int_distribution<int> dist_x(0, grid_width - 1);
+	std::uniform_int_distribution<int> dist_y(0, grid_height - 1);
 
-	std::uniform_real_distribution<double> dist_u(0.0, 1.0);
-	std::uniform_int_distribution<int> dist_rel(-1, 1);
-	std::uniform_int_distribution<int> dist_abs(0, 14);
+	// occupancy
+	std::vector<int> occ(grid_width * grid_height, -1);
+	auto rebuild_occ = [&](const std::vector<Pos>& s) {
+		std::fill(occ.begin(), occ.end(), -1);
+		for (UINT j = 0; j < (UINT)s.size(); ++j) {
+			const Pos& pp = s[j];
+			if (pp.x >= 0 && pp.x < grid_width && pp.y >= 0 && pp.y < grid_height)
+				occ[pp.y * grid_width + pp.x] = (int)j;
+		}
+		};
+	rebuild_occ(state);
 
-	printf("Starting SA... Initial Energy: %.2f\n", current_energy);
+	// move probabilities (base)
+	double p_random_swap = 0.04; // 任意2点スワップ
+	double p_long = 0.01;        // ランダムセルジャンプ
+	double p_rotate = 0.02;      // multi-rotate operator
+	// neighbor-swap が残りの確率
 
-	for (int step = 0; step < iterations; ++step) {
-		// 500回に1回、全てのGotoに対してバイパスと削除を試みる
-		if (step % 512 == 0) {
-			if (cleanup_gotos()) {
-				best_energy = current_energy = calculate_energy();
+	// stagnation / reheating
+	const int stagnation_limit = 200000;
+	int iter_since_improve = 0;
+	const double reheating_multiplier = 1.8;
+	const int reheating_boost_steps = 50000;
+	int reheating_steps_left = 0;
+
+	const int max_iter = 2000000;
+	for (int iter = 0; iter < max_iter; ++iter) {
+		auto next_state = state;
+		UINT a = dist_idx(gen);
+		double r = dist_prob(gen);
+
+		bool proposed = false;
+		int b = -1; // -1 means move to empty cell
+
+		// Possibly boost exploratory moves during reheating
+		double local_p_random_swap = p_random_swap;
+		double local_p_long = p_long;
+		double local_p_rotate = p_rotate;
+		if (reheating_steps_left > 0) {
+			local_p_random_swap = std::min(0.5, p_random_swap * 6.0);
+			local_p_long = std::min(0.2, p_long * 6.0);
+			local_p_rotate = std::min(0.5, p_rotate * 6.0);
+			reheating_steps_left--;
+		}
+
+		double threshold1 = local_p_random_swap;
+		double threshold2 = threshold1 + local_p_long;
+		double threshold3 = threshold2 + local_p_rotate;
+
+		if (r < threshold1) {
+			// 任意 2 点スワップ (global)
+			UINT bb = dist_idx(gen);
+			if (bb == a) continue;
+			std::swap(next_state[a], next_state[bb]);
+			proposed = true;
+			b = (int)bb;
+		}
+		else if (r < threshold2) {
+			// ランダムセルへのジャンプ（空きがあれば移動、なければスワップ）
+			int nx = dist_x(gen);
+			int ny = dist_y(gen);
+			int occIdx = occ[ny * grid_width + nx];
+			if (occIdx == -1) {
+				next_state[a].x = nx;
+				next_state[a].y = ny;
+				b = -1;
+				proposed = true;
+			}
+			else {
+				UINT bb = (UINT)occIdx;
+				if (bb == a) continue;
+				std::swap(next_state[a], next_state[bb]);
+				proposed = true;
+				b = (int)bb;
+			}
+		}
+		else if (r < threshold3) {
+			// multi-rotate: k 個ランダムインデックスを選び位置を回転させる
+			int k = 3 + (gen() % 3); // 3..5
+			std::vector<UINT> ids;
+			ids.reserve(k);
+			// collect distinct indices
+			std::uniform_int_distribution<UINT> di(0, (UINT)pool.size() - 1);
+			while ((int)ids.size() < k) {
+				UINT cid = di(gen);
+				// ensure unique
+				bool found = false;
+				for (UINT v : ids) if (v == cid) { found = true; break; }
+				if (!found) ids.push_back(cid);
+			}
+			// rotate positions among ids (circular right shift)
+			std::vector<Pos> tmp(k);
+			for (int i = 0; i < k; ++i) tmp[i] = next_state[ids[i]];
+			for (int i = 0; i < k; ++i) next_state[ids[(i + 1) % k]] = tmp[i];
+			proposed = true;
+			b = -2; // special marker
+		}
+		else {
+			// 隣接セルとのスワップ（8方向）
+			int dir = dist_dir(gen);
+			int nx = state[a].x + dx[dir];
+			int ny = state[a].y + dy[dir];
+			if (nx < 0 || nx >= grid_width || ny < 0 || ny >= grid_height) continue;
+			int occIdx = occ[ny * grid_width + nx];
+			if (occIdx == -1) {
+				next_state[a].x = nx;
+				next_state[a].y = ny;
+				b = -1;
+				proposed = true;
+			}
+			else {
+				UINT bb = (UINT)occIdx;
+				if (bb == a) continue;
+				std::swap(next_state[a], next_state[bb]);
+				proposed = true;
+				b = (int)bb;
+			}
+		}
+
+		if (!proposed) continue;
+
+		double next_E = calculate_energy(next_state);
+
+		// 早期最適性判定
+		if (next_E < 0.0001) {
+			state = next_state;
+			current_E = next_E;
+			best_state = next_state;
+			UpdateBest = true;
+			best_E = next_E;
+			break;
+		}
+
+		double diff = next_E - current_E;
+		if (diff < 0 || dist_prob(gen) < std::exp(-diff / T)) {
+			// accept
+			state = next_state;
+			// rebuild occ (safer than incremental updates for multiple operators)
+			rebuild_occ(state);
+			current_E = next_E;
+			if (current_E < best_E - 1e-9) {
+				best_E = current_E;
 				best_state = state;
-				bUpdateBest = true;
+				UpdateBest = true;
+				iter_since_improve = 0;
+			}
+			else {
+				++iter_since_improve;
 			}
 		}
-		
-		int target;
-		do{
-			std::uniform_int_distribution<int> dist_idx(0, (int)pool.m_list.size() - 1);
-			target = dist_idx(this->gen);
-		}while(state[target].x == POS_INVALID);
-
-		// --- 通常の移動処理 ---
-		Pos old_pos = state[target];
-		if (dist_u(this->gen) < 0.9) {
-			state[target].x += dist_rel(this->gen);
-			state[target].y += dist_rel(this->gen);
-		} else {
-			state[target].x = dist_abs(this->gen);
-			state[target].y = dist_abs(this->gen);
+		else {
+			++iter_since_improve;
 		}
 
-		bool overlap = false;
-		for (int i = 0; i < (int)state.size(); ++i) {
-			if (i == target || state[i].x == POS_INVALID) continue;
-			if (state[i].x == state[target].x && state[i].y == state[target].y) {
-				overlap = true; break;
-			}
+		// cooling
+		T *= cooling;
+
+		// stagnation -> reheating
+		if (iter_since_improve >= stagnation_limit) {
+			// reheat
+			T = std::max(T, T0) * reheating_multiplier;
+			reheating_steps_left = reheating_boost_steps;
+			iter_since_improve = 0;
+			// optionally print a message
+			printf("Reheat at iter %d : T=%.4f\n", iter, T);
 		}
 
-		if (overlap || is_invalid_layout(state)) {
-			state[target] = old_pos;
-			--step;
-			continue;
-		}
-
-		double next_energy = calculate_energy();
-		double delta = next_energy - current_energy;
-
-		if (delta < 0 || exp(-delta / T) > dist_u(this->gen)) {
-			current_energy = next_energy;
-			if (current_energy < best_energy) {
-				best_energy = current_energy;
-				best_state = state;
-				bUpdateBest = true;
-			}
-		} else {
-			state[target] = old_pos;
-		}
-
-		T *= alpha;
-		if (step % 100000 == 0){
-			printf("Step: %7d, T: %7.2f, Energy: %10.2f, Best: %10.2f\n", step, T, current_energy, best_energy);
-			if(bUpdateBest && m_svg_file){
-				OutputSvg(m_svg_file, best_state);
-				bUpdateBest = false;
-			}
-		}
-		
-		if(current_energy < 0.001) break;
-	}
-	state = std::move(best_state);
-	if(m_svg_file)OutputSvg(m_svg_file, state);
-	finalize();
-}
-
-void CarnageSA::finalize() {
-	const int n = (int)pool.m_list.size();
-
-	// 1. 削除された GoTo チップのメモリ解放と無効化
-	for (int i = 0; i < n; ++i) {
-		if (state[i].x == POS_INVALID) {
-			// 安全に削除
-			if (pool.m_list[i] != nullptr) {
-				delete pool.m_list[i];
-				pool.m_list[i] = nullptr;
+		if (iter % 200000 == 0){
+			printf("Step: %7d | Energy: %5.4f | Best: %5.4f\n", iter, current_E, best_E);
+			if(UpdateBest){
+				OutputSvg(m_svg_file, state);
+				UpdateBest = false;
 			}
 		}
 	}
+
+	state = best_state;
+	OutputSvg(m_svg_file, state);	
+	printf("Step: %7d | Energy: %5.4f\n", max_iter, best_E);
 }
 
 //////////////////////////////////////////////////////////////////////////////
