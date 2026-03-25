@@ -2236,7 +2236,7 @@ void else_statement(
 	LastLocation();
 
 	if(g_pCurBlockInfo->GetMode() != CBlockInfo::BM_IF){
-		throw OkeccError("Unexpected else");
+		throw OkeccError("Unexpected else / elseif");
 	}
 	
 	g_pCurBlockInfo->m_BlockStack.pop_back(); // mode
@@ -2259,6 +2259,10 @@ void elseif_statement(CChipTree &&cc, LastLocationArg){
 	else_statement(location);
 	if_statement(cc, location, false);
 }
+
+void elseif_statement(const CChipCond& chip, LastLocationArg){elseif_statement(chip.GetCChipTree(), location);}
+void elseif_statement(const CChipVal&  chip, LastLocationArg){elseif_statement(chip >= 1, location);}
+void elseif_statement(const CChipVar&  chip, LastLocationArg){elseif_statement(chip != 0, location);}
 
 void endif_statement(
 	LastLocationArg
@@ -3157,7 +3161,7 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void){
-#if 0
+#if 1
 	// 格闘
 	if(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
 		fight();
@@ -3484,7 +3488,7 @@ int main(void){
 	g_pCurChipPool->dump();
 	
 	CarnageSA sa(*g_pCurChipPool, "chip.svg");
-	//sa.run();
+	sa.run();
 	sa.OutputSvg("chip.svg", sa.get_result());
 
 	return 0;
