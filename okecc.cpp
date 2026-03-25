@@ -2517,14 +2517,6 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& current_state) {
 		overlap_count[p]++;
 	}
 
-	// 重心計算
-	double avg_x = 0, avg_y = 0;
-	for (const auto& p : current_state) {
-		avg_x += p.x; avg_y += p.y;
-	}
-	avg_x /= current_state.size();
-	avg_y /= current_state.size();
-
 	// 隣接リスト（outgoing / incoming）構築
 	std::vector<std::vector<UINT>> adj_out(N), adj_in(N);
 	for (UINT u = 0; u < N; ++u) {
@@ -2543,6 +2535,7 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& current_state) {
 	const double weight_out = 0.25;           // outgoing に対する重み
 	const double weight_in  = 0.12;           // incoming に対する重み（小さめ）
 	const double max_local_penalty = 300.0;   // 局所ペナルティ上限
+	const double start_end_penalty = 200.0;		// start/end 枠からの距離
 
 	for (UINT i = 0; i < (UINT)current_state.size(); ++i) {
 		Pos p = current_state[i];
@@ -2551,106 +2544,16 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& current_state) {
 		// 物理制約
 		if (p.x < 0 || p.x >= grid_width || p.y < 0 || p.y >= grid_height) base_energy += 5000.0;
 
-		// 凝集コスト（全体的な重心への寄せ）
-		cohesion_energy += (std::abs(p.x - avg_x) + std::abs(p.y - avg_y)) * 0.05;
-
 		// Startチップ制約
-		if (i == pool.m_start && p.y != 0) base_energy += (double)std::abs(p.y) * 200.0;
-
-		// 接続コスト（NOP経路検証付き）
-		auto eval_link = [&](UINT next_idx) {
-			if (next_idx == IDX_NONE) return 0.0;
-			if (next_idx == IDX_EXIT) {
-				int dx_edge = std::min(p.x, (grid_width - 1) - p.x);
-				int dy_edge = std::min(p.y, (grid_height - 1) - p.y);
-				return (double)std::min(dx_edge, dy_edge) * 150.0;
-			}
-
-			assert(next_idx < current_state.size());
-			Pos target = current_state[next_idx];
-			
-			int diff_x = target.x - p.x;
-			int diff_y = target.y - p.y;
-			int abs_dx = std::abs(diff_x);
-			int abs_dy = std::abs(diff_y);
-			int dist = std::max(abs_dx, abs_dy);
-
-			if (dist <= 1) return 0.0; // 隣接
-
-			double route_penalty = 0.0;
-			Pos check = p;
-
-			// dist 回（NOPの必要数分）ステップを繰り返す
-			for (int step = 1; step < dist; ++step) {
-				bool found_step = false;
-				
-				if (abs_dx == abs_dy) {
-					check.x += (diff_x > 0) ? 1 : -1;
-					check.y += (diff_y > 0) ? 1 : -1;
-					found_step = true;
-				} else {
-					int main_step_x = 0, main_step_y = 0;
-					bool x_is_main = (abs_dx > abs_dy);
-					if (x_is_main) {
-						main_step_x = (diff_x > 0) ? 1 : -1;
-					} else {
-						main_step_y = (diff_y > 0) ? 1 : -1;
-					}
-
-					int sub_dir = x_is_main ? ((diff_y > 0) ? 1 : (diff_y < 0 ? -1 : 0))
-											: ((diff_x > 0) ? 1 : (diff_x < 0 ? -1 : 0));
-					
-					int candidates[] = { sub_dir, 0, -sub_dir };
-
-					for (int c : candidates) {
-						Pos next_p = check;
-						if (x_is_main) {
-							next_p.x += main_step_x;
-							next_p.y += c;
-						} else {
-							next_p.x += c;
-							next_p.y += main_step_y;
-						}
-
-						// 条件：ターゲットとの残り距離が、ステップ数を超えない（遠ざかりすぎない）
-						int remaining_dist = std::max(std::abs(target.x - next_p.x), std::abs(target.y - next_p.y));
-						if (remaining_dist <= (dist - step)) {
-							// 空き地チェック
-							if (next_p.x >= 0 && next_p.x < grid_width && next_p.y >= 0 && next_p.y < grid_height) {
-								int occupant = grid_occupancy[next_p.y * grid_width + next_p.x];
-								if (occupant == -1) {
-									check = next_p;
-									found_step = true;
-									break;
-								}
-							}
-						}
-					}
-
-					// どこも空いていなければ、仕方なく「近づく」方向へ進みペナルティ
-					if (!found_step) {
-						if (x_is_main) {
-							check.x += main_step_x;
-							check.y += sub_dir;
-						} else {
-							check.x += sub_dir;
-							check.y += main_step_y;
-						}
-						route_penalty += 50.0;
-					}
-				}
-
-				// 枠外ペナルティ（found_step で空き地が見つからなかった場合も含む）
-				if (check.x < 0 || check.x >= grid_width || check.y < 0 || check.y >= grid_height) {
-					route_penalty += 100.0;
-				}
-			}
-
-			return (double)(dist - 1) + route_penalty;
-		};
-
-		base_energy += eval_link(chip->m_NextG);
-		if (chip->ValidR()) base_energy += eval_link(chip->m_NextR);
+		if (i == pool.m_start && p.y != 0) base_energy += (double)std::abs(p.y) * start_end_penalty;
+		
+		// exit チップ制約
+		if(pool[i]->m_NextG == IDX_EXIT || pool[i]->m_NextR == IDX_EXIT){
+			base_energy += start_end_penalty * std::min(
+				std::min(p.x, grid_width - p.x - 1),
+				std::min(p.y, grid_height- p.y - 1)
+			);
+		}
 
 		// ホップ版局所平均距離を計算（outgoing と incoming を別個に BFS）
 		auto bfs_mean_dist = [&](UINT src, bool use_out, bool use_in) -> double {
@@ -2803,27 +2706,6 @@ void CarnageSA::run() {
 				b = (int)bb;
 			}
 		}
-		else if (r < threshold3) {
-			// multi-rotate: k 個ランダムインデックスを選び位置を回転させる
-			int k = 3 + (gen() % 3); // 3..5
-			std::vector<UINT> ids;
-			ids.reserve(k);
-			// collect distinct indices
-			std::uniform_int_distribution<UINT> di(0, (UINT)pool.size() - 1);
-			while ((int)ids.size() < k) {
-				UINT cid = di(gen);
-				// ensure unique
-				bool found = false;
-				for (UINT v : ids) if (v == cid) { found = true; break; }
-				if (!found) ids.push_back(cid);
-			}
-			// rotate positions among ids (circular right shift)
-			std::vector<Pos> tmp(k);
-			for (int i = 0; i < k; ++i) tmp[i] = next_state[ids[i]];
-			for (int i = 0; i < k; ++i) next_state[ids[(i + 1) % k]] = tmp[i];
-			proposed = true;
-			b = -2; // special marker
-		}
 		else {
 			// 隣接セルとのスワップ（8方向）
 			int dir = dist_dir(gen);
@@ -2883,16 +2765,6 @@ void CarnageSA::run() {
 
 		// cooling
 		T *= cooling;
-
-		// stagnation -> reheating
-		if (iter_since_improve >= stagnation_limit) {
-			// reheat
-			T = std::max(T, T0) * reheating_multiplier;
-			reheating_steps_left = reheating_boost_steps;
-			iter_since_improve = 0;
-			// optionally print a message
-			printf("Reheat at iter %d : T=%.4f\n", iter, T);
-		}
 
 		if (iter % 200000 == 0){
 			printf("Step: %7d | Energy: %5.4f | Best: %5.4f\n", iter, current_E, best_E);
