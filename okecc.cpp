@@ -340,9 +340,9 @@ public:
 		m_LastR = idx;
 	}
 
-	bool ValidStart(void) const {return m_start < IDX_EXIT;}
-	bool ValidG    (void) const {return m_LastG < IDX_EXIT;}
-	bool ValidR    (void) const {return m_LastR < IDX_EXIT;}
+	bool ValidStart(void) const {return m_start < g_pCurChipPool->m_list.size();}
+	bool ValidG    (void) const {return m_LastG < g_pCurChipPool->m_list.size();}
+	bool ValidR    (void) const {return m_LastR < g_pCurChipPool->m_list.size();}
 
 	// Tree にチップ追加
 	CChipTree& add(CChip *pchip){
@@ -2178,25 +2178,52 @@ CChipTree CChipVar::operator< (const int imm) const {return CChipCond(new CChipC
 //////////////////////////////////////////////////////////////////////////////
 // if - else - endif
 
-static constexpr UINT BLOCK_TOP = 0xFFFFFFFF;
-std::vector<UINT>	g_IfBlockStack;
+class CBlockInfo;
+CBlockInfo *g_pCurBlockInfo;
 
-static bool BlockStackUdf(void){
-	return g_IfBlockStack.size() < 1 || g_IfBlockStack.back() == BLOCK_TOP;
-}
+class CBlockInfo {
+public:
+	static constexpr UINT BLOCK_TOP = 0xFFFFFFFF;
+	
+	enum {
+		BM_NONE,
+		BM_IF_TOP,	// top of if block
+		BM_IF,		// if / elseif 中
+		BM_ELSE,	// else 中
+		BM_LOOP,	// loop 中
+	};
+	
+	UINT m_Break;
+	
+	// stack 構造
+	// low <--> high
+	// IF:   [BM_IF_TOP] [飛び先] [BM_*] [飛び先] [BM_*] ...
+	// Loop: [break先保存] [loop先頭] [BM_LOOP]
+	
+	std::vector<UINT>	m_BlockStack;
+	
+	UINT GetMode(void){
+		return g_pCurBlockInfo->m_BlockStack.size() < 1 ? BM_NONE :
+			g_pCurBlockInfo->m_BlockStack.back();
+	}
+};
 
 void if_statement(const CChipTree& cc, LastLocationArg, bool BlockStart = true){
 	LastLocation();
 	
-	// block top mark
-	if(BlockStart) g_IfBlockStack.push_back(BLOCK_TOP);
+	if(BlockStart){
+		g_pCurBlockInfo->m_BlockStack.push_back(CBlockInfo::BM_IF_TOP);
+	}
 	
 	// CurTree に if 条件のツリーを接続
 	g_pCurTree->AddToG(cc.m_start);
 	g_pCurTree->m_LastG = cc.m_LastR;
 
 	// false 飛び先を push
-	g_IfBlockStack.push_back(cc.m_LastG);
+	g_pCurBlockInfo->m_BlockStack.push_back(cc.m_LastG);
+	
+	// mode
+	g_pCurBlockInfo->m_BlockStack.push_back(CBlockInfo::BM_IF);
 }
 
 void if_statement(const CChipCond& chip, LastLocationArg){if_statement(chip.GetCChipTree(), location);}
@@ -2208,17 +2235,23 @@ void else_statement(
 ){
 	LastLocation();
 
-	if(BlockStackUdf()){
+	if(g_pCurBlockInfo->GetMode() != CBlockInfo::BM_IF){
 		throw OkeccError("Unexpected else");
 	}
-
+	
+	g_pCurBlockInfo->m_BlockStack.pop_back(); // mode
+	
 	UINT idx = g_pCurTree->m_LastG;	// then 節の最後
 
 	// else 節先頭は，BlockStack に積んでいた false 飛び先
-	g_pCurTree->m_LastG = g_IfBlockStack.back(); g_IfBlockStack.pop_back();
+	g_pCurTree->m_LastG = g_pCurBlockInfo->m_BlockStack.back();
+	g_pCurBlockInfo->m_BlockStack.pop_back();
 
 	// then 節の最後を block statck に積む
-	g_IfBlockStack.push_back(idx);
+	g_pCurBlockInfo->m_BlockStack.push_back(idx);
+	
+	// mode
+	g_pCurBlockInfo->m_BlockStack.push_back(CBlockInfo::BM_ELSE);
 }
 
 void elseif_statement(CChipTree &&cc, LastLocationArg){
@@ -2232,27 +2265,40 @@ void endif_statement(
 ){
 	LastLocation();
 	
-	if(BlockStackUdf()){
+	if(
+		g_pCurBlockInfo->GetMode() != CBlockInfo::BM_IF &&
+		g_pCurBlockInfo->GetMode() != CBlockInfo::BM_ELSE
+	){
 		throw OkeccError("Unexpected endif");
 	}
 	
-	while(1){
-		UINT idx = g_IfBlockStack.back(); g_IfBlockStack.pop_back();
-		if(idx == BLOCK_TOP) break;
+	while(
+		g_pCurBlockInfo->GetMode() == CBlockInfo::BM_IF ||
+		g_pCurBlockInfo->GetMode() == CBlockInfo::BM_ELSE
+	){
+		if(g_pCurBlockInfo->m_BlockStack.size() < 3){
+			throw OkeccError("Internal error: BlockStack broken");
+		}
+		
+		g_pCurBlockInfo->m_BlockStack.pop_back(); // mode
 		
 		// 合流 GOTO 生成
 		UINT merge = g_pCurChipPool->add(new CChipGoto);
 		g_pCurTree->AddToG(merge);
 		
 		// false 条件の飛び先合流
-		(*g_pCurChipPool)[idx]->m_NextG = merge;
+		(*g_pCurChipPool)[g_pCurBlockInfo->m_BlockStack.back()]->m_NextG = merge;
+		g_pCurBlockInfo->m_BlockStack.pop_back();
+		
+		if(g_pCurBlockInfo->GetMode() == CBlockInfo::BM_IF_TOP){
+			g_pCurBlockInfo->m_BlockStack.pop_back();
+			break;
+		}
 	}
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // Loop statement
-
-std::vector<UINT>	g_LoopBlockStack;
 
 void loop_statement(LastLocationArg){
 	LastLocation();
@@ -2260,37 +2306,42 @@ void loop_statement(LastLocationArg){
 	UINT LoopTop;
 	
 	// goto を 2個生成
-	g_LoopBlockStack.push_back(LoopTop = g_pCurChipPool->add(new CChipGoto));	// loop 先頭
-	g_LoopBlockStack.push_back(g_pCurChipPool->add(new CChipGoto));				// break 先
+	g_pCurBlockInfo->m_BlockStack.push_back(g_pCurBlockInfo->m_Break);	// 直前の break 先を保存
+	g_pCurBlockInfo->m_BlockStack.push_back(LoopTop = g_pCurChipPool->add(new CChipGoto));	// loop 先頭
+	g_pCurBlockInfo->m_Break = g_pCurChipPool->add(new CChipGoto);	// break 先
 	
 	// Top の goto を接続
 	g_pCurTree->AddToG(LoopTop);
+	
+	// mode
+	g_pCurBlockInfo->m_BlockStack.push_back(CBlockInfo::BM_LOOP);
 }
 
 void loopend_statement(LastLocationArg){
 	LastLocation();
 	
-	if(g_LoopBlockStack.size() == 0){
+	if(g_pCurBlockInfo->GetMode() != CBlockInfo::BM_LOOP){
 		OkeccError("Unexpected endloop");
 	}
+	g_pCurBlockInfo->m_BlockStack.pop_back(); // mode
 	
-	UINT LoopExit = g_LoopBlockStack.back();	// break 先
-	g_LoopBlockStack.pop_back();
-	
-	UINT LoopTop = g_LoopBlockStack.back();		// loop top
-	g_LoopBlockStack.pop_back();
+	UINT LoopTop = g_pCurBlockInfo->m_BlockStack.back();	// loop top
+	g_pCurBlockInfo->m_BlockStack.pop_back();
 	
 	// ループ先頭に接続
 	g_pCurTree->AddToG(LoopTop);
+	g_pCurTree->m_LastG = g_pCurBlockInfo->m_Break;
 	
-	g_pCurTree->m_LastG = LoopExit;
+	// break 先を pop
+	g_pCurBlockInfo->m_Break = g_pCurBlockInfo->m_BlockStack.back();
+	g_pCurBlockInfo->m_BlockStack.pop_back();
 }
 
 void break_statement(LastLocationArg){
 	LastLocation();
 	
-	if(g_LoopBlockStack.size() < 0){
-		OkeccError("break found out of loop");
+	if(g_pCurBlockInfo->GetMode() != CBlockInfo::BM_LOOP){
+		OkeccError("break not within a loop");
 	}
 	
 	UINT idx = g_pCurTree->m_LastG;
@@ -2299,7 +2350,7 @@ void break_statement(LastLocationArg){
 	g_pCurTree->AddToG(g_pCurChipPool->add(new CChipGoto));
 	
 	// break 先に分岐
-	(*g_pCurChipPool)[idx]->m_NextG = g_LoopBlockStack[g_LoopBlockStack.size() - 1];
+	(*g_pCurChipPool)[idx]->m_NextG = g_pCurBlockInfo->m_Break;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -3106,6 +3157,7 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void){
+#if 0
 	// 格闘
 	if(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
 		fight();
@@ -3173,7 +3225,7 @@ void chip_main(void){
 	if(ammo_num(2)) fire(0, 512, 320, OKE_ALL, 1, 3); endif
 	wait_ae();
 	if(ammo_num(3)) fire(0, 512, 320, OKE_ALL, 3, 3); endif
-	
+#endif
 #if 0
 	option(1);
 	
@@ -3410,8 +3462,9 @@ void chip_main(void){
 //////////////////////////////////////////////////////////////////////////////
 
 int main(void){
-	g_pCurTree = new CChipTree;
-	g_pCurChipPool = new CChipPool(15, 15);
+	g_pCurTree		= new CChipTree;
+	g_pCurChipPool	= new CChipPool(15, 15);
+	g_pCurBlockInfo	= new CBlockInfo;
 	
 	try{
 		chip_main();
@@ -3431,7 +3484,7 @@ int main(void){
 	g_pCurChipPool->dump();
 	
 	CarnageSA sa(*g_pCurChipPool, "chip.svg");
-	sa.run();
+	//sa.run();
 	sa.OutputSvg("chip.svg", sa.get_result());
 
 	return 0;
