@@ -2400,6 +2400,8 @@ static constexpr int POS_INVALID = -100;
 
 class CarnageSA {
 	CChipPool& pool;
+	std::vector<std::vector<UINT>> LinkList; // チップごとの接続リスト
+
 	int grid_width;
 	int grid_height;
 	std::vector<Pos> state;
@@ -2413,6 +2415,7 @@ class CarnageSA {
 public:
 	CarnageSA(CChipPool& p, const char *svg_file = nullptr)
 		: pool(p), grid_width(p.m_width), grid_height(p.m_height), gen(42/*std::random_device{}()*/), m_svg_file(svg_file){
+		LinkList.resize(pool.size());
 		initialize();
 	}
 	
@@ -2489,11 +2492,21 @@ std::vector<int> CarnageSA::calculate_max_distances() {
 
 void CarnageSA::initialize() {
 	for (UINT i = 0; i < (UINT)pool.size(); ++i) {
-		int row = (int)i / grid_width;
-		int col = (int)i % grid_width;
-		int x = (row % 2 == 0) ? col : (grid_width - 1 - col);
-		int y = grid_height - 1 - (row % grid_height);
+		int y = (int)i / grid_width;
+		int x = (int)i % grid_width;
+		x = (y % 2 == 0) ? x : (grid_width - 1 - x);
 		state.push_back({x, y});
+		
+		// 接続リストの構築
+		UINT u;
+		if ((u = pool[i]->m_NextG) < pool.size()) {
+			LinkList[i].push_back(u);
+			LinkList[u].push_back(i); // 双方向に接続	
+		}
+		if ((u = pool[i]->m_NextR) < pool.size()) {
+			LinkList[i].push_back(u);
+			LinkList[u].push_back(i); // 双方向に接続
+		}
 	}
 	
 	OutputSvg(m_svg_file, state);
@@ -2501,7 +2514,10 @@ void CarnageSA::initialize() {
 
 double CarnageSA::calculate_energy(const std::vector<Pos>& current_state) {
 	double base_energy = 0.0;
-	double cohesion_energy = 0.0;
+	
+	// ペナルティ
+	const double distance_penalty	= 1.0;		// chip 距離
+	const double start_end_penalty	= 1000.0;	// start/end 枠からの距離
 	
 	// 1. 占有状況の高速検索用マップ
 	std::vector<int> grid_occupancy(grid_width * grid_height, -1);
@@ -2517,87 +2533,39 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& current_state) {
 		overlap_count[p]++;
 	}
 
-	// 隣接リスト（outgoing / incoming）構築
-	std::vector<std::vector<UINT>> adj_out(N), adj_in(N);
-	for (UINT u = 0; u < N; ++u) {
-		if (pool[u]->m_NextG != IDX_NONE && pool[u]->m_NextG < N) {
-			adj_out[u].push_back(pool[u]->m_NextG);
-			adj_in[pool[u]->m_NextG].push_back(u);
-		}
-		if (pool[u]->m_NextR != IDX_NONE && pool[u]->m_NextR < N) {
-			adj_out[u].push_back(pool[u]->m_NextR);
-			adj_in[pool[u]->m_NextR].push_back(u);
-		}
-	}
-
 	// パラメータ（調整可能）
-	const int hop_k = 2;                      // ホップ幅
-	const double weight_out = 0.25;           // outgoing に対する重み
-	const double weight_in  = 0.12;           // incoming に対する重み（小さめ）
-	const double max_local_penalty = 300.0;   // 局所ペナルティ上限
-	const double start_end_penalty = 200.0;		// start/end 枠からの距離
 
-	for (UINT i = 0; i < (UINT)current_state.size(); ++i) {
-		Pos p = current_state[i];
-		CChip* chip = pool[i];
+	for (UINT u = 0; u < (UINT)current_state.size(); ++u) {
+		Pos p = current_state[u];
+		CChip* chip = pool[u];
 
 		// 物理制約
 		if (p.x < 0 || p.x >= grid_width || p.y < 0 || p.y >= grid_height) base_energy += 5000.0;
 
 		// Startチップ制約
-		if (i == pool.m_start && p.y != 0) base_energy += (double)std::abs(p.y) * start_end_penalty;
+		if (u == pool.m_start && p.y != 0) base_energy += (double)std::abs(p.y) * start_end_penalty;
 		
 		// exit チップ制約
-		if(pool[i]->m_NextG == IDX_EXIT || pool[i]->m_NextR == IDX_EXIT){
+		if(pool[u]->m_NextG == IDX_EXIT || pool[u]->m_NextR == IDX_EXIT){
 			base_energy += start_end_penalty * std::min(
 				std::min(p.x, grid_width - p.x - 1),
 				std::min(p.y, grid_height- p.y - 1)
 			);
 		}
-
-		// ホップ版局所平均距離を計算（outgoing と incoming を別個に BFS）
-		auto bfs_mean_dist = [&](UINT src, bool use_out, bool use_in) -> double {
-			std::vector<int> dist(N, -1);
-			std::vector<UINT> q;
-			dist[src] = 0;
-			q.push_back(src);
-			size_t qhead = 0;
-			while (qhead < q.size()) {
-				UINT v = q[qhead++];
-				if (dist[v] >= hop_k) continue;
-				if (use_out) {
-					for (UINT w : adj_out[v]) {
-						if (dist[w] == -1) { dist[w] = dist[v] + 1; q.push_back(w); }
-					}
-				}
-				if (use_in) {
-					for (UINT w : adj_in[v]) {
-						if (dist[w] == -1) { dist[w] = dist[v] + 1; q.push_back(w); }
-					}
-				}
-			}
-			double sumd = 0.0;
-			int cnt = 0;
-			for (UINT j = 0; j < N; ++j) {
-				if (j == src) continue;
-				if (dist[j] > 0 && dist[j] <= hop_k) {
-					sumd += (double)(std::abs(current_state[j].x - p.x) + std::abs(current_state[j].y - p.y)); // Manhattan
-					++cnt;
-				}
-			}
-			return cnt > 0 ? (sumd / cnt) : 0.0;
+		
+		// チップ距離
+		auto ChipDistanceE = [&](UINT ToIdx) -> double {
+			Pos to = state[ToIdx];
+			
+			UINT distance = distance_penalty * (std::max(
+				std::abs(p.x - to.x), std::abs(p.y - to.y)
+			) - 1);
+			
+			return distance;
 		};
-
-		double mean_out = bfs_mean_dist(i, true, false);
-		double mean_in  = bfs_mean_dist(i, false, true);
-
-		// 局所ペナルティは「遠いほど正のペナルティ」
-		double local_pen_out = (mean_out > 0.0) ? (weight_out * mean_out) : 0.0;
-		double local_pen_in  = (mean_in  > 0.0) ? (weight_in  * mean_in)  : 0.0;
-		double local_pen = local_pen_out + local_pen_in;
-		if (local_pen > max_local_penalty) local_pen = max_local_penalty;
-
-		base_energy += local_pen;
+		
+		if(pool[u]->m_NextG < N) base_energy += ChipDistanceE(pool[u]->m_NextG);
+		if(pool[u]->m_NextR < N) base_energy += ChipDistanceE(pool[u]->m_NextR);
 	}
 
 	// 重なりペナルティ（通常は swap により 0 だが防御的に残す）
@@ -2607,128 +2575,204 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& current_state) {
 	}
 
 	if (base_energy <= 0.0) return 0.0;
-	return base_energy + cohesion_energy;
+	return base_energy;
 }
 
 void CarnageSA::run() {
 	// 改良版 SA:
 	// - 隣接スワップ中心（局所探索）
 	// - 低確率で任意2点スワップ（global）とランダムジャンプ
-	// - k個のインデックスを回転させる multi-rotate operator
-	// - 停滞検出によるリヒート（温度を復元して探索幅を一時拡大）
-	double T0 = 100.0;
-	double T = T0;
-	double cooling = 0.99997; // 既定より少し緩やかに
+	constexpr int max_iter = 8000000;
+	double T = 5000.0;
+	constexpr double cooling = 0.9999995;
+	
+	constexpr UINT p_random_swap	= 4;	// 任意2点スワップ
+	constexpr UINT p_long			= 1;	// ランダムセルジャンプ
+	constexpr UINT p_nearby_swap	= 5;	// ランダムセルジャンプ
+	constexpr UINT p_move_mid		= 5;	// 接続chip の真ん中に移動
+	
 	double current_E = calculate_energy(state);
 	auto best_state = state;
 	double best_E = current_E;
 	bool UpdateBest = false;
 
-	std::uniform_int_distribution<UINT> dist_idx(0, (UINT)pool.size() - 1);
-	std::uniform_int_distribution<int> dist_dir(0, 7);
-	std::uniform_real_distribution<double> dist_prob(0.0, 1.0);
+	std::uniform_int_distribution<UINT>		dist_idx(0, (UINT)pool.size() - 1);
+	std::uniform_int_distribution<int>		dist_dir(0, 7);
+	std::uniform_int_distribution<UINT>		dist_prob(0,
+		p_random_swap +
+		p_long +
+		p_nearby_swap +
+		p_move_mid
+	);
 	std::uniform_int_distribution<int> dist_x(0, grid_width - 1);
 	std::uniform_int_distribution<int> dist_y(0, grid_height - 1);
 
 	// occupancy
-	std::vector<int> occ(grid_width * grid_height, -1);
+	std::vector<UINT> occ(grid_width * grid_height, IDX_NONE);
 	auto rebuild_occ = [&](const std::vector<Pos>& s) {
-		std::fill(occ.begin(), occ.end(), -1);
+		std::fill(occ.begin(), occ.end(), IDX_NONE);
 		for (UINT j = 0; j < (UINT)s.size(); ++j) {
 			const Pos& pp = s[j];
 			if (pp.x >= 0 && pp.x < grid_width && pp.y >= 0 && pp.y < grid_height)
 				occ[pp.y * grid_width + pp.x] = (int)j;
 		}
-		};
+	};
 	rebuild_occ(state);
 
 	// move probabilities (base)
-	double p_random_swap = 0.04; // 任意2点スワップ
-	double p_long = 0.01;        // ランダムセルジャンプ
-	double p_rotate = 0.02;      // multi-rotate operator
 	// neighbor-swap が残りの確率
 
-	// stagnation / reheating
-	const int stagnation_limit = 200000;
-	int iter_since_improve = 0;
-	const double reheating_multiplier = 1.8;
-	const int reheating_boost_steps = 50000;
-	int reheating_steps_left = 0;
-
-	const int max_iter = 2000000;
 	for (int iter = 0; iter < max_iter; ++iter) {
 		auto next_state = state;
-		UINT a = dist_idx(gen);
-		double r = dist_prob(gen);
+		UINT src_idx = dist_idx(gen);
+		UINT rnd = dist_prob(gen);
 
 		bool proposed = false;
 		int b = -1; // -1 means move to empty cell
 
-		// Possibly boost exploratory moves during reheating
-		double local_p_random_swap = p_random_swap;
-		double local_p_long = p_long;
-		double local_p_rotate = p_rotate;
-		if (reheating_steps_left > 0) {
-			local_p_random_swap = std::min(0.5, p_random_swap * 6.0);
-			local_p_long = std::min(0.2, p_long * 6.0);
-			local_p_rotate = std::min(0.5, p_rotate * 6.0);
-			reheating_steps_left--;
-		}
-
-		double threshold1 = local_p_random_swap;
-		double threshold2 = threshold1 + local_p_long;
-		double threshold3 = threshold2 + local_p_rotate;
-
-		if (r < threshold1) {
+		// 1chip 移動
+		auto move_chip = [&](UINT from_x, UINT from_y, UINT to_x, UINT to_y) {
+			UINT src_chip = occ[from_y * grid_width + from_x];
+			occ[from_y * grid_width + from_x] = IDX_NONE;
+			occ[to_y * grid_width + to_x] = src_chip;
+			next_state[src_chip].x = to_x;
+			next_state[src_chip].y = to_y;
+		};
+		
+		if (rnd < p_random_swap) {
 			// 任意 2 点スワップ (global)
 			UINT bb = dist_idx(gen);
-			if (bb == a) continue;
-			std::swap(next_state[a], next_state[bb]);
+			if (bb == src_idx) continue;
+			std::swap(next_state[src_idx], next_state[bb]);
 			proposed = true;
 			b = (int)bb;
 		}
-		else if (r < threshold2) {
+		else if (rnd < p_random_swap + p_long) {
 			// ランダムセルへのジャンプ（空きがあれば移動、なければスワップ）
 			int nx = dist_x(gen);
 			int ny = dist_y(gen);
 			int occIdx = occ[ny * grid_width + nx];
-			if (occIdx == -1) {
-				next_state[a].x = nx;
-				next_state[a].y = ny;
+			if (occIdx == IDX_NONE) {
+				next_state[src_idx].x = nx;
+				next_state[src_idx].y = ny;
 				b = -1;
 				proposed = true;
 			}
 			else {
 				UINT bb = (UINT)occIdx;
-				if (bb == a) continue;
-				std::swap(next_state[a], next_state[bb]);
+				if (bb == src_idx) continue;
+				std::swap(next_state[src_idx], next_state[bb]);
+				proposed = true;
+				b = (int)bb;
+			}
+		}
+		else if(rnd < p_random_swap + p_long + p_nearby_swap){
+			// 隣接セルとのスワップ（8方向）
+			int dir = dist_dir(gen);
+			int nx = state[src_idx].x + dx[dir];
+			int ny = state[src_idx].y + dy[dir];
+			if (nx < 0 || nx >= grid_width || ny < 0 || ny >= grid_height) continue;
+			int occIdx = occ[ny * grid_width + nx];
+			if (occIdx == IDX_NONE) {
+				next_state[src_idx].x = nx;
+				next_state[src_idx].y = ny;
+				b = -1;
+				proposed = true;
+			}
+			else {
+				UINT bb = (UINT)occIdx;
+				if (bb == src_idx) continue;
+				std::swap(next_state[src_idx], next_state[bb]);
 				proposed = true;
 				b = (int)bb;
 			}
 		}
 		else {
-			// 隣接セルとのスワップ（8方向）
-			int dir = dist_dir(gen);
-			int nx = state[a].x + dx[dir];
-			int ny = state[a].y + dy[dir];
-			if (nx < 0 || nx >= grid_width || ny < 0 || ny >= grid_height) continue;
-			int occIdx = occ[ny * grid_width + nx];
-			if (occIdx == -1) {
-				next_state[a].x = nx;
-				next_state[a].y = ny;
-				b = -1;
-				proposed = true;
+			// 接続チップの真ん中に移動
+			if (LinkList[src_idx].empty()) continue;
+
+			UINT dst_x = 0, dst_y = 0;
+			for(UINT neighbor : LinkList[src_idx]){
+				dst_x += state[neighbor].x;
+				dst_y += state[neighbor].y;
 			}
-			else {
-				UINT bb = (UINT)occIdx;
-				if (bb == a) continue;
-				std::swap(next_state[a], next_state[bb]);
-				proposed = true;
-				b = (int)bb;
+			dst_x = (dst_x + (int)LinkList[src_idx].size() / 2) / (int)LinkList[src_idx].size();
+			dst_y = (dst_y + (int)LinkList[src_idx].size() / 2) / (int)LinkList[src_idx].size();
+
+			auto p = state[src_idx];
+
+			// 移動先が同じなら continue
+			if (p.x == dst_x && p.y == dst_y){
+				continue;
 			}
+			
+			// start チップの場合は dst_y=0 に固定
+			if (src_idx == pool.m_start) dst_y = 0;
+
+			// Exit チップの場合は端に固定
+			else if(pool[src_idx]->m_NextG == IDX_EXIT || pool[src_idx]->m_NextR == IDX_EXIT){
+				UINT xdist = std::min(dst_x, grid_width - 1 - dst_x);
+				UINT ydist = std::min(dst_y, grid_height - 1 - dst_y);
+
+				if (xdist < ydist) {
+					dst_x = (dst_x < grid_width / 2) ? 0 : (grid_width - 1);
+				} else {
+					dst_y = (dst_y < grid_height / 2) ? 0 : (grid_height - 1);
+				}
+			}
+
+			// 移動先が空きならそのまま移動
+			if (occ[dst_y * grid_width + dst_x] == IDX_NONE) {
+				next_state[src_idx].x = dst_x;
+				next_state[src_idx].y = dst_y;
+				proposed = true;
+				continue;
+			}
+			
+			// 一旦 chip を消す
+			occ[p.y * grid_width + p.x] = IDX_NONE;
+			
+			// 最も近い空きセルを探す
+			UINT best_x;
+			UINT best_y;
+			UINT best_dist = INT_MAX;
+
+			for(UINT y = 0; y < grid_height; ++y){
+				for(UINT x = 0; x < grid_width; ++x){
+					int occIdx = occ[y * grid_width + x];
+					if (occIdx == IDX_NONE) {
+						UINT dist = std::abs((int)(x - dst_x)) + std::abs((int)(y - dst_y));
+						if (dist < best_dist) {
+							best_dist = dist;
+							best_x = x;
+							best_y = y;
+						}
+					}
+				}
+			}
+			
+			// チップ移動
+			if(best_x < dst_x){
+				for (UINT x = best_x; x < dst_x; ++x) move_chip(x + 1, best_y, x, best_y);
+			}else{
+				for (UINT x = best_x; x > dst_x; --x) move_chip(x - 1, best_y, x, best_y);
+			}
+			if(best_y < dst_y){
+				for (UINT y = best_y; y < dst_y; ++y) move_chip(dst_x, y + 1, dst_x, y);
+			}else{
+				for (UINT y = best_y; y > dst_y; --y) move_chip(dst_x, y - 1, dst_x, y);
+			}
+			
+			occ[dst_y * grid_width + dst_x] = src_idx;
+			next_state[src_idx].x = dst_x;
+			next_state[src_idx].y = dst_y;
+			proposed = true;
 		}
 
-		if (!proposed) continue;
+		if (!proposed){
+			--iter;
+			continue;
+		}
 
 		double next_E = calculate_energy(next_state);
 
@@ -2753,21 +2797,15 @@ void CarnageSA::run() {
 				best_E = current_E;
 				best_state = state;
 				UpdateBest = true;
-				iter_since_improve = 0;
 			}
-			else {
-				++iter_since_improve;
-			}
-		}
-		else {
-			++iter_since_improve;
 		}
 
 		// cooling
 		T *= cooling;
 
 		if (iter % 200000 == 0){
-			printf("Step: %7d | Energy: %5.4f | Best: %5.4f\n", iter, current_E, best_E);
+			printf("Step: %7d | T: %7.2f Energy: %5.4f | Best: %5.4f\n", iter, T, current_E, best_E);
+			OutputSvg("z.svg", next_state);
 			if(UpdateBest){
 				OutputSvg(m_svg_file, state);
 				UpdateBest = false;
