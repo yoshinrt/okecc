@@ -2415,7 +2415,7 @@ class CarnageSA {
 	
 public:
 	CarnageSA(CChipPool& p, const char *svg_file = nullptr)
-		: pool(p), GridWidth(p.m_width), GridHeight(p.m_height), gen(42/*std::random_device{}()*/), m_svg_file(svg_file){
+		: pool(p), GridWidth(p.m_width), GridHeight(p.m_height), gen(std::random_device{}()), m_svg_file(svg_file){
 		LinkList.resize(pool.size());
 		initialize();
 	}
@@ -2505,8 +2505,12 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vec
 			);
 		}
 		
-		auto IsOcc = [&](int x, int y) -> bool {
-			return occ[y * GridWidth + x] != IDX_NONE;
+		auto IsBrank = [&](int x, int y) -> bool {
+			return occ[y * GridWidth + x] == IDX_NONE;
+		};
+		
+		auto Occupy = [&](int x, int y){
+			occ[y * GridWidth + x] = 0;
 		};
 		
 		auto ChipE = [&](UINT ToIdx) -> double {
@@ -2532,11 +2536,13 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vec
 					auto [y, mod] = std::div((edy - sty) * (x - stx) * stepx, (edx - stx) * stepx);
 					y += sty;
 					
-					if(
-						IsOcc(x, y) &&
-						(!(mod < 0) || IsOcc(x, y - 1)) &&
-						(!(mod > 0) || IsOcc(x, y + 1))
-					){
+					if(IsBrank(x, y)){
+						Occupy(x, y);
+					}else if(mod < 0 && IsBrank(x, y - 1)){
+						Occupy(x, y - 1);
+					}else if(mod > 0 && IsBrank(x, y + 1)){
+						Occupy(x, y + 1);
+					}else{
 						e += overwrap_penalty;
 					}
 				}
@@ -2547,11 +2553,13 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vec
 					auto [x, mod] = std::div((edx - stx) * (y - sty) * stepy, (edy - sty) * stepy);
 					x += stx;
 					
-					if(
-						IsOcc(x, y) &&
-						(!(mod < 0) || IsOcc(x - 1, y)) &&
-						(!(mod > 0) || IsOcc(x + 1, y))
-					){
+					if(IsBrank(x, y)){
+						Occupy(x, y);
+					}else if(mod < 0 && IsBrank(x - 1, y)){
+						Occupy(x - 1, y);
+					}else if(mod > 0 && IsBrank(x + 1, y)){
+						Occupy(x + 1, y);
+					}else{
 						e += overwrap_penalty;
 					}
 				}
@@ -2572,7 +2580,7 @@ void CarnageSA::run() {
 	// - 隣接スワップ中心（局所探索）
 	// - 低確率で任意2点スワップ（global）とランダムジャンプ
 	constexpr int max_iter = 8000000;
-	constexpr double cooling = 0.999995;
+	constexpr double cooling = 0.999997;
 	double T = 2000.0;
 	
 	constexpr UINT p_random_swap	= 1;	// ランダムスワップ
@@ -2763,7 +2771,7 @@ void CarnageSA::run() {
 		}
 
 		double next_E = calculate_energy(next_state, next_occ);
-
+		
 		// 早期最適性判定
 		if (next_E < 0.0001) {
 			state		= next_state;
@@ -2790,7 +2798,7 @@ void CarnageSA::run() {
 
 		// cooling
 		T *= cooling;
-
+		
 		if (iter % 200000 == 0){
 			//dump_occ(next_occ);
 			printf("Step: %7d | T: %7.2f Energy: %8.2f | Best: %8.2f\n", iter, T, current_E, best_E);
