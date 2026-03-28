@@ -210,13 +210,40 @@ public:
 	
 	bool ValidG(void){return m_NextG < IDX_EXIT;}
 	bool ValidR(void){return m_NextR < IDX_EXIT;}
-
+	
+	virtual uint32_t GetBinary(void){
+		return
+			(m_Id.GetRaw() << 26) |
+			(m_RawG.GetRaw() << 23);
+	}
+	
+	virtual void SetBinary(uint32_t bin){
+		m_Id.SetRaw(bin >> 26);
+		m_RawG.SetRaw(bin >> 23);
+	}
+	
 	ScaledInt<6>	m_Id;
 	ScaledInt<3>	m_RawG;
 	ScaledInt<3>	m_RawR;
 
 	UINT			m_NextG = IDX_NONE;
 	UINT			m_NextR = IDX_NONE;
+};
+
+class CChipCond : public CChip {
+public:
+	virtual ~CChipCond(){}
+	
+	virtual uint32_t GetBinary(void){
+		return
+			CChip::GetBinary() |
+			(m_RawR.GetRaw() << 20);
+	}
+	
+	virtual void SetBinary(uint32_t bin){
+		CChip::SetBinary(bin);
+		m_RawR.SetRaw(bin >> 20);
+	}
 };
 
 //////////////////////////////////////////////////////////////////////////////
