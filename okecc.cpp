@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <wchar.h>
+#include "mcmgr.cpp"
 
 enum {
 	OKE_BIPED,
@@ -2967,6 +2968,7 @@ public:
 	void initialize(void);
 	void run();
 	double calculate_energy(const std::vector<Pos>& state, const std::vector<UINT>& occ);
+	void SetArrow(void);
 	void OutputSvg(const char* filename, const std::vector<Pos>& state_disp);
 	
 	const std::vector<Pos>& get_result() const { return state; }
@@ -3338,6 +3340,47 @@ void CarnageSA::run() {
 }
 
 //////////////////////////////////////////////////////////////////////////////
+// RawG/R 設定
+
+void CarnageSA::SetArrow(void){
+	
+	auto GetArrowCode = [&](UINT from, UINT to) -> int {
+		if(to == IDX_NONE) return 0;
+
+		if(to == IDX_EXIT){
+			// EXIT は外枠への矢印とする
+			if(state[from].y == 0)						return 0; // N
+			else if(state[from].y == (GridHeight - 1))	return 4; // S
+			else if(state[from].x == 0)					return 6; // W
+			else if(state[from].x == (GridWidth - 1))	return 2; // E
+			else										return 0; // 内部にある場合はとりあえず N
+		}
+		
+		int dx = (int)state[to].x - (int)state[from].x;
+		int dy = (int)state[to].y - (int)state[from].y;
+		
+		if(dy < 0){
+			if(dx < 0)			return 7; // NW
+			else if(dx == 0)	return 0; // N
+			else				return 1; // NE
+		}
+		else if(dy == 0){
+			if(dx < 0)			return 6; // W
+			else				return 2; // E
+		}
+		if(dx < 0)				return 5; // SW
+		else if(dx == 0)		return 4; // S
+		else					return 3; // SE
+	};
+	
+	for(UINT u = 0; u < pool.size(); ++u){
+		CChip* chip = pool[u];
+		chip->m_RawG = GetArrowCode(u, chip->m_NextG);
+		chip->m_RawR = GetArrowCode(u, chip->m_NextR);
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////////
 
 void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_disp) {
 	const int CHIP_SIZE = 75;    // チップサイズ
@@ -3467,6 +3510,87 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 }
 
 //////////////////////////////////////////////////////////////////////////////
+
+void chip_main();
+
+int main(void){
+	g_pCurTree		= new CChipTree;
+	g_pCurChipPool	= new CChipPool(15, 15);
+	g_pCurBlockInfo	= new CBlockInfo;
+	
+	try{
+		chip_main();
+	}catch(const OkeccError& e){
+		puts(e.what());
+		return 0;
+	}
+	
+	g_pCurTree->AddToG(IDX_EXIT);
+	g_pCurChipPool->m_start = g_pCurTree->m_start;
+	g_pCurChipPool->dump();
+	
+	// Goto 最適化
+	g_pCurChipPool->CleanupGoto();
+	
+	printf("Number of chip(s): %d\n", (UINT)g_pCurChipPool->m_list.size());
+	g_pCurChipPool->dump();
+	
+	CarnageSA sa(*g_pCurChipPool, "chip.svg");
+	sa.run();
+	sa.SetArrow();
+	sa.OutputSvg("chip.svg", sa.get_result());
+	
+	const std::string mcFile = "memcard1.mcd";
+	const std::string gameId = "SLPS-01666";
+
+	// 1. インスタンス生成（ファイル読み込みとID設定）
+	MemoryCardManager manager(mcFile, gameId);
+
+	// 2. データの読み出し
+	std::vector<uint8_t> saveBuffer;
+	size_t dataSize = manager.read(saveBuffer);
+
+	if (dataSize == 0) {
+		std::cerr << "Not found Game ID '" << gameId << std::endl;
+		exit(1);
+	}
+	
+	std::cout << "Game ID: " << gameId << " detected" << std::endl;
+	std::cout << "Data size: " << dataSize << "Byte(s) (" << (dataSize / 1024) << " KB)" << std::endl;
+	
+	SaveDataZeus *pZeus = (SaveDataZeus *)saveBuffer.data();
+	
+	// ソフト書き込み
+	constexpr int CARD = 0;
+	
+	auto state = sa.get_result();
+	for(UINT u = 0; u < 23 * 15; ++u) pZeus->Oke[CARD].Software[u] = 0;
+	
+	for(UINT u = 0; u < state.size(); ++u){
+		Pos& p = state[u];
+		pZeus->Oke[CARD].Software[p.y * 23 + p.x] = g_pCurChipPool->m_list[u]->GetBinary();
+	}
+	
+	pZeus->Oke[CARD].StartMainX = state[g_pCurChipPool->m_start].x + 2;
+	pZeus->Oke[CARD].StartMainY = 2;
+	
+	// chksum
+	uint8_t ChkSum = 0;
+	for(int i = 0; i < dataSize - 1; ++i) ChkSum += saveBuffer[i];
+	pZeus->ChkSum = ChkSum;
+
+	// 3. データの書き込み
+	if (manager.write(saveBuffer) && manager.saveToFile()) {
+		std::cout << "Successfully wrote to " << mcFile << std::endl;
+	} else {
+		std::cerr << "Failed to write to " << mcFile << std::endl;
+		return 1;
+	}
+	
+	return 0;
+}
+
+//////////////////////////////////////////////////////////////////////////////
 // C との命名被り回避
 
 #define if(cc)		if_statement(cc);
@@ -3483,8 +3607,12 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 
 //////////////////////////////////////////////////////////////////////////////
 
-void chip_main(void){
-#if 1
+void chip_main(){
+	nop();
+	wait_ae();
+	wait(60);
+	sound(4, 7);
+#if 0
 	// 格闘
 	if(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
 		fight();
@@ -3791,35 +3919,4 @@ void chip_main(void){
 	
 	jump_backward();
 #endif
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
-int main(void){
-	g_pCurTree		= new CChipTree;
-	g_pCurChipPool	= new CChipPool(15, 15);
-	g_pCurBlockInfo	= new CBlockInfo;
-	
-	try{
-		chip_main();
-	}catch(const OkeccError& e){
-		puts(e.what());
-		return 0;
-	}
-	
-	g_pCurTree->AddToG(IDX_EXIT);
-	g_pCurChipPool->m_start = g_pCurTree->m_start;
-	g_pCurChipPool->dump();
-	
-	// Goto 最適化
-	g_pCurChipPool->CleanupGoto();
-	
-	printf("Number of chip(s): %d\n", (UINT)g_pCurChipPool->m_list.size());
-	g_pCurChipPool->dump();
-	
-	CarnageSA sa(*g_pCurChipPool, "chip.svg");
-	sa.run();
-	sa.OutputSvg("chip.svg", sa.get_result());
-
-	return 0;
 }
