@@ -113,6 +113,16 @@ private:
 //////////////////////////////////////////////////////////////////////////////
 // bit scaled int
 
+class CChipBinary {
+public:
+	CChipBinary(uint32_t val = 0) : m_val(val), m_pos(32){}
+	
+	uint32_t GetVal(void){return m_val;}
+	
+	uint32_t	m_val;
+	int			m_pos;
+};
+
 template<UINT _width, UINT _step = 1, int _offset = 0>
 class ScaledInt {
 public:
@@ -139,8 +149,15 @@ public:
 		return m_value * step + offset;
 	}
 	
-	UINT GetRaw(void){return m_value;}
-	void SetRaw(uint32_t bin){m_value = bin & ((1 << width) - 1);}
+	void GetBin(CChipBinary& bin){
+		bin.m_pos -= width;
+		bin.m_val |= m_value << bin.m_pos;
+	}
+	
+	void SetBin(CChipBinary& bin){
+		bin.m_pos -= width;
+		m_value = (bin.m_val >> bin.m_pos) & ((1 << width) - 1);
+	};
 	
 private:
 	UINT	m_value = 0;
@@ -211,15 +228,14 @@ public:
 	bool ValidG(void){return m_NextG < IDX_EXIT;}
 	bool ValidR(void){return m_NextR < IDX_EXIT;}
 	
-	virtual uint32_t GetBinary(void){
-		return
-			(m_Id.GetRaw() << 26) |
-			(m_RawG.GetRaw() << 23);
+	virtual void GetBin(CChipBinary& bin){
+		m_Id.GetBin(bin);
+		m_RawG.GetBin(bin);
 	}
 	
-	virtual void SetBinary(uint32_t bin){
-		m_Id.SetRaw(bin >> 26);
-		m_RawG.SetRaw(bin >> 23);
+	virtual void SetBin(CChipBinary& bin){
+		m_Id.SetBin(bin);
+		m_RawG.SetBin(bin);
 	}
 	
 	ScaledInt<6>	m_Id;
@@ -234,15 +250,14 @@ class CChipCond : public CChip {
 public:
 	virtual ~CChipCond(){}
 	
-	virtual uint32_t GetBinary(void){
-		return
-			CChip::GetBinary() |
-			(m_RawR.GetRaw() << 20);
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_RawR.GetBin(bin);
 	}
 	
-	virtual void SetBinary(uint32_t bin){
-		CChip::SetBinary(bin);
-		m_RawR.SetRaw(bin >> 20);
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_RawR.SetBin(bin);
 	}
 };
 
@@ -629,6 +644,16 @@ public:
 			m_param.get() == 0 ? "NOP" :
 			m_param.get() == NOP_AE ? "Wait AE" :
 			std::format("Wait {:2d}", m_param.get());
+	}
+	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_param.GetBin(bin);
+	}
+	
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_param.SetBin(bin);
 	}
 	
 	ScaledInt<5,2> m_param;
@@ -1090,6 +1115,20 @@ public:
 				(m_weapon.get() < 5 ? "武装" : "オプション"), (m_weapon.get() % 5 + 1),
 				m_operator_str[m_operator.get()], m_num.get()
 			);
+	}
+	
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_weapon.GetBin(bin);
+		m_num.GetBin(bin);
+		m_operator.GetBin(bin);
+	}
+	
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_weapon.SetBin(bin);
+		m_num.SetBin(bin);
+		m_operator.SetBin(bin);
 	}
 	
 	ScaledInt<3>		m_weapon;
