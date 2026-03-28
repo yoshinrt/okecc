@@ -138,7 +138,10 @@ public:
 	int get(void){
 		return m_value * step + offset;
 	}
-
+	
+	UINT GetRaw(void){return m_value;}
+	void SetRaw(uint32_t bin){m_value = bin & ((1 << width) - 1);}
+	
 private:
 	UINT	m_value = 0;
 };
