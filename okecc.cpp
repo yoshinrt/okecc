@@ -2655,7 +2655,8 @@ void CarnageSA::run() {
 		);
 	};
 	
-	for (int iter = 0; iter < max_iter; ++iter) {
+	int iter;
+	for (iter = 0; iter < max_iter; ++iter) {
 		next_state	= state;
 		next_occ	= occ;
 		
@@ -2812,7 +2813,7 @@ void CarnageSA::run() {
 
 	state = best_state;
 	OutputSvg(m_svg_file, state);	
-	printf("Step: %7d | Energy: %.2f\n", max_iter, best_E);
+	printf("Step: %7d | Energy: %.2f\n", iter, best_E);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2981,8 +2982,14 @@ void chip_main(void){
 	endif
 	
 	lockon(0, 512, 320, OKE_ALL);
+	D = target_z();
 	
-	if(barrier_height(0, 128, 20) >= 3 || projectile_num(0, 32, 160, P_ALL) || friendly_num(0, 128, 20, OKE_ALL))
+	if(
+		barrier_height(0, 128, 20) >= 3 ||
+		projectile_num(0, 32, 160, P_ALL) ||
+		friendly_num(0, 128, 20, OKE_ALL) ||
+		barrier_height(0, 160, 40) >= 24
+	)
 		turn_left();
 	endif
 	
@@ -2999,37 +3006,38 @@ void chip_main(void){
 	// 前進
 	move_forward();
 	
-	if(target_distance() >= 50) exit(); endif
+	// 近すぎる敵から距離を取る
+	if(target_distance() <= 50) exit(); endif
 	
-	// 飛行型には積極的には撃たない
-	if(target_z() >= 6 || heat() >= 50) exit(); endif
-	
-	loop
-		B = ammo_num(1);
-		if(A != B || !is_self_firing()) break; endif
-	endloop
-	
-	fire(0, 448, 160, OKE_ALL, 3, 1);
-	fire(0, 448, 160, OKE_ALL, 1, 1);
-	A = ammo_num(1);
-	
-	// 140m 以上離れた敵にはミサイルを打ちやすくする
-	if(target_distance() >= 140)
-		D = 1;
+	// 飛行型には積極的にはカノンを撃たない
+	if(!(target_z() >= 6 && heat() >= 50))
+		loop
+			B = ammo_num(1);
+			if(A != B || !is_self_firing()) break; endif
+		endloop
+		
+		fire(0, 448, 160, OKE_ALL, 3, 1);
+		fire(0, 448, 160, OKE_ALL, 1, 1);
+		A = ammo_num(1);
+		
+		// 140m 以上離れた敵にはミサイルを打ちやすくする
+		if(target_distance() >= 140)
+			D = 1;
+		endif
 	endif
 	
 	B = time();
 	C = ch_receive(1);
 	
 	// ミサイルタイマを過ぎるか，破損が多ければミサイルを撃つ
-	if(!(B >= C || damage() >= 60 || D)) exit(); endif
-	
-	// ミサイル射撃
-	ch_send(1, B += 3);
-	
-	if(ammo_num(2)) fire(0, 512, 320, OKE_ALL, 1, 3); endif
-	wait_ae();
-	if(ammo_num(3)) fire(0, 512, 320, OKE_ALL, 3, 3); endif
+	if(B >= C || damage() >= 60 || D)
+		// ミサイル射撃
+		ch_send(1, B += 3);
+		
+		if(ammo_num(2)) fire(0, 512, 320, OKE_ALL, 1, 3); endif
+		wait_ae();
+		if(ammo_num(3)) fire(0, 512, 320, OKE_ALL, 3, 3); endif
+	endif
 #endif
 #if 0
 	option(1);
