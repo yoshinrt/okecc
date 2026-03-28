@@ -4,6 +4,8 @@
 #include <cassert>
 #include <climits>
 #include <cmath>
+#include <concepts>
+#include <cstdlib>
 #include <fcntl.h>
 #include <format>
 #include <io.h>
@@ -16,7 +18,6 @@
 #include <string>
 #include <vector>
 #include <wchar.h>
-#include <concepts>
 
 enum {
 	OKE_BIPED,
@@ -2472,14 +2473,17 @@ void CarnageSA::initialize() {
 	OutputSvg(m_svg_file, state);
 }
 
-double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vector<UINT>& occ) {
+double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vector<UINT>& occ_org) {
 	double base_energy = 0.0;
 	
 	// ペナルティ
 	const double distance_penalty	= 1.0;		// chip 距離
+	const double overwrap_penalty	= 100.0;	// チップ間 path が他のチップを通過
 	const double start_end_penalty	= 1000.0;	// start/end 枠からの距離
 	
 	const size_t N = state.size();
+	
+	auto occ = occ_org;
 
 	// パラメータ（調整可能）
 
@@ -2501,19 +2505,62 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vec
 			);
 		}
 		
-		// チップ距離
-		auto ChipDistanceE = [&](UINT ToIdx) -> double {
+		auto IsOcc = [&](int x, int y) -> bool {
+			return occ[y * GridWidth + x] != IDX_NONE;
+		};
+		
+		auto ChipE = [&](UINT ToIdx) -> double {
+			// チップ距離
 			Pos to = state[ToIdx];
 			
-			auto distance = distance_penalty * (std::max(
+			auto e = distance_penalty * (std::max(
 				std::abs((int)p.x - (int)to.x), std::abs((int)p.y - (int)to.y)
 			) - 1);
 			
-			return distance;
+			if(e == 0) return e;
+			
+			// チップ path が他のチップを通過
+			int stx = p.x;
+			int sty = p.y;
+			int edx = state[ToIdx].x;
+			int edy = state[ToIdx].y;
+			
+			if(std::abs(stx - edx) >= std::abs(sty - edy)){
+				int stepx = stx < edx ? 1 : -1;
+				
+				for(int x = stx + stepx; x != edx; x += stepx){
+					auto [y, mod] = std::div((edy - sty) * (x - stx) * stepx, (edx - stx) * stepx);
+					y += sty;
+					
+					if(
+						IsOcc(x, y) &&
+						(!(mod < 0) || IsOcc(x, y - 1)) &&
+						(!(mod > 0) || IsOcc(x, y + 1))
+					){
+						e += overwrap_penalty;
+					}
+				}
+			}else{
+				int stepy = sty < edy ? 1 : -1;
+				
+				for(int y = sty + stepy; y != edy; y += stepy){
+					auto [x, mod] = std::div((edx - stx) * (y - sty) * stepy, (edy - sty) * stepy);
+					x += stx;
+					
+					if(
+						IsOcc(x, y) &&
+						(!(mod < 0) || IsOcc(x - 1, y)) &&
+						(!(mod > 0) || IsOcc(x + 1, y))
+					){
+						e += overwrap_penalty;
+					}
+				}
+			}
+			return e;
 		};
 		
-		if(pool[u]->m_NextG < N) base_energy += ChipDistanceE(pool[u]->m_NextG);
-		if(pool[u]->m_NextR < N) base_energy += ChipDistanceE(pool[u]->m_NextR);
+		if(pool[u]->m_NextG < N) base_energy += ChipE(pool[u]->m_NextG);
+		if(pool[u]->m_NextR < N) base_energy += ChipE(pool[u]->m_NextR);
 	}
 
 	if (base_energy <= 0.0) return 0.0;
@@ -2525,12 +2572,12 @@ void CarnageSA::run() {
 	// - 隣接スワップ中心（局所探索）
 	// - 低確率で任意2点スワップ（global）とランダムジャンプ
 	constexpr int max_iter = 8000000;
-	constexpr double cooling = 0.9999995;
-	double T = 5000.0;
+	constexpr double cooling = 0.999995;
+	double T = 2000.0;
 	
 	constexpr UINT p_random_swap	= 1;	// ランダムスワップ
 	constexpr UINT p_nearby_swap	= 5;	// 隣接スワップ
-	constexpr UINT p_move_mid		= 5;	// 接続chip の真ん中に移動
+	constexpr UINT p_move_mid		= 50;	// 接続chip の真ん中に移動
 	
 	std::uniform_int_distribution<UINT>		dist_idx(0, (UINT)pool.size() - 1);
 	std::uniform_int_distribution<int>		dist_dir(0, 7);
