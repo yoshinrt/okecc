@@ -2444,7 +2444,7 @@ public:
 	
 	void initialize(void);
 	void run();
-	double calculate_energy(const std::vector<Pos>& current_state);
+	double calculate_energy(const std::vector<Pos>& state, const std::vector<UINT>& occ);
 	void OutputSvg(const char* filename, const std::vector<Pos>& state_disp);
 	
 	const std::vector<Pos>& get_result() const { return state; }
@@ -2472,31 +2472,19 @@ void CarnageSA::initialize() {
 	OutputSvg(m_svg_file, state);
 }
 
-double CarnageSA::calculate_energy(const std::vector<Pos>& current_state) {
+double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vector<UINT>& occ) {
 	double base_energy = 0.0;
 	
 	// ペナルティ
 	const double distance_penalty	= 1.0;		// chip 距離
 	const double start_end_penalty	= 1000.0;	// start/end 枠からの距離
 	
-	// 1. 占有状況の高速検索用マップ
-	std::vector<int> grid_occupancy(GridWidth * GridHeight, -1);
-	std::map<Pos, int> overlap_count; // 重なりペナルティ用
-
-	const size_t N = current_state.size();
-
-	for (UINT i = 0; i < (UINT)current_state.size(); ++i) {
-		Pos p = current_state[i];
-		if ((UINT)p.x < GridWidth && (UINT)p.y < GridHeight) {
-			grid_occupancy[p.y * GridWidth + p.x] = (int)i;
-		}
-		overlap_count[p]++;
-	}
+	const size_t N = state.size();
 
 	// パラメータ（調整可能）
 
-	for (UINT u = 0; u < (UINT)current_state.size(); ++u) {
-		Pos p = current_state[u];
+	for (UINT u = 0; u < (UINT)state.size(); ++u) {
+		Pos p = state[u];
 		CChip* chip = pool[u];
 
 		// 物理制約
@@ -2517,7 +2505,7 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& current_state) {
 		auto ChipDistanceE = [&](UINT ToIdx) -> double {
 			Pos to = state[ToIdx];
 			
-			UINT distance = distance_penalty * (std::max(
+			auto distance = distance_penalty * (std::max(
 				std::abs((int)p.x - (int)to.x), std::abs((int)p.y - (int)to.y)
 			) - 1);
 			
@@ -2526,12 +2514,6 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& current_state) {
 		
 		if(pool[u]->m_NextG < N) base_energy += ChipDistanceE(pool[u]->m_NextG);
 		if(pool[u]->m_NextR < N) base_energy += ChipDistanceE(pool[u]->m_NextR);
-	}
-
-	// 重なりペナルティ（通常は swap により 0 だが防御的に残す）
-	for (auto const& kv : overlap_count) {
-		int count = kv.second;
-		if (count > 1) base_energy += (double)count * 1000.0;
 	}
 
 	if (base_energy <= 0.0) return 0.0;
@@ -2543,18 +2525,13 @@ void CarnageSA::run() {
 	// - 隣接スワップ中心（局所探索）
 	// - 低確率で任意2点スワップ（global）とランダムジャンプ
 	constexpr int max_iter = 8000000;
-	double T = 5000.0;
 	constexpr double cooling = 0.9999995;
+	double T = 5000.0;
 	
-	constexpr UINT p_random_swap	= 1;	// 任意2点スワップ
-	constexpr UINT p_nearby_swap	= 5;	// ランダムセルジャンプ
+	constexpr UINT p_random_swap	= 1;	// ランダムスワップ
+	constexpr UINT p_nearby_swap	= 5;	// 隣接スワップ
 	constexpr UINT p_move_mid		= 5;	// 接続chip の真ん中に移動
 	
-	double current_E = calculate_energy(state);
-	auto best_state = state;
-	double best_E = current_E;
-	bool UpdateBest = false;
-
 	std::uniform_int_distribution<UINT>		dist_idx(0, (UINT)pool.size() - 1);
 	std::uniform_int_distribution<int>		dist_dir(0, 7);
 	std::uniform_int_distribution<UINT>		dist_prob(0,
@@ -2590,6 +2567,11 @@ void CarnageSA::run() {
 		}
 	};
 	
+	double current_E	= calculate_energy(state, occ);
+	auto best_state		= state;
+	double best_E		= current_E;
+	bool UpdateBest		= false;
+
 	// move probabilities (base)
 	// neighbor-swap が残りの確率
 	auto next_state = state;
@@ -2733,7 +2715,7 @@ void CarnageSA::run() {
 			continue;
 		}
 
-		double next_E = calculate_energy(next_state);
+		double next_E = calculate_energy(next_state, next_occ);
 
 		// 早期最適性判定
 		if (next_E < 0.0001) {
@@ -2764,7 +2746,7 @@ void CarnageSA::run() {
 
 		if (iter % 200000 == 0){
 			//dump_occ(next_occ);
-			printf("Step: %7d | T: %7.2f Energy: %5.4f | Best: %5.4f\n", iter, T, current_E, best_E);
+			printf("Step: %7d | T: %7.2f Energy: %8.2f | Best: %8.2f\n", iter, T, current_E, best_E);
 			OutputSvg("z.svg", next_state);
 			if(UpdateBest){
 				OutputSvg(m_svg_file, state);
@@ -2775,7 +2757,7 @@ void CarnageSA::run() {
 
 	state = best_state;
 	OutputSvg(m_svg_file, state);	
-	printf("Step: %7d | Energy: %5.4f\n", max_iter, best_E);
+	printf("Step: %7d | Energy: %.2f\n", max_iter, best_E);
 }
 
 //////////////////////////////////////////////////////////////////////////////
