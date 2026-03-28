@@ -1064,7 +1064,7 @@ static void option(UINT param, LastLocationArg){
 //////////////////////////////////////////////////////////////////////////////
 // 残弾
 
-class CChipAmmoNum : public CChip {
+class CChipAmmoNum : public CChipCond {
 public:
 	
 	CChipAmmoNum(
@@ -1108,7 +1108,7 @@ static CCond option_num(
 //////////////////////////////////////////////////////////////////////////////
 // 近くの OKE を探索
 
-class CChipOkeNum : public CChip{
+class CChipOkeNum : public CChipCond{
 public:
 	CChipOkeNum(
 		int angleCenter,
@@ -1186,7 +1186,7 @@ static CCond friendly_num(
 //////////////////////////////////////////////////////////////////////////////
 // 近くの障害物を探索
 
-class CChipBarrier : public CChip {
+class CChipBarrier : public CChipCond {
 public:
 
 	CChipBarrier(
@@ -1237,7 +1237,7 @@ static CCond barrier_height(
 //////////////////////////////////////////////////////////////////////////////
 // 近くの危険物を探索
 
-class CChipProjectileNum : public CChip {
+class CChipProjectileNum : public CChipCond {
 public:
 	static inline const char *m_ProjectileTypeStr[] = {
 		"危険物", "弾丸", "ミサイル", "ビーム", "ロケット", "地雷", "機雷", "高速"
@@ -1295,7 +1295,7 @@ static CCond projectile_num(
 //////////////////////////////////////////////////////////////////////////////
 // マップポイント
 
-class CChipMapPoint : public CChip {
+class CChipMapPoint : public CChipCond {
 public:
 	CChipMapPoint(
 		int angleCenter,
@@ -1345,7 +1345,7 @@ static CCond is_mappoint(
 //////////////////////////////////////////////////////////////////////////////
 // 自機の状態確認
 
-class CChipSelfStatus : public CChip {
+class CChipSelfStatus : public CChipCond {
 public:
 	enum {
 		HEAT,
@@ -1413,7 +1413,7 @@ static void sub(
 //////////////////////////////////////////////////////////////////////////////
 // 乱数
 
-class CChipIsRand : public CChip {
+class CChipIsRand : public CChipCond {
 public:
 	
 	CChipIsRand(
@@ -1451,7 +1451,7 @@ static CChipTree is_rand(
 //////////////////////////////////////////////////////////////////////////////
 // 時間
 
-class CChipTime : public CChip {
+class CChipTime : public CChipCond {
 public:
 	
 	CChipTime(void){
@@ -1535,7 +1535,7 @@ static void lockon(
 //////////////////////////////////////////////////////////////////////////////
 // ターゲット距離
 
-class CChipTgtDistance : public CChip {
+class CChipTgtDistance : public CChipCond {
 public:
 	
 	CChipTgtDistance(void){
@@ -1571,7 +1571,7 @@ static CCond target_distance(
 //////////////////////////////////////////////////////////////////////////////
 // ターゲット方向
 
-class CChipTgtDirection : public CChip {
+class CChipTgtDirection : public CChipCond {
 public:
 	
 	CChipTgtDirection(
@@ -1648,7 +1648,7 @@ static void get_target_direction(
 /////////////////////////////////////////////////////////////////////////////////////////////
 // ターゲット XYZ 座標
 
-class CChipIsCoordinate : public CChip{
+class CChipIsCoordinate : public CChipCond{
 public:
 	
 	CChipIsCoordinate(
@@ -1716,7 +1716,7 @@ public:
 //////////////////////////////////////////////////////////////////////////////
 // ターゲット状態
 
-class CChipTgtAction : public CChip {
+class CChipTgtAction : public CChipCond {
 public:
 	
 	enum {
@@ -2163,7 +2163,7 @@ CChipVar& CChipVar::operator= (const int imm){g_pCurTree->add(new CChipCalc(m_va
 //////////////////////////////////////////////////////////////////////////////
 // 算術比較
 
-class CChipCmp : public CChip {
+class CChipCmp : public CChipCond {
 public:
 	CChipCmp(
 		int op1,
