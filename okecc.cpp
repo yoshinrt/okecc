@@ -433,10 +433,10 @@ CChipTree operator||(T&& lhs, U&& rhs) {
 
 //////////////////////////////////////////////////////////////////////////////
 
-class CChipCond {
+class CCond {
 public:
 	
-	CChipCond(CChip *pchip) : m_pchip(pchip){}
+	CCond(CChip *pchip) : m_pchip(pchip){}
 	
 	CChip *m_pchip;
 	
@@ -519,7 +519,7 @@ public:
 		return *this >= 1;
 	}
 	
-	CChipCond GetCChipCond(void) const;
+	CCond GetCChipCond(void) const;
 	CChipTree operator<=(int num) const;
 	CChipTree operator< (int num) const;
 	CChipTree operator>=(int num) const;
@@ -1070,12 +1070,12 @@ public:
 	ScaledInt<1>		m_operator;
 };
 
-static CChipCond option_num(
+static CCond option_num(
 	int weapon,
 	LastLocationArg
 ){
 	LastLocation();
-	return CChipCond(new CChipAmmoNum(weapon + 4));
+	return CCond(new CChipAmmoNum(weapon + 4));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1124,17 +1124,17 @@ public:
 	ScaledInt<1>			m_operator;
 };
 
-static CChipCond oke_num(
+static CCond oke_num(
 	int angleCenter,
 	int angleRange,
 	int distance,
 	int type,
 	int enemy
 ){
-	return CChipCond(new CChipOkeNum(angleCenter, angleRange, distance, type, enemy));
+	return CCond(new CChipOkeNum(angleCenter, angleRange, distance, type, enemy));
 }
 
-static CChipCond enemy_num(
+static CCond enemy_num(
 	int angleCenter,
 	int angleRange,
 	int distance,
@@ -1145,7 +1145,7 @@ static CChipCond enemy_num(
 	return oke_num(angleCenter, angleRange, distance, type, CChip::ENEMY);
 }
 
-static CChipCond friendly_num(
+static CCond friendly_num(
 	int angleCenter,
 	int angleRange,
 	int distance,
@@ -1197,14 +1197,14 @@ public:
 	ScaledInt<1>			m_operator;
 };
 
-static CChipCond barrier_height(
+static CCond barrier_height(
 	int angleCenter,
 	int angleRange,
 	int distance,
 	LastLocationArg
 ){
 	LastLocation();
-	return CChipCond(new CChipBarrier(angleCenter, angleRange, distance));
+	return CCond(new CChipBarrier(angleCenter, angleRange, distance));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1254,7 +1254,7 @@ public:
 	ScaledInt<1>			m_operator;
 };
 
-static CChipCond projectile_num(
+static CCond projectile_num(
 	int angleCenter,
 	int angleRange,
 	int distance,
@@ -1262,7 +1262,7 @@ static CChipCond projectile_num(
 	LastLocationArg
 ){
 	LastLocation();
-	return CChipCond(new CChipProjectileNum(angleCenter, angleRange, distance, type));
+	return CCond(new CChipProjectileNum(angleCenter, angleRange, distance, type));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1303,7 +1303,7 @@ public:
 	ScaledInt<3>			m_y;
 };
 
-static CChipCond is_mappoint(
+static CCond is_mappoint(
 	int angleCenter,
 	int angleRange,
 	int distance,
@@ -1312,7 +1312,7 @@ static CChipCond is_mappoint(
 	LastLocationArg
 ){
 	LastLocation();
-	return CChipCond(new CChipMapPoint(angleCenter, angleRange, distance, map_x, map_y));
+	return CCond(new CChipMapPoint(angleCenter, angleRange, distance, map_x, map_y));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1418,7 +1418,7 @@ static CChipTree is_rand(
 	LastLocationArg
 ){
 	LastLocation();
-	return CChipCond(new CChipIsRand(num1, num2)).GetCChipTree();
+	return CCond(new CChipIsRand(num1, num2)).GetCChipTree();
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1534,11 +1534,11 @@ public:
 	ScaledInt<1>			m_operator;
 };
 
-static CChipCond target_distance(
+static CCond target_distance(
 	LastLocationArg
 ){
 	LastLocation();
-	return CChipCond(new CChipTgtDistance());
+	return CCond(new CChipTgtDistance());
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1576,7 +1576,7 @@ static CChipTree is_target_direction(
 	LastLocationArg
 ){
 	LastLocation();
-	return CChipCond(new CChipTgtDirection(angleCenter, angleRange)).GetCChipTree();
+	return CCond(new CChipTgtDirection(angleCenter, angleRange)).GetCChipTree();
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1733,7 +1733,7 @@ static CChipTree is_self_target_status(
 	int self_tgt,
 	int param
 ){
-	return CChipCond(new CChipTgtAction(self_tgt, param)).GetCChipTree();
+	return CCond(new CChipTgtAction(self_tgt, param)).GetCChipTree();
 }
 
 static CChipTree is_self_stop   (LastLocationArg){LastLocation(); return is_self_target_status(CChip::SELF, CChipTgtAction::STOP);}
@@ -2030,7 +2030,7 @@ CChipVar& CChipVar::operator=(const CChipVal& val){
 	return *this;
 }
 
-CChipCond CChipVal::GetCChipCond(void) const {
+CCond CChipVal::GetCChipCond(void) const {
 	
 	CChip *pchip;
 	
@@ -2071,7 +2071,7 @@ CChipCond CChipVal::GetCChipCond(void) const {
 			pchip = new CChipAmmoNum(m_type);
 	}
 	
-	return CChipCond(pchip);
+	return CCond(pchip);
 }
 
 CChipTree CChipVal::operator<=(int num) const {return GetCChipCond() <= num;}
@@ -2165,19 +2165,19 @@ public:
 	ScaledInt<3>	m_operator;
 };
 
-CChipTree CChipVar::operator>=(const CChipVar& op2) const {return CChipCond(new CChipCmp(m_var, CChip::OP_GE, 0, op2.m_var)).GetCChipTree();}
-CChipTree CChipVar::operator<=(const CChipVar& op2) const {return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 0, op2.m_var)).GetCChipTree();}
-CChipTree CChipVar::operator==(const CChipVar& op2) const {return CChipCond(new CChipCmp(m_var, CChip::OP_EQ, 0, op2.m_var)).GetCChipTree();}
-CChipTree CChipVar::operator!=(const CChipVar& op2) const {return CChipCond(new CChipCmp(m_var, CChip::OP_NE, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator>=(const CChipVar& op2) const {return CCond(new CChipCmp(m_var, CChip::OP_GE, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator<=(const CChipVar& op2) const {return CCond(new CChipCmp(m_var, CChip::OP_LE, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator==(const CChipVar& op2) const {return CCond(new CChipCmp(m_var, CChip::OP_EQ, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator!=(const CChipVar& op2) const {return CCond(new CChipCmp(m_var, CChip::OP_NE, 0, op2.m_var)).GetCChipTree();}
 CChipTree CChipVar::operator> (const CChipVar& op2) const {return !(*this <= op2);}
 CChipTree CChipVar::operator< (const CChipVar& op2) const {return !(*this >= op2);}
 
-CChipTree CChipVar::operator>=(const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_GE, 1, imm)).GetCChipTree();}
-CChipTree CChipVar::operator<=(const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm)).GetCChipTree();}
-CChipTree CChipVar::operator==(const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_EQ, 1, imm)).GetCChipTree();}
-CChipTree CChipVar::operator!=(const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_NE, 1, imm)).GetCChipTree();}
-CChipTree CChipVar::operator> (const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_GE, 1, imm - 1)).GetCChipTree();}
-CChipTree CChipVar::operator< (const int imm) const {return CChipCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm + 1)).GetCChipTree();}
+CChipTree CChipVar::operator>=(const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_GE, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator<=(const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator==(const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_EQ, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator!=(const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_NE, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator> (const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_GE, 1, imm - 1)).GetCChipTree();}
+CChipTree CChipVar::operator< (const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm + 1)).GetCChipTree();}
 
 //////////////////////////////////////////////////////////////////////////////
 // if - else - endif
@@ -2230,7 +2230,7 @@ void if_statement(const CChipTree& cc, LastLocationArg, bool BlockStart = true){
 	g_pCurBlockInfo->m_BlockStack.push_back(CBlockInfo::BM_IF);
 }
 
-void if_statement(const CChipCond& chip, LastLocationArg){if_statement(chip.GetCChipTree(), location);}
+void if_statement(const CCond& chip, LastLocationArg){if_statement(chip.GetCChipTree(), location);}
 void if_statement(const CChipVal&  chip, LastLocationArg){if_statement(chip >= 1, location);}
 void if_statement(const CChipVar&  chip, LastLocationArg){if_statement(chip != 0, location);}
 
@@ -2264,7 +2264,7 @@ void elseif_statement(CChipTree &&cc, LastLocationArg){
 	if_statement(cc, location, false);
 }
 
-void elseif_statement(const CChipCond& chip, LastLocationArg){elseif_statement(chip.GetCChipTree(), location);}
+void elseif_statement(const CCond& chip, LastLocationArg){elseif_statement(chip.GetCChipTree(), location);}
 void elseif_statement(const CChipVal&  chip, LastLocationArg){elseif_statement(chip >= 1, location);}
 void elseif_statement(const CChipVar&  chip, LastLocationArg){elseif_statement(chip != 0, location);}
 
