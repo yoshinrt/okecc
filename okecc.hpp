@@ -1,23 +1,16 @@
-﻿#define _CRT_SECURE_NO_WARNINGS
-
-#include <algorithm>
+﻿#include <algorithm>
 #include <cassert>
 #include <climits>
 #include <cmath>
 #include <concepts>
 #include <cstdlib>
-#include <fcntl.h>
 #include <format>
-#include <io.h>
 #include <iostream>
-#include <map>
 #include <random>
 #include <source_location>
 #include <stdexcept>
 #include <stdio.h>
-#include <string>
 #include <vector>
-#include <wchar.h>
 #include <thread>
 
 #define WIN32_LEAN_AND_MEAN
@@ -2939,14 +2932,6 @@ struct PathNode {
 	int dist_to_exit; // EXITまでの最大距離
 };
 
-// Y座標を指定し、それ以降のチップを一括シフトする
-void shift_y_range(std::vector<Pos>& state, int threshold_y, int delta) {
-	for (auto& p : state) {
-		if (delta > 0 && p.y >= threshold_y) p.y += delta;
-		else if (delta < 0 && p.y <= threshold_y) p.y += delta;
-	}
-}
-
 // 座標が未決定、または論理的に削除されたことを示す定数
 static constexpr int POS_INVALID = -100;
 
@@ -3129,9 +3114,6 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vec
 }
 
 void CarnageSA::run_single() {
-	// 改良版 SA:
-	// - 隣接スワップ中心（局所探索）
-	// - 低確率で任意2点スワップ（global）とランダムジャンプ
 	constexpr int max_iter = 20000000;
 	constexpr double cooling = 0.9999995;
 	double T = 2000.0;
@@ -3255,7 +3237,7 @@ void CarnageSA::run_single() {
 				dst_y += next_state[neighbor].y;
 			}
 			
-			UINT n = LinkList[SrcIdx].size();
+			UINT n = (UINT)LinkList[SrcIdx].size();
 			dst_x = (dst_x + n / 2) / n;
 			dst_y = (dst_y + n / 2) / n;
 
@@ -3393,14 +3375,14 @@ void CarnageSA::run(UINT num_threads){
 	if(num_threads == 0) num_threads = std::thread::hardware_concurrency();
 
 	// 1. スレッドごとに自分(*this)をコピーして独立したインスタンスを作る
-	for (int i = 0; i < num_threads; ++i) {
+	for (UINT u = 0; u < num_threads; ++u) {
 		workers.push_back(*this); 
 	}
 
 	// 2. 各インスタンスの run を並列実行
 	
-	for (int i = 0; i < num_threads; ++i) {
-		threads.emplace_back(&CarnageSA::run_single, &workers[i]);
+	for (UINT u = 0; u < num_threads; ++u) {
+		threads.emplace_back(&CarnageSA::run_single, &workers[u]);
 	}
 
 	// 3. 終了待機
