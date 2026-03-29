@@ -19,6 +19,16 @@
 #include <vector>
 #include <wchar.h>
 #include <thread>
+
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#define VC_EXTRALEAN
+#define NOSERVICE
+#define NOMCX
+#define NOIME
+#define NOSOUND
+#include <windows.h>
+
 #include "mcmgr.cpp"
 
 enum {
@@ -3147,6 +3157,11 @@ void CarnageSA::run_single() {
 	// occupancy
 	std::vector<UINT> occ(GridWidth * GridHeight, IDX_NONE);
 	std::vector<UINT> next_occ(GridWidth * GridHeight, IDX_NONE);
+	
+	HANDLE hThread = GetCurrentThread();
+	if (!SetThreadPriority(hThread, THREAD_PRIORITY_BELOW_NORMAL)) {
+		// 失敗した場合の処理（通常は無視しても動作に支障はありません）
+	}
 	
 	auto rebuild_occ = [&](const std::vector<Pos>& s) {
 		std::fill(occ.begin(), occ.end(), IDX_NONE);
