@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <wchar.h>
+#include <thread>
 #include "mcmgr.cpp"
 
 enum {
@@ -2946,8 +2947,8 @@ class CarnageSA {
 	UINT GridWidth;
 	UINT GridHeight;
 	std::vector<Pos> state;
-	std::mt19937 gen;
 	const char *m_svg_file;
+	double best_E;
 
 	// 8方向のベクトル定義 (N, NE, E, SE, S, SW, W, NW)
 	inline static const int dx[] = { 0,  1,  1,  1,  0, -1, -1, -1, 0};
@@ -2955,7 +2956,7 @@ class CarnageSA {
 	
 public:
 	CarnageSA(CChipPool& p, const char *svg_file = nullptr)
-		: pool(p), GridWidth(p.m_width), GridHeight(p.m_height), gen(std::random_device{}()), m_svg_file(svg_file){
+		: pool(p), GridWidth(p.m_width), GridHeight(p.m_height), m_svg_file(svg_file){
 		LinkList.resize(pool.size());
 		initialize();
 	}
@@ -2984,7 +2985,8 @@ public:
 	}
 	
 	void initialize(void);
-	void run();
+	void run(UINT num_threads = 0);
+	void run_single();
 	double calculate_energy(const std::vector<Pos>& state, const std::vector<UINT>& occ);
 	void SetArrow(void);
 	void OutputSvg(const char* filename, const std::vector<Pos>& state_disp);
@@ -3116,7 +3118,7 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vec
 	return base_energy;
 }
 
-void CarnageSA::run() {
+void CarnageSA::run_single() {
 	// 改良版 SA:
 	// - 隣接スワップ中心（局所探索）
 	// - 低確率で任意2点スワップ（global）とランダムジャンプ
@@ -3127,6 +3129,9 @@ void CarnageSA::run() {
 	constexpr UINT p_random_swap	= 1;	// ランダムスワップ
 	constexpr UINT p_nearby_swap	= 5;	// 隣接スワップ
 	constexpr UINT p_move_mid		= 50;	// 接続chip の真ん中に移動
+	
+	std::mt19937_64 gen;
+	gen.seed(std::random_device{}());
 	
 	std::uniform_int_distribution<UINT>		dist_idx(0, (UINT)pool.size() - 1);
 	std::uniform_int_distribution<int>		dist_dir8(0, 7);
@@ -3166,7 +3171,7 @@ void CarnageSA::run() {
 	
 	double current_E	= calculate_energy(state, occ);
 	auto best_state		= state;
-	double best_E		= current_E;
+	best_E				= current_E;
 	bool UpdateBest		= false;
 
 	// move probabilities (base)
@@ -3350,20 +3355,54 @@ void CarnageSA::run() {
 		// cooling
 		T *= cooling;
 		
-		if (iter % 500000 == 0){
-			//dump_occ(next_occ);
-			printf("Step: %7d | T: %7.2f Energy: %8.2f | Best: %8.2f\n", iter, T, current_E, best_E);
-			OutputSvg("z.svg", next_state);
-			if(UpdateBest){
-				OutputSvg(m_svg_file, state);
-				UpdateBest = false;
+		#ifdef DEBUG
+			if (iter % 500000 == 0){
+				//dump_occ(next_occ);
+				printf("Step: %7d | T: %7.2f Energy: %8.2f | Best: %8.2f\n", iter, T, current_E, best_E);
+				OutputSvg("z.svg", next_state);
+				if(UpdateBest){
+					OutputSvg(m_svg_file, state);
+					UpdateBest = false;
+				}
 			}
-		}
+		#endif
 	}
 
 	state = best_state;
-	OutputSvg(m_svg_file, state);	
 	printf("Step: %7d | Energy: %.2f\n", iter, best_E);
+}
+
+void CarnageSA::run(UINT num_threads){
+	std::vector<CarnageSA> workers;
+	std::vector<std::thread> threads;
+	if(num_threads == 0) num_threads = std::thread::hardware_concurrency();
+
+	// 1. スレッドごとに自分(*this)をコピーして独立したインスタンスを作る
+	for (int i = 0; i < num_threads; ++i) {
+		workers.push_back(*this); 
+	}
+
+	// 2. 各インスタンスの run を並列実行
+	
+	for (int i = 0; i < num_threads; ++i) {
+		threads.emplace_back(&CarnageSA::run_single, &workers[i]);
+	}
+
+	// 3. 終了待機
+	for (auto& t : threads) {
+		if (t.joinable()) t.join();
+	}
+
+	// 4. 最良の結果を自分自身(*this)に書き戻す
+	auto best_it = std::min_element(workers.begin(), workers.end(), 
+		[](const CarnageSA& a, const CarnageSA& b) {
+			return a.best_E < b.best_E;
+		});
+
+	this->state = best_it->state;
+	this->best_E = best_it->best_E;
+	
+	std::cout << "Parallel run finished. Best energy: " << this->best_E << std::endl;
 }
 
 //////////////////////////////////////////////////////////////////////////////
