@@ -699,6 +699,16 @@ public:
 									  "停止";
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_param.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_param.SetBin(bin);
+	}
+	
 	ScaledInt<3> m_param;
 };
 
@@ -733,6 +743,16 @@ public:
 		return m_param.get() == LEFT	? "左旋回" : "右旋回";
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_param.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_param.SetBin(bin);
+	}
+
 	ScaledInt<1> m_param;
 };
 
@@ -769,6 +789,16 @@ public:
 			m_param.get() == LEFT	? "左Jmp" : "右Jmp";
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_param.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_param.SetBin(bin);
+	}
+
 	ScaledInt<2> m_param;
 };
 
@@ -811,6 +841,16 @@ public:
 			m_param.get() == ACTION2	? "Action2" : "Action3";
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_param.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_param.SetBin(bin);
+	}
+
 	ScaledInt<2> m_param;
 };
 
@@ -849,6 +889,16 @@ public:
 			m_param.get() == MID	? "中高度" : "低高度";
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_param.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_param.SetBin(bin);
+	}
+
 	ScaledInt<2> m_param;
 };
 
@@ -895,6 +945,26 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_angleCenter.GetBin(bin);
+		m_angleRange.GetBin(bin);
+		m_distance.GetBin(bin);
+		m_type.GetBin(bin);
+		m_weapon.GetBin(bin);
+		m_cnt.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_angleCenter.SetBin(bin);
+		m_angleRange.SetBin(bin);
+		m_distance.SetBin(bin);
+		m_type.SetBin(bin);
+		m_weapon.SetBin(bin);
+		m_cnt.SetBin(bin);
+	}
+
 	ScaledInt<5, 16, -240>	m_angleCenter;
 	ScaledInt<4, 32, 32>	m_angleRange;
 	ScaledInt<4, 20, 20>	m_distance;
@@ -950,6 +1020,22 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_direction.GetBin(bin);
+		m_elevation.GetBin(bin);
+		m_weapon.GetBin(bin);
+		m_cnt.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_direction.SetBin(bin);
+		m_elevation.SetBin(bin);
+		m_weapon.SetBin(bin);
+		m_cnt.SetBin(bin);
+	}
+
 	ScaledInt<5, 16, -240>	m_direction;
 	ScaledInt<4, 16, -112>	m_elevation;
 	ScaledInt<3>			m_weapon;
@@ -994,6 +1080,18 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_weapon.GetBin(bin);
+		m_cnt.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_weapon.SetBin(bin);
+		m_cnt.SetBin(bin);
+	}
+
 	ScaledInt<3>			m_weapon;
 	ScaledInt<3, 1, 1>		m_cnt;
 };
@@ -1040,6 +1138,22 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_direction.GetBin(bin);
+		m_elevation.GetBin(bin);
+		m_weapon.GetBin(bin);
+		m_cnt.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_direction.SetBin(bin);
+		m_elevation.SetBin(bin);
+		m_weapon.SetBin(bin);
+		m_cnt.SetBin(bin);
+	}
+
 	ScaledInt<3>		m_direction;
 	ScaledInt<3>		m_elevation;
 	ScaledInt<3>		m_weapon;
@@ -1078,6 +1192,16 @@ public:
 		return std::format("Option #{}", m_param.get());
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_param.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_param.SetBin(bin);
+	}
+
 	ScaledInt<2, 1, 1> m_param;
 };
 
@@ -1181,6 +1305,28 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_angleCenter.GetBin(bin);
+		m_angleRange.GetBin(bin);
+		m_distance.GetBin(bin);
+		m_enemy.GetBin(bin);
+		m_type.GetBin(bin);
+		m_num.GetBin(bin);
+		m_operator.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_angleCenter.SetBin(bin);
+		m_angleRange.SetBin(bin);
+		m_distance.SetBin(bin);
+		m_enemy.SetBin(bin);
+		m_type.SetBin(bin);
+		m_num.SetBin(bin);
+		m_operator.SetBin(bin);
+	}
+
 	ScaledInt<5, 16, -240>	m_angleCenter;
 	ScaledInt<4, 32, 32>	m_angleRange;
 	ScaledInt<4, 20, 20>	m_distance;
@@ -1256,6 +1402,24 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_angleCenter.GetBin(bin);
+		m_angleRange.GetBin(bin);
+		m_distance.GetBin(bin);
+		m_num.GetBin(bin);
+		m_operator.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_angleCenter.SetBin(bin);
+		m_angleRange.SetBin(bin);
+		m_distance.SetBin(bin);
+		m_num.SetBin(bin);
+		m_operator.SetBin(bin);
+	}
+
 	ScaledInt<5, 16, -240>	m_angleCenter;
 	ScaledInt<4, 32, 32>	m_angleRange;
 	ScaledInt<4, 10, 10>	m_distance;
@@ -1312,6 +1476,26 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_angleCenter.GetBin(bin);
+		m_angleRange.GetBin(bin);
+		m_distance.GetBin(bin);
+		m_type.GetBin(bin);
+		m_num.GetBin(bin);
+		m_operator.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_angleCenter.SetBin(bin);
+		m_angleRange.SetBin(bin);
+		m_distance.SetBin(bin);
+		m_type.SetBin(bin);
+		m_num.SetBin(bin);
+		m_operator.SetBin(bin);
+	}
+
 	ScaledInt<5, 16, -240>	m_angleCenter;
 	ScaledInt<4, 32, 32>	m_angleRange;
 	ScaledInt<4, 10, 10>	m_distance;
@@ -1362,6 +1546,24 @@ public:
 		);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_angleCenter.GetBin(bin);
+		m_angleRange.GetBin(bin);
+		m_distance.GetBin(bin);
+		m_x.GetBin(bin);
+		m_y.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_angleCenter.SetBin(bin);
+		m_angleRange.SetBin(bin);
+		m_distance.SetBin(bin);
+		m_x.SetBin(bin);
+		m_y.SetBin(bin);
+	}
+
 	ScaledInt<5, 16, -240>	m_angleCenter;
 	ScaledInt<4, 32, 32>	m_angleRange;
 	ScaledInt<4, 20, 20>	m_distance;
@@ -1415,6 +1617,20 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_type.GetBin(bin);
+		m_num.GetBin(bin);
+		m_operator.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_type.SetBin(bin);
+		m_num.SetBin(bin);
+		m_operator.SetBin(bin);
+	}
+
 	ScaledInt<2>			m_type;
 	ScaledInt<5, 5>			m_num;
 	ScaledInt<1>			m_operator;
@@ -1438,6 +1654,16 @@ public:
 		return std::format("SUB{}", m_no.get());
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_no.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_no.SetBin(bin);
+	}
+
 	ScaledInt<2,1,1> m_no;
 };
 
@@ -1474,6 +1700,18 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_num1.GetBin(bin);
+		m_num2.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_num1.SetBin(bin);
+		m_num2.SetBin(bin);
+	}
+
 	ScaledInt<6, 1, 1>		m_num1;
 	ScaledInt<6, 1, 1>		m_num2;
 };
@@ -1512,6 +1750,18 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_num.GetBin(bin);
+		m_operator.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_num.SetBin(bin);
+		m_operator.SetBin(bin);
+	}
+
 	ScaledInt<6, 5>			m_num;
 	ScaledInt<1>			m_operator;
 };
@@ -1547,6 +1797,24 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_angleCenter.GetBin(bin);
+		m_angleRange.GetBin(bin);
+		m_distance.GetBin(bin);
+		m_enemy.GetBin(bin);
+		m_type.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_angleCenter.SetBin(bin);
+		m_angleRange.SetBin(bin);
+		m_distance.SetBin(bin);
+		m_enemy.SetBin(bin);
+		m_type.SetBin(bin);
+	}
+
 	ScaledInt<5, 16, -240>	m_angleCenter;
 	ScaledInt<4, 32, 32>	m_angleRange;
 	ScaledInt<4, 20, 20>	m_distance;
@@ -1596,6 +1864,18 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_num.GetBin(bin);
+		m_operator.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_num.SetBin(bin);
+		m_operator.SetBin(bin);
+	}
+
 	ScaledInt<6, 20>		m_num;
 	ScaledInt<1>			m_operator;
 };
@@ -1632,6 +1912,18 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_angleCenter.GetBin(bin);
+		m_angleRange.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_angleCenter.SetBin(bin);
+		m_angleRange.SetBin(bin);
+	}
+
 	ScaledInt<5, 16, -240>	m_angleCenter;
 	ScaledInt<4, 32, 32>	m_angleRange;
 };
@@ -1671,6 +1963,18 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_var_dir.GetBin(bin);
+		m_var_elev.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_var_dir.SetBin(bin);
+		m_var_elev.SetBin(bin);
+	}
+
 	ScaledInt<3>	m_var_dir;
 	ScaledInt<3>	m_var_elev;
 };
@@ -1715,6 +2019,22 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_self_tgt.GetBin(bin);
+		m_param.GetBin(bin);
+		m_num.GetBin(bin);
+		m_operator.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_self_tgt.SetBin(bin);
+		m_param.SetBin(bin);
+		m_num.SetBin(bin);
+		m_operator.SetBin(bin);
+	}
+	
 	ScaledInt<1>			m_self_tgt;
 	ScaledInt<2>			m_param;
 	ScaledInt<7, 3, -168>	m_num;
@@ -1745,6 +2065,20 @@ public:
 				m_SelfTgtTypeStr[m_self_tgt.get()],
 				m_CoordinateStr[m_param.get()]
 			);
+	}
+	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_var.GetBin(bin);
+		m_self_tgt.GetBin(bin);
+		m_param.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_var.SetBin(bin);
+		m_self_tgt.SetBin(bin);
+		m_param.SetBin(bin);
 	}
 	
 	ScaledInt<3>			m_var;
@@ -1791,6 +2125,18 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_self_tgt.GetBin(bin);
+		m_param.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_self_tgt.SetBin(bin);
+		m_param.SetBin(bin);
+	}
+
 	ScaledInt<1>	m_self_tgt;
 	ScaledInt<3>	m_param;
 };
@@ -1840,6 +2186,18 @@ public:
 		);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_snd.GetBin(bin);
+		m_cnt.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_snd.SetBin(bin);
+		m_cnt.SetBin(bin);
+	}
+
 	ScaledInt<3,1,1> m_snd;
 	ScaledInt<3,1,1> m_cnt;
 };
@@ -1884,6 +2242,18 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_var.GetBin(bin);
+		m_param.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_var.SetBin(bin);
+		m_param.SetBin(bin);
+	}
+
 	ScaledInt<3>			m_var;
 	ScaledInt<3>			m_param;
 };
@@ -1921,6 +2291,18 @@ public:
 			);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_var.GetBin(bin);
+		m_param.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_var.SetBin(bin);
+		m_param.SetBin(bin);
+	}
+
 	ScaledInt<3>			m_var;
 	ScaledInt<2>			m_param;
 };
@@ -1949,6 +2331,20 @@ public:
 		);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_var.GetBin(bin);
+		m_min.GetBin(bin);
+		m_max.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_var.SetBin(bin);
+		m_min.SetBin(bin);
+		m_max.SetBin(bin);
+	}
+
 	ScaledInt<3> m_var;
 	ScaledInt<8, 1, -127> m_min;
 	ScaledInt<8, 1, -127> m_max;
@@ -1985,6 +2381,18 @@ public:
 		);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_var.GetBin(bin);
+		m_ch.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_var.SetBin(bin);
+		m_ch.SetBin(bin);
+	}
+
 	ScaledInt<3>			m_var;
 	ScaledInt<3, 1, 1>		m_ch;
 };
@@ -2016,6 +2424,18 @@ public:
 		);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_var.GetBin(bin);
+		m_ch.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_var.SetBin(bin);
+		m_ch.SetBin(bin);
+	}
+
 	ScaledInt<3>			m_var;
 	ScaledInt<3, 1, 1>		m_ch;
 };
@@ -2179,6 +2599,22 @@ public:
 			std::format("{} {}= {}", m_VarNameStr[m_op1.get()], m_OprStr[m_operator.get()], m_VarNameStr[m_op2.get()]);
 	}
 	
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_op1.GetBin(bin);
+		m_operator.GetBin(bin);
+		m_immxvar.GetBin(bin);
+		m_op2.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_op1.SetBin(bin);
+		m_operator.SetBin(bin);
+		m_immxvar.SetBin(bin);
+		m_op2.SetBin(bin);
+	}
+	
 	ScaledInt<3>	m_op1;
 	ScaledInt<3>	m_operator;
 	ScaledInt<1>	m_immxvar;
@@ -2223,6 +2659,22 @@ public:
 		return m_immxvar.get() ?
 			std::format("{}{}{}?", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_op2.get()) :
 			std::format("{}{}{}?", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_VarNameStr[m_op2.get()]);
+	}
+	
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_op1.GetBin(bin);
+		m_immxvar.GetBin(bin);
+		m_op2.GetBin(bin);
+		m_operator.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_op1.SetBin(bin);
+		m_immxvar.SetBin(bin);
+		m_op2.SetBin(bin);
+		m_operator.SetBin(bin);
 	}
 	
 	ScaledInt<3>	m_op1;
