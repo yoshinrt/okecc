@@ -39,14 +39,14 @@ const char *OkeTypeStr[] = {
 };
 
 enum {
-	P_ALL,
 	P_BULLET,
 	P_MISSILE,
 	P_BEAM,
 	P_ROCKET,
 	P_MINE,
 	P_FMINE,
-	P_HI_V
+	P_HI_V,
+	P_ALL,
 };
 
 enum {
@@ -124,21 +124,23 @@ public:
 	int			m_pos;
 };
 
-template<UINT _width, UINT _step = 1, int _offset = 0>
+template<UINT _width, UINT _step = 1, int _offset = 0, bool _sign = false>
 class ScaledInt {
 public:
-	static constexpr UINT width	= _width;
-	static constexpr int offset	= _offset;
-	static constexpr UINT step	= _step;
-	static constexpr int min	= offset;
-	static constexpr int max	= offset + (int)(((1U << width) - 1) * step);
+	static constexpr UINT width			= _width;
+	static constexpr uint32_t bitmask	= (1U << width) - 1;
+	static constexpr int offset			= _offset;
+	static constexpr UINT step			= _step;
+	static constexpr bool sign			= _sign;
+	static constexpr int min			= offset - (int)(sign ? (int)(bitmask >> 1) * step : 0);
+	static constexpr int max			= offset + (int)(step * (sign ? ((bitmask >> 1) + 1): bitmask));
 
 	void set(int val){
 		if(val < min || max < val){
 			throw OkeccError(std::format("Value {} is out of range [{} - {}]", val, min, max));
 		}
 
-		m_value = (UINT)((double)(val - offset) / step + 0.5) & ((1 << width) - 1);
+		m_value = ((((val - offset) << 1)/ step + 1) >> 1) & ((1 << width) - 1);
 	};
 
 	ScaledInt& operator=(int i){
@@ -147,17 +149,18 @@ public:
 	}
 
 	int get(void){
-		return m_value * step + offset;
+		int i = m_value * step + offset;
+		return (i > max) ? (i - max * 2) : i;
 	}
 	
 	void GetBin(CChipBinary& bin){
 		bin.m_pos -= width;
-		bin.m_val |= m_value << bin.m_pos;
+		bin.m_val |= (m_value & bitmask) << bin.m_pos;
 	}
 	
 	void SetBin(CChipBinary& bin){
 		bin.m_pos -= width;
-		m_value = (bin.m_val >> bin.m_pos) & ((1 << width) - 1);
+		m_value = (bin.m_val >> bin.m_pos) & bitmask;
 	};
 	
 private:
@@ -679,8 +682,8 @@ public:
 	enum {
 		FWD,
 		BACK,
-		LEFT,
 		RIGHT,
+		LEFT,
 		STOP,
 	};
 
@@ -695,21 +698,24 @@ public:
 		return
 			m_param.get() == FWD	? "前進" :
 			m_param.get() == BACK	? "後退" :
-			m_param.get() == LEFT	? "左移動" :
 			m_param.get() == RIGHT	? "右移動" :
+			m_param.get() == LEFT	? "左移動" :
 									  "停止";
 	}
 	
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
+		m_pad.GetBin(bin);
 		m_param.GetBin(bin);
 	}
 
 	virtual void SetBin(CChipBinary& bin){
 		CChip::SetBin(bin);
+		m_pad.SetBin(bin);
 		m_param.SetBin(bin);
 	}
 	
+	ScaledInt<1> m_pad;
 	ScaledInt<3> m_param;
 };
 
@@ -729,8 +735,8 @@ static void stop         (LastLocationArg){LastLocation(); put_move_chip(CChipMo
 class CChipTurn : public CChip {
 public:
 	enum {
-		LEFT,
 		RIGHT,
+		LEFT,
 	};
 
 	CChipTurn(UINT param){
@@ -772,8 +778,8 @@ public:
 	enum {
 		FWD,
 		BACK,
-		LEFT,
 		RIGHT,
+		LEFT,
 	};
 
 	CChipJump(UINT param){
@@ -852,19 +858,17 @@ public:
 		m_param.SetBin(bin);
 	}
 
-	ScaledInt<2> m_param;
+	ScaledInt<3> m_param;
 };
 
 static void put_action_chip(UINT param){
 	g_pCurTree->add(new CChipAction(param));
 }
 
-static void fight  (LastLocationArg){LastLocation(); put_action_chip(CChipAction::FIGHT);}
-static void crouch (LastLocationArg){LastLocation(); put_action_chip(CChipAction::CROUCH);}
-static void guard  (LastLocationArg){LastLocation(); put_action_chip(CChipAction::GUARD);}
-static void action1(LastLocationArg){LastLocation(); put_action_chip(CChipAction::ACTION1);}
-static void action2(LastLocationArg){LastLocation(); put_action_chip(CChipAction::ACTION2);}
-static void action3(LastLocationArg){LastLocation(); put_action_chip(CChipAction::ACTION3);}
+static void fight (LastLocationArg){LastLocation(); put_action_chip(CChipAction::FIGHT);}
+static void crouch(LastLocationArg){LastLocation(); put_action_chip(CChipAction::CROUCH);}
+static void guard (LastLocationArg){LastLocation(); put_action_chip(CChipAction::GUARD);}
+static void action(UINT param, LastLocationArg){LastLocation(); put_action_chip(CChipAction::ACTION1 + param - 1);}
 
 //////////////////////////////////////////////////////////////////////////////
 // alt
@@ -872,9 +876,9 @@ static void action3(LastLocationArg){LastLocation(); put_action_chip(CChipAction
 class CChipAlt : public CChip {
 public:
 	enum {
-		HIGH,
-		MID,
 		LOW,
+		MID,
+		HIGH,
 	};
 
 	CChipAlt(UINT param){
@@ -966,12 +970,12 @@ public:
 		m_cnt.SetBin(bin);
 	}
 
-	ScaledInt<5, 16, -240>	m_angleCenter;
-	ScaledInt<4, 32, 32>	m_angleRange;
-	ScaledInt<4, 20, 20>	m_distance;
-	ScaledInt<3>			m_type;
-	ScaledInt<3>			m_weapon;
-	ScaledInt<3, 1, 1>		m_cnt;
+	ScaledInt<5, 16, 0, true>	m_angleCenter;
+	ScaledInt<4, 32, 32>		m_angleRange;
+	ScaledInt<4, 20, 20>		m_distance;
+	ScaledInt<3>				m_type;
+	ScaledInt<3, 1, 1>			m_weapon;
+	ScaledInt<3, 1, 1>			m_cnt;
 };
 
 static void fire(
@@ -1004,7 +1008,7 @@ public:
 	){
 		m_Id		= CHIPID_FIRE_FIXED_DIR;
 		m_direction	= direction;
-		m_elevation	= elevation;
+		m_elevation	= -elevation;
 		m_weapon	= weapon;
 		m_cnt		= cnt;
 	}
@@ -1017,7 +1021,7 @@ public:
 				"射撃 #{}x{}\n方位 {}\n角度 {}",
 				m_weapon.get(),
 				m_cnt.get(),
-				m_direction.get(), m_elevation.get()
+				m_direction.get(), -m_elevation.get()
 			);
 	}
 	
@@ -1037,10 +1041,10 @@ public:
 		m_cnt.SetBin(bin);
 	}
 
-	ScaledInt<5, 16, -240>	m_direction;
-	ScaledInt<4, 16, -112>	m_elevation;
-	ScaledInt<3>			m_weapon;
-	ScaledInt<3, 1, 1>		m_cnt;
+	ScaledInt<5, 16, 0, true>	m_direction;
+	ScaledInt<4, 16, -112>		m_elevation;
+	ScaledInt<3, 1, 1>			m_weapon;
+	ScaledInt<3, 1, 1>			m_cnt;
 };
 
 static void fire_direction(
@@ -1093,7 +1097,7 @@ public:
 		m_cnt.SetBin(bin);
 	}
 
-	ScaledInt<3>			m_weapon;
+	ScaledInt<3, 1, 1>		m_weapon;
 	ScaledInt<3, 1, 1>		m_cnt;
 };
 
@@ -1157,7 +1161,7 @@ public:
 
 	ScaledInt<3>		m_direction;
 	ScaledInt<3>		m_elevation;
-	ScaledInt<3>		m_weapon;
+	ScaledInt<3, 1, 1>	m_weapon;
 	ScaledInt<3, 1, 1>	m_cnt;
 };
 
@@ -1257,7 +1261,7 @@ public:
 	}
 	
 	ScaledInt<3>		m_weapon;
-	ScaledInt<7, 1, 1>	m_num;
+	ScaledInt<7>		m_num;
 	ScaledInt<1>		m_operator;
 };
 
@@ -1328,13 +1332,13 @@ public:
 		m_operator.SetBin(bin);
 	}
 
-	ScaledInt<5, 16, -240>	m_angleCenter;
-	ScaledInt<4, 32, 32>	m_angleRange;
-	ScaledInt<4, 20, 20>	m_distance;
-	ScaledInt<1>		 	m_enemy;
-	ScaledInt<3>			m_type;
-	ScaledInt<2, 1, 1>		m_num;
-	ScaledInt<1>			m_operator;
+	ScaledInt<5, 16, 0, true>	m_angleCenter;
+	ScaledInt<4, 32, 32>		m_angleRange;
+	ScaledInt<4, 20, 20>		m_distance;
+	ScaledInt<1>		 		m_enemy;
+	ScaledInt<3>				m_type;
+	ScaledInt<2, 1, 1>			m_num;
+	ScaledInt<1>				m_operator;
 };
 
 static CCond oke_num(
@@ -1421,11 +1425,11 @@ public:
 		m_operator.SetBin(bin);
 	}
 
-	ScaledInt<5, 16, -240>	m_angleCenter;
-	ScaledInt<4, 32, 32>	m_angleRange;
-	ScaledInt<4, 10, 10>	m_distance;
-	ScaledInt<3, 3, 3>		m_num;
-	ScaledInt<1>			m_operator;
+	ScaledInt<5, 16, 0, true>	m_angleCenter;
+	ScaledInt<4, 32, 32>		m_angleRange;
+	ScaledInt<4, 10, 10>		m_distance;
+	ScaledInt<3, 3, 3>			m_num;
+	ScaledInt<1>				m_operator;
 };
 
 static CCond barrier_height(
@@ -1444,7 +1448,7 @@ static CCond barrier_height(
 class CChipProjectileNum : public CChipCond {
 public:
 	static inline const char *m_ProjectileTypeStr[] = {
-		"危険物", "弾丸", "ミサイル", "ビーム", "ロケット", "地雷", "機雷", "高速"
+		"弾丸", "ミサイル", "ビーム", "ロケット", "地雷", "機雷", "高速", "発射物"
 	};
 	
 	CChipProjectileNum(
@@ -1497,12 +1501,12 @@ public:
 		m_operator.SetBin(bin);
 	}
 
-	ScaledInt<5, 16, -240>	m_angleCenter;
-	ScaledInt<4, 32, 32>	m_angleRange;
-	ScaledInt<4, 10, 10>	m_distance;
-	ScaledInt<3>			m_type;
-	ScaledInt<3, 1, 1>		m_num;
-	ScaledInt<1>			m_operator;
+	ScaledInt<5, 16, 0, true>	m_angleCenter;
+	ScaledInt<4, 32, 32>		m_angleRange;
+	ScaledInt<4, 10, 10>		m_distance;
+	ScaledInt<3>				m_type;
+	ScaledInt<3>				m_num;
+	ScaledInt<1>				m_operator;
 };
 
 static CCond projectile_num(
@@ -1565,11 +1569,11 @@ public:
 		m_y.SetBin(bin);
 	}
 
-	ScaledInt<5, 16, -240>	m_angleCenter;
-	ScaledInt<4, 32, 32>	m_angleRange;
-	ScaledInt<4, 20, 20>	m_distance;
-	ScaledInt<3, 1, 1>		m_x;
-	ScaledInt<3>			m_y;
+	ScaledInt<5, 16, 0, true>	m_angleCenter;
+	ScaledInt<4, 32, 32>		m_angleRange;
+	ScaledInt<4, 20, 20>		m_distance;
+	ScaledInt<3, 1, 1>			m_x;
+	ScaledInt<3, 1, 1>			m_y;
 };
 
 static CCond is_mappoint(
@@ -1665,7 +1669,7 @@ public:
 		m_no.SetBin(bin);
 	}
 
-	ScaledInt<2,1,1> m_no;
+	ScaledInt<1,1,1> m_no;
 };
 
 static void sub(
@@ -1816,11 +1820,11 @@ public:
 		m_type.SetBin(bin);
 	}
 
-	ScaledInt<5, 16, -240>	m_angleCenter;
-	ScaledInt<4, 32, 32>	m_angleRange;
-	ScaledInt<4, 20, 20>	m_distance;
-	ScaledInt<1>			m_enemy;
-	ScaledInt<3>			m_type;
+	ScaledInt<5, 16, 0, true>	m_angleCenter;
+	ScaledInt<4, 32, 32>		m_angleRange;
+	ScaledInt<4, 20, 20>		m_distance;
+	ScaledInt<1>				m_enemy;
+	ScaledInt<3>				m_type;
 };
 
 static void lockon(
@@ -1877,8 +1881,8 @@ public:
 		m_operator.SetBin(bin);
 	}
 
-	ScaledInt<6, 20>		m_num;
-	ScaledInt<1>			m_operator;
+	ScaledInt<6, 5>		m_num;
+	ScaledInt<1>		m_operator;
 };
 
 static CCond target_distance(
@@ -1925,8 +1929,8 @@ public:
 		m_angleRange.SetBin(bin);
 	}
 
-	ScaledInt<5, 16, -240>	m_angleCenter;
-	ScaledInt<4, 32, 32>	m_angleRange;
+	ScaledInt<5, 16, 0, true>	m_angleCenter;
+	ScaledInt<4, 32, 32>		m_angleRange;
 };
 
 static CChipTree is_target_direction(
@@ -2036,10 +2040,10 @@ public:
 		m_operator.SetBin(bin);
 	}
 	
-	ScaledInt<1>			m_self_tgt;
-	ScaledInt<2>			m_param;
-	ScaledInt<7, 3, -168>	m_num;
-	ScaledInt<1>			m_operator;
+	ScaledInt<1>				m_self_tgt;
+	ScaledInt<2>				m_param;
+	ScaledInt<7, 3, -168>		m_num;
+	ScaledInt<1>				m_operator;
 };
 
 class CChipGetCoordinate : public CChip{
@@ -2267,12 +2271,12 @@ public:
 	enum {
 		TIME,
 		RAND,
-		FRIENDLY_NUM,
 		ENEMY_NUM,
+		FRIENDLY_NUM,
 	};
 	
 	static inline const char *m_TypeStr[] = {
-		"時間", "乱数", "味方機数", "敵機数"
+		"時間", "乱数", "敵機数", "味方機数"
 	};
 	
 	CChipGetMiscNum(int param, int var){
@@ -2315,8 +2319,8 @@ class CChipClamp : public CChip {
 public:
 	CChipClamp(
 		int var,
-		int min,
-		int max
+		int max,
+		int min
 	){
 		m_Id	= CHIPID_CLAMP;
 		m_var	= var;
@@ -2335,30 +2339,30 @@ public:
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_var.GetBin(bin);
-		m_min.GetBin(bin);
 		m_max.GetBin(bin);
+		m_min.GetBin(bin);
 	}
 
 	virtual void SetBin(CChipBinary& bin){
 		CChip::SetBin(bin);
 		m_var.SetBin(bin);
-		m_min.SetBin(bin);
 		m_max.SetBin(bin);
+		m_min.SetBin(bin);
 	}
 
 	ScaledInt<3> m_var;
-	ScaledInt<8, 1, -127> m_min;
 	ScaledInt<8, 1, -127> m_max;
+	ScaledInt<8, 1, -127> m_min;
 };
 
 static void clamp(
 	CChipVar &var,
-	int min,
 	int max,
+	int min,
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurTree->add(new CChipClamp(var.m_var, min, max));
+	g_pCurTree->add(new CChipClamp(var.m_var, max, min));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2650,7 +2654,7 @@ public:
 		m_op1		= op1;
 		m_operator	= opr;
 		m_immxvar	= immxvar;
-		m_op2		= op2;
+		m_op2		= immxvar ? op2 : op2 - 127;
 		m_Id		= CHIPID_CMP;
 	}
 	
@@ -2659,7 +2663,7 @@ public:
 	virtual std::string GetLayoutText(void){
 		return m_immxvar.get() ?
 			std::format("{}{}{}?", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_op2.get()) :
-			std::format("{}{}{}?", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_VarNameStr[m_op2.get()]);
+			std::format("{}{}{}?", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_VarNameStr[m_op2.get() + 127]);
 	}
 	
 	virtual void GetBin(CChipBinary& bin){
@@ -2678,10 +2682,10 @@ public:
 		m_operator.SetBin(bin);
 	}
 	
-	ScaledInt<3>	m_op1;
-	ScaledInt<1>	m_immxvar;
-	ScaledInt<8>	m_op2;
-	ScaledInt<3>	m_operator;
+	ScaledInt<3>			m_op1;
+	ScaledInt<1>			m_immxvar;
+	ScaledInt<8, 1, -127>	m_op2;
+	ScaledInt<2>			m_operator;
 };
 
 CChipTree CChipVar::operator>=(const CChipVar& op2) const {return CCond(new CChipCmp(m_var, CChip::OP_GE, 0, op2.m_var)).GetCChipTree();}
@@ -3536,7 +3540,7 @@ int main(void){
 	g_pCurChipPool->dump();
 	
 	CarnageSA sa(*g_pCurChipPool, "chip.svg");
-	sa.run();
+	//sa.run();
 	sa.SetArrow();
 	sa.OutputSvg("chip.svg", sa.get_result());
 	
@@ -3567,8 +3571,11 @@ int main(void){
 	for(UINT u = 0; u < 23 * 15; ++u) pZeus->Oke[CARD].Software[u] = 0;
 	
 	for(UINT u = 0; u < state.size(); ++u){
+		CChipBinary bin;
+		
 		Pos& p = state[u];
-		pZeus->Oke[CARD].Software[p.y * 23 + p.x] = g_pCurChipPool->m_list[u]->GetBinary();
+		g_pCurChipPool->m_list[u]->GetBin(bin);
+		pZeus->Oke[CARD].Software[p.y * 23 + p.x] = bin.m_val;
 	}
 	
 	pZeus->Oke[CARD].StartMainX = state[g_pCurChipPool->m_start].x + 2;
@@ -3608,10 +3615,136 @@ int main(void){
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(){
+#if 1
 	nop();
 	wait_ae();
 	wait(60);
 	sound(4, 7);
+	move_forward();
+	move_backward();
+	move_left();
+	move_right();
+	stop();
+	turn_left();
+	turn_right();
+	jump_forward();
+	jump_backward();
+	jump_left();
+	jump_right();
+	fight();
+	crouch();
+	guard();
+	action(1);
+	action(2);
+	action(3);
+	move_high();
+	move_mid();
+	move_low();
+	fire(-240, 32, 20, OKE_BIPED, 1, 8);
+	fire(0, 512, 320, OKE_QUADRUPED, 5, 1);
+	fire(256, 32, 20, OKE_VEHICLE, 1, 8);
+	fire(-240, 32, 20, OKE_HOVER, 1, 8);
+	fire(-240, 32, 20, OKE_FLIGHT, 1, 8);
+	fire(-240, 32, 20, OKE_ALL, 1, 8);
+	fire_direction(-240, -112, 1, 1);
+	fire_direction(0, 0, 5, 8);
+	fire_direction(256, 112, 5, 8);
+	fire_target(1, 1);
+	fire_target(5, 8);
+	fire_direction(A, F, 1, 1);
+	fire_direction(F, A, 5, 8);
+	option(1);
+	option(2);
+	option(3);
+	if(ammo_num(1) >= 0) nop(); endif
+	if(ammo_num(1) <= 0) nop(); endif
+	if(ammo_num(5) <= 127) nop(); endif
+	if(option_num(1) <= 127) nop(); endif
+	if(option_num(3) >= 127) nop(); endif
+	if(enemy_num(-240, 32, 20, OKE_BIPED) >= 1) nop(); endif
+	if(enemy_num(0, 512, 320, OKE_QUADRUPED) >= 4) nop(); endif
+	if(enemy_num(256, 32, 20, OKE_VEHICLE) <= 1) nop(); endif
+	if(enemy_num(-240, 32, 20, OKE_HOVER) <= 4) nop(); endif
+	if(enemy_num(-240, 32, 20, OKE_FLIGHT) >= 1) nop(); endif
+	if(friendly_num(-240, 32, 20, OKE_ALL) >= 1) nop(); endif
+	if(barrier_height(-240, 32, 10) >= 3) nop(); endif
+	if(barrier_height(256, 512, 160) <= 24) nop(); endif
+	if(projectile_num(-240, 32, 10, P_ALL) >= 0) nop(); endif
+	if(projectile_num(256, 512, 160, P_BULLET) <= 0) nop(); endif
+	if(projectile_num(-240, 32, 10, P_MISSILE) >= 7) nop(); endif
+	if(projectile_num(-240, 32, 10, P_BEAM) <= 7) nop(); endif
+	if(projectile_num(-240, 32, 10, P_ROCKET) >= 0) nop(); endif
+	if(projectile_num(-240, 32, 10, P_MINE) >= 0) nop(); endif
+	if(projectile_num(-240, 32, 10, P_FMINE) >= 0) nop(); endif
+	if(projectile_num(-240, 32, 10, P_HI_V) >= 0) nop(); endif
+	if(is_mappoint(-240, 32, 20, 1, 8)) nop(); endif
+	if(is_mappoint(256, 512, 320, 8, 1)) nop(); endif
+	if(heat() >= 0) nop(); endif
+	if(fuel() <= 100) nop(); endif
+	if(damage() <= 100) nop(); endif
+	sub(1);
+	sub(2);
+	if(is_rand(1,2)) nop(); endif
+	if(is_rand(49,50)) nop(); endif
+	if(time() >= 0) nop(); endif
+	if(time() <= 290) nop(); endif
+	lockon(-240, 32, 20, OKE_BIPED);
+	lockon(0, 512, 320, OKE_QUADRUPED);
+	lockon(256, 32, 20, OKE_VEHICLE);
+	lockon(-240, 32, 20, OKE_HOVER);
+	lockon(-240, 32, 20, OKE_FLIGHT);
+	lockon(-240, 32, 20, OKE_ALL);
+	if(target_distance() >= 0) nop(); endif
+	if(target_distance() <= 315) nop(); endif
+	if(is_target_direction(-240, 32)) nop(); endif
+	if(is_target_direction(256, 512)) nop(); endif
+	if(target_x() >= -168) nop(); endif
+	if(target_x() <= -168) nop(); endif
+	if(target_y() >= 0) nop(); endif
+	if(target_y() <= 168) nop(); endif
+	if(self_z() >= 168) nop(); endif
+	if(self_z() <= -168) nop(); endif
+	if(is_target_stop   ()) nop(); endif
+	if(is_self_moving ()) nop(); endif
+	if(is_self_turning()) nop(); endif
+	if(is_self_jumping()) nop(); endif
+	if(is_self_firing ()) nop(); endif
+	if(is_self_acting ()) nop(); endif
+	if(is_target_stun   ()) nop(); endif
+	sound(1, 5);
+	sound(5, 1);
+	A = fuel();
+	B = heat();
+	C = damage();
+	D = ammo_num(1);
+	F = ammo_num(5);
+	A = time();
+	B = rand();
+	C = friendly_num();
+	F = enemy_num();
+	clamp(A, -127, 127);
+	clamp(F, 127, -127);
+	clamp(F, 0, 0);
+	ch_send(1, A);
+	ch_send(5, F);
+	F = ch_receive(1);
+	A = ch_receive(6);
+	A += B;
+	B -= C;
+	C *= D;
+	D /= E;
+	E %= F;
+	F = A;
+	A += 0;
+	B = 255;
+	if(A >= F) nop(); endif
+	if(F <= A) nop(); endif
+	if(B == C) nop(); endif
+	if(D != E) nop(); endif
+	if(A >= 127) nop(); endif
+	if(A <=  -127) nop(); endif
+#endif
+	
 #if 0
 	// 格闘
 	if(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
