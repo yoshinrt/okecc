@@ -3114,9 +3114,10 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vec
 }
 
 void CarnageSA::run_single() {
-	constexpr int max_iter = 20000000;
-	constexpr double cooling = 0.9999995;
-	double T = 2000.0;
+	constexpr int max_iter	= 20000000;
+	double T				= 2000.0;
+	constexpr double EndT	= 0.05;
+	const double cooling	= std::pow(EndT / T, 1.0 / max_iter);
 	
 	constexpr UINT p_random_swap	= 1;	// ランダムスワップ
 	constexpr UINT p_nearby_swap	= 5;	// 隣接スワップ
