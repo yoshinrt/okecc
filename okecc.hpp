@@ -1382,13 +1382,15 @@ public:
 	CChipBarrier(
 		int angleCenter,
 		int angleRange,
-		int distance
+		int distance,
+		int opr		= OP_GE,
+		int num		= 3
 	){
 		m_angleCenter	= angleCenter;
 		m_angleRange	= angleRange;
 		m_distance		= distance;
-		m_operator		= OP_GE;
-		m_num			= 3;
+		m_operator		= opr;
+		m_num			= num;
 		m_Id			= CHIPID_DET_BARRIER;
 	}
 	
@@ -1432,14 +1434,26 @@ public:
 	ScaledInt<1>				m_operator;
 };
 
-static CCond barrier_height(
+static CCond is_barrier_over(
 	int angleCenter,
 	int angleRange,
 	int distance,
+	int height,
 	LastLocationArg
 ){
 	LastLocation();
-	return CCond(new CChipBarrier(angleCenter, angleRange, distance));
+	return CCond(new CChipBarrier(angleCenter, angleRange, distance, CChip::OP_GE, height));
+}
+
+static CCond is_barrier_under(
+	int angleCenter,
+	int angleRange,
+	int distance,
+	int height,
+	LastLocationArg
+){
+	LastLocation();
+	return CCond(new CChipBarrier(angleCenter, angleRange, distance, CChip::OP_LE, height));
 }
 
 //////////////////////////////////////////////////////////////////////////////
