@@ -2950,8 +2950,8 @@ class CarnageSA {
 	const char *m_svg_file;
 
 	// 8方向のベクトル定義 (N, NE, E, SE, S, SW, W, NW)
-	inline static const int dx[] = { 0,  1,  1,  1,  0, -1, -1, -1};
-	inline static const int dy[] = {-1, -1,  0,  1,  1,  1,  0, -1};
+	inline static const int dx[] = { 0,  1,  1,  1,  0, -1, -1, -1, 0};
+	inline static const int dy[] = {-1, -1,  0,  1,  1,  1,  0, -1, 0};
 	
 public:
 	CarnageSA(CChipPool& p, const char *svg_file = nullptr)
@@ -3120,8 +3120,8 @@ void CarnageSA::run() {
 	// 改良版 SA:
 	// - 隣接スワップ中心（局所探索）
 	// - 低確率で任意2点スワップ（global）とランダムジャンプ
-	constexpr int max_iter = 8000000;
-	constexpr double cooling = 0.9999997;
+	constexpr int max_iter = 20000000;
+	constexpr double cooling = 0.9999995;
 	double T = 2000.0;
 	
 	constexpr UINT p_random_swap	= 1;	// ランダムスワップ
@@ -3129,7 +3129,8 @@ void CarnageSA::run() {
 	constexpr UINT p_move_mid		= 50;	// 接続chip の真ん中に移動
 	
 	std::uniform_int_distribution<UINT>		dist_idx(0, (UINT)pool.size() - 1);
-	std::uniform_int_distribution<int>		dist_dir(0, 7);
+	std::uniform_int_distribution<int>		dist_dir8(0, 7);
+	std::uniform_int_distribution<int>		dist_dir9(0, 8);
 	std::uniform_int_distribution<UINT>		dist_prob(0,
 		p_random_swap +
 		p_nearby_swap +
@@ -3203,7 +3204,7 @@ void CarnageSA::run() {
 		
 		UINT SrcIdx = dist_idx(gen);
 		UINT rnd = dist_prob(gen);
-
+		
 		bool proposed = false;
 
 		if (rnd < p_random_swap) {
@@ -3216,7 +3217,7 @@ void CarnageSA::run() {
 		}
 		else if(rnd < p_random_swap + p_nearby_swap){
 			// 隣接セルとのスワップ（8方向）
-			int dir = dist_dir(gen);
+			int dir = dist_dir8(gen);
 			UINT nx = next_state[SrcIdx].x + dx[dir];
 			UINT ny = next_state[SrcIdx].y + dy[dir];
 			if (nx < GridWidth && ny < GridHeight){
@@ -3238,6 +3239,14 @@ void CarnageSA::run() {
 			dst_x = (dst_x + n / 2) / n;
 			dst_y = (dst_y + n / 2) / n;
 
+			// 隣接セルとのスワップ（8方向）
+			int dir = dist_dir9(gen);
+			dst_x += dx[dir];
+			dst_y += dy[dir];
+			
+			if(dst_x >= GridWidth ){dst_x -= dx[dir];}
+			if(dst_y >= GridHeight){dst_y -= dy[dir];}
+			
 			auto p = next_state[SrcIdx];
 
 			// 移動先が同じなら continue
@@ -3341,7 +3350,7 @@ void CarnageSA::run() {
 		// cooling
 		T *= cooling;
 		
-		if (iter % 200000 == 0){
+		if (iter % 500000 == 0){
 			//dump_occ(next_occ);
 			printf("Step: %7d | T: %7.2f Energy: %8.2f | Best: %8.2f\n", iter, T, current_E, best_E);
 			OutputSvg("z.svg", next_state);
@@ -3545,13 +3554,13 @@ int main(void){
 	
 	g_pCurTree->AddToG(IDX_EXIT);
 	g_pCurChipPool->m_start = g_pCurTree->m_start;
-	g_pCurChipPool->dump();
+	//g_pCurChipPool->dump();
 	
 	// Goto 最適化
 	g_pCurChipPool->CleanupGoto();
 	
 	printf("Number of chip(s): %d\n", (UINT)g_pCurChipPool->m_list.size());
-	g_pCurChipPool->dump();
+	//g_pCurChipPool->dump();
 	
 	CarnageSA sa(*g_pCurChipPool, "chip.svg");
 	sa.run();
