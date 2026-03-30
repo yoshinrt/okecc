@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <vector>
 #include <thread>
+#include <chrono>
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -95,8 +96,30 @@ public:
 	double calculate_energy(const std::vector<Pos>& state, const std::vector<UINT>& occ);
 	void SetArrow(void);
 	void OutputSvg(const char* filename, const std::vector<Pos>& state_disp);
+	void NopRouting(void);
+	void rebuild_occ(const std::vector<Pos>& state, std::vector<UINT>& occ);
 	
 	const std::vector<Pos>& get_result() const { return state; }
+	
+	void dump(void){
+		printf("Start=%d\n x  y  ID   G   R  Description\n", pool.m_start);
+		for(UINT u = 0; u < pool.size(); ++u){
+			if(pool[u]){
+				std::string s = pool[u]->GetLayoutText();
+				std::replace(s.begin(), s.end(), '\n', ' ');
+				
+				Pos& p = state[u];
+				
+				printf("%2d %2d %3d %3d %3d  %s\n",
+					p.x, p.y,
+					u,
+					pool[u]->m_NextG,
+					pool[u]->m_NextR,
+					s.c_str()
+				);
+			}
+		}
+	}
 };
 
 void CarnageSA::initialize() {
@@ -223,6 +246,17 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vec
 	return base_energy;
 }
 
+void CarnageSA::rebuild_occ(const std::vector<Pos>& state, std::vector<UINT>& occ){
+	std::fill(occ.begin(), occ.end(), IDX_NONE);
+	
+	for (UINT j = 0; j < (UINT)state.size(); ++j) {
+		const Pos& pp = state[j];
+		if (pp.x < GridWidth && pp.y < GridHeight){
+			occ[pp.y * GridWidth + pp.x] = j;
+		}
+	}
+};
+
 void CarnageSA::run_single() {
 	constexpr int max_iter	= 20000000;
 	double T				= 2000.0;
@@ -256,17 +290,7 @@ void CarnageSA::run_single() {
 		// 失敗した場合の処理（通常は無視しても動作に支障はありません）
 	}
 	
-	auto rebuild_occ = [&](const std::vector<Pos>& s) {
-		std::fill(occ.begin(), occ.end(), IDX_NONE);
-		
-		for (UINT j = 0; j < (UINT)s.size(); ++j) {
-			const Pos& pp = s[j];
-			if (pp.x < GridWidth && pp.y < GridHeight){
-				occ[pp.y * GridWidth + pp.x] = j;
-			}
-		}
-	};
-	rebuild_occ(state);
+	rebuild_occ(state, occ);
 	
 	auto dump_occ = [&](std::vector<UINT>& occ){
 		printf("----------------\n");
@@ -477,14 +501,19 @@ void CarnageSA::run_single() {
 	}
 
 	state = best_state;
-	printf("Step: %7d | Energy: %.2f\n", iter, best_E);
+	
+	#ifdef DEBUG
+		printf("Step: %7d | Energy: %.2f\n", iter, best_E);
+	#endif
 }
 
 void CarnageSA::run(UINT num_threads){
 	std::vector<CarnageSA> workers;
 	std::vector<std::thread> threads;
 	if(num_threads == 0) num_threads = std::thread::hardware_concurrency();
-
+	
+	auto start = std::chrono::steady_clock::now();
+	
 	// 1. スレッドごとに自分(*this)をコピーして独立したインスタンスを作る
 	for (UINT u = 0; u < num_threads; ++u) {
 		workers.push_back(*this); 
@@ -510,7 +539,100 @@ void CarnageSA::run(UINT num_threads){
 	this->state = best_it->state;
 	this->best_E = best_it->best_E;
 	
-	std::cout << "Parallel run finished. Best energy: " << this->best_E << std::endl;
+	auto end = std::chrono::steady_clock::now();
+	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+	
+	if(best_E < 100){
+		NopRouting();
+	}
+	
+	std::cout << "Parallel run finished in " << elapsed << "ms. Best energy: " << this->best_E << std::endl;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Nop ルーティング
+
+void CarnageSA::NopRouting(void){
+	
+	std::vector<UINT> occ(GridWidth * GridHeight, IDX_NONE);
+	rebuild_occ(state, occ);
+	
+	UINT N = (UINT)state.size();
+	
+	for (UINT u = 0; u < N; ++u) {
+		Pos p = state[u];
+		CChip* chip = pool[u];
+		
+		auto PlaceNop = [&](UINT ToIdx, bool rxg){
+			
+			auto IsBrank = [&](int x, int y) -> bool {
+				return occ[y * GridWidth + x] == IDX_NONE;
+			};
+			
+			auto Occupy = [&](int x, int y){
+				UINT nop = pool.add(new CChipNop());
+				
+				if(rxg){
+					chip->m_NextR = nop;
+				}else{
+					chip->m_NextG = nop;
+				}
+				
+				occ[y * GridWidth + x] = nop;
+				chip = pool[nop];
+				state.push_back({(UINT)x, (UINT)y});
+			};
+			
+			// チップ距離
+			Pos to = state[ToIdx];
+			
+			if(std::max(std::abs((int)p.x - (int)to.x), std::abs((int)p.y - (int)to.y)) == 1) return;
+			
+			// チップ path が他のチップを通過
+			int stx = p.x;
+			int sty = p.y;
+			int edx = state[ToIdx].x;
+			int edy = state[ToIdx].y;
+			
+			if(std::abs(stx - edx) >= std::abs(sty - edy)){
+				int stepx = stx < edx ? 1 : -1;
+				
+				for(int x = stx + stepx; x != edx; x += stepx){
+					auto [y, mod] = std::div((edy - sty) * (x - stx) * stepx, (edx - stx) * stepx);
+					y += sty;
+					
+					if(IsBrank(x, y)){
+						Occupy(x, y);
+					}else if(mod < 0 && IsBrank(x, y - 1)){
+						Occupy(x, y - 1);
+					}else if(mod > 0 && IsBrank(x, y + 1)){
+						Occupy(x, y + 1);
+					}
+				}
+			}else{
+				int stepy = sty < edy ? 1 : -1;
+				
+				for(int y = sty + stepy; y != edy; y += stepy){
+					auto [x, mod] = std::div((edx - stx) * (y - sty) * stepy, (edy - sty) * stepy);
+					x += stx;
+					
+					if(IsBrank(x, y)){
+						Occupy(x, y);
+					}else if(mod < 0 && IsBrank(x - 1, y)){
+						Occupy(x - 1, y);
+					}else if(mod > 0 && IsBrank(x + 1, y)){
+						Occupy(x + 1, y);
+					}
+				}
+			}
+			
+			chip->m_NextG = ToIdx;
+		};
+		
+		if(pool[u]->m_NextG < N) PlaceNop(pool[u]->m_NextG, 0);
+		chip = pool[u];
+		if(pool[u]->m_NextR < N) PlaceNop(pool[u]->m_NextR, 1);
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////////

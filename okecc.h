@@ -627,7 +627,7 @@ static constexpr UINT NOP_AE = 62;
 
 class CChipNop : public CChip {
 public:
-	CChipNop(UINT param){
+	CChipNop(UINT param = 0){
 		m_Id	= CHIPID_NOP;
 		m_param	= param;
 	}
