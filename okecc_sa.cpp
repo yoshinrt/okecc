@@ -1,4 +1,5 @@
-﻿#include <algorithm>
+﻿#include <array>
+#include <algorithm>
 #include <cassert>
 #include <climits>
 #include <cmath>
@@ -27,11 +28,13 @@
 #include "okecc.h"
 #include "mcmgr.h"
 
+typedef uint8_t ChipID_t;
+
 //////////////////////////////////////////////////////////////////////////////
 // 焼きなまし法
 
 struct Pos {
-	UINT x, y;
+	uint8_t x, y;
 	bool operator<(const Pos& other) const {
 		if (x != other.x) return x < other.x;
 		return y < other.y;
@@ -44,15 +47,16 @@ struct PathNode {
 };
 
 // 座標が未決定、または論理的に削除されたことを示す定数
-static constexpr int POS_INVALID = -100;
+static constexpr ChipID_t POS_INVALID = 0xFF;
 
+template <size_t MAX_CHIPS = 256>
 class CarnageSA {
 	CChipPool& pool;
-	std::vector<std::vector<UINT>> LinkList; // チップごとの接続リスト
+	std::vector<std::vector<ChipID_t>> LinkList; // チップごとの接続リスト
 
 	UINT GridWidth;
 	UINT GridHeight;
-	std::vector<Pos> state;
+	std::array<Pos, MAX_CHIPS> state;
 	const char *m_svg_file;
 	double best_E;
 
@@ -64,6 +68,7 @@ public:
 	CarnageSA(CChipPool& p, const char *svg_file = nullptr)
 		: pool(p), GridWidth(p.m_width), GridHeight(p.m_height), m_svg_file(svg_file){
 		LinkList.resize(pool.size());
+		state.fill({POS_INVALID, POS_INVALID});
 		initialize();
 	}
 	
@@ -72,18 +77,20 @@ public:
 		int min_x = INT_MAX, min_y = INT_MAX;
 		bool has_data = false;
 	
-		for (const auto& p : state) {
-			if (p.x != INT_MAX) {
-				min_x = std::min(min_x, (int)p.x);
-				min_y = std::min(min_y, (int)p.y);
+		for (UINT i = 0; i < (UINT)pool.size(); ++i) {
+			const auto& p = state[i];
+			if (p.x != POS_INVALID) {
+				min_x = (std::min)(min_x, (int)p.x);
+				min_y = (std::min)(min_y, (int)p.y);
 				has_data = true;
 			}
 		}
 	
 		if (!has_data) return;
 	
-		for (auto& p : state) {
-			if (p.x != INT_MAX) {
+		for (UINT i = 0; i < (UINT)pool.size(); ++i) {
+			auto& p = state[i];
+			if (p.x != POS_INVALID) {
 				p.x -= min_x;
 				p.y -= min_y;
 			}
@@ -93,13 +100,13 @@ public:
 	void initialize(void);
 	void run(UINT num_threads = 0);
 	void run_single();
-	double calculate_energy(const std::vector<Pos>& state, const std::vector<UINT>& occ);
+	double calculate_energy(const std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org);
 	void SetArrow(void);
-	void OutputSvg(const char* filename, const std::vector<Pos>& state_disp);
+	void OutputSvg(const char* filename, const std::array<Pos, MAX_CHIPS>& state_disp);
 	void NopRouting(void);
-	void rebuild_occ(const std::vector<Pos>& state, std::vector<UINT>& occ);
+	void rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ);
 	
-	const std::vector<Pos>& get_result() const { return state; }
+	const std::array<Pos, MAX_CHIPS>& get_result() const { return state; }
 	
 	void dump(void){
 		printf("Start=%d\n x  y  ID   G   R  Description\n", pool.m_start);
@@ -122,12 +129,13 @@ public:
 	}
 };
 
-void CarnageSA::initialize() {
+template <size_t MAX_CHIPS>
+void CarnageSA<MAX_CHIPS>::initialize() {
 	for (UINT i = 0; i < (UINT)pool.size(); ++i) {
 		UINT y = i / GridWidth;
 		UINT x = i % GridWidth;
 		x = (y % 2 == 0) ? x : (GridWidth - 1 - x);
-		state.push_back({x, y});
+		state[i] = {(uint8_t)x, (uint8_t)y};
 		
 		// 接続リストの構築
 		UINT u;
@@ -144,7 +152,8 @@ void CarnageSA::initialize() {
 	OutputSvg(m_svg_file, state);
 }
 
-double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vector<UINT>& occ_org) {
+template <size_t MAX_CHIPS>
+double CarnageSA<MAX_CHIPS>::calculate_energy(const std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org) {
 	double base_energy = 0.0;
 	
 	// ペナルティ
@@ -152,13 +161,13 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vec
 	const double overwrap_penalty	= 100.0;	// チップ間 path が他のチップを通過
 	const double start_end_penalty	= 1000.0;	// start/end 枠からの距離
 	
-	const size_t N = state.size();
+	const size_t N = pool.size();
 	
 	auto occ = occ_org;
 
 	// パラメータ（調整可能）
 
-	for (UINT u = 0; u < (UINT)state.size(); ++u) {
+	for (UINT u = 0; u < (UINT)pool.size(); ++u) {
 		Pos p = state[u];
 		CChip* chip = pool[u];
 
@@ -170,14 +179,14 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vec
 		
 		// exit チップ制約
 		if(pool[u]->m_NextG == IDX_EXIT || pool[u]->m_NextR == IDX_EXIT){
-			base_energy += start_end_penalty * std::min(
-				std::min(p.x, GridWidth - p.x - 1),
-				std::min(p.y, GridHeight- p.y - 1)
+			base_energy += start_end_penalty * (std::min)(
+				std::min<int>(p.x, GridWidth - p.x - 1),
+				std::min<int>(p.y, GridHeight- p.y - 1)
 			);
 		}
 		
 		auto IsBrank = [&](int x, int y) -> bool {
-			return occ[y * GridWidth + x] == IDX_NONE;
+			return occ[y * GridWidth + x] == POS_INVALID;
 		};
 		
 		auto Occupy = [&](int x, int y){
@@ -188,7 +197,7 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vec
 			// チップ距離
 			Pos to = state[ToIdx];
 			
-			auto e = distance_penalty * (std::max(
+			auto e = distance_penalty * ((std::max)(
 				std::abs((int)p.x - (int)to.x), std::abs((int)p.y - (int)to.y)
 			) - 1);
 			
@@ -246,18 +255,20 @@ double CarnageSA::calculate_energy(const std::vector<Pos>& state, const std::vec
 	return base_energy;
 }
 
-void CarnageSA::rebuild_occ(const std::vector<Pos>& state, std::vector<UINT>& occ){
-	std::fill(occ.begin(), occ.end(), IDX_NONE);
+template <size_t MAX_CHIPS>
+void CarnageSA<MAX_CHIPS>::rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ){
+	std::fill(occ.begin(), occ.end(), POS_INVALID);
 	
-	for (UINT j = 0; j < (UINT)state.size(); ++j) {
+	for (UINT j = 0; j < (UINT)pool.size(); ++j) {
 		const Pos& pp = state[j];
 		if (pp.x < GridWidth && pp.y < GridHeight){
-			occ[pp.y * GridWidth + pp.x] = j;
+			occ[pp.y * GridWidth + pp.x] = (ChipID_t)j;
 		}
 	}
 };
 
-void CarnageSA::run_single() {
+template <size_t MAX_CHIPS>
+void CarnageSA<MAX_CHIPS>::run_single() {
 	constexpr int max_iter	= 20000000;
 	double T				= 2000.0;
 	constexpr double EndT	= 0.05;
@@ -282,8 +293,8 @@ void CarnageSA::run_single() {
 	std::uniform_int_distribution<int> dist_y(0, GridHeight - 1);
 
 	// occupancy
-	std::vector<UINT> occ(GridWidth * GridHeight, IDX_NONE);
-	std::vector<UINT> next_occ(GridWidth * GridHeight, IDX_NONE);
+	std::array<ChipID_t, MAX_CHIPS> occ;
+	std::array<ChipID_t, MAX_CHIPS> next_occ;
 	
 	HANDLE hThread = GetCurrentThread();
 	if (!SetThreadPriority(hThread, THREAD_PRIORITY_BELOW_NORMAL)) {
@@ -292,10 +303,10 @@ void CarnageSA::run_single() {
 	
 	rebuild_occ(state, occ);
 	
-	auto dump_occ = [&](std::vector<UINT>& occ){
+	auto dump_occ = [&](std::array<ChipID_t, MAX_CHIPS>& occ){
 		printf("----------------\n");
-		for(UINT u = 0; u < occ.size(); ++u){
-			if(occ[u] == IDX_NONE) printf("-- ");
+		for(UINT u = 0; u < GridWidth * GridHeight; ++u){
+			if(occ[u] == POS_INVALID) printf("-- ");
 			else printf("%02d ", occ[u]);
 			if(u % GridWidth == (GridWidth - 1)) printf("\n");
 		}
@@ -317,21 +328,14 @@ void CarnageSA::run_single() {
 		
 		std::swap(next_occ[ay * GridWidth + ax], next_occ[by * GridWidth + bx]);
 		
-		if(achip != IDX_NONE){
-			next_state[achip].x = bx;
-			next_state[achip].y = by;
+		if(achip != POS_INVALID){
+			next_state[achip].x = (uint8_t)bx;
+			next_state[achip].y = (uint8_t)by;
 		}
-		if(bchip != IDX_NONE){
-			next_state[bchip].x = ax;
-			next_state[bchip].y = ay;
+		if(bchip != POS_INVALID){
+			next_state[bchip].x = (uint8_t)ax;
+			next_state[bchip].y = (uint8_t)ay;
 		}
-	};
-	
-	auto SwapChip = [&](UINT a, UINT b){
-		SwapChipXY(
-			next_state[a].x, next_state[a].y,
-			next_state[b].x, next_state[b].y
-		);
 	};
 	
 	int iter;
@@ -358,7 +362,7 @@ void CarnageSA::run_single() {
 			UINT nx = next_state[SrcIdx].x + dx[dir];
 			UINT ny = next_state[SrcIdx].y + dy[dir];
 			if (nx < GridWidth && ny < GridHeight){
-				SwapChip(nx, ny);
+				SwapChipXY(next_state[SrcIdx].x, next_state[SrcIdx].y, nx, ny);
 				proposed = true;
 			}
 		}
@@ -397,8 +401,8 @@ void CarnageSA::run_single() {
 
 			// Exit チップの場合は端に固定
 			else if(pool[SrcIdx]->m_NextG == IDX_EXIT || pool[SrcIdx]->m_NextR == IDX_EXIT){
-				UINT xdist = std::min(dst_x, GridWidth  - 1 - dst_x);
-				UINT ydist = std::min(dst_y, GridHeight - 1 - dst_y);
+				UINT xdist = (std::min)(dst_x, GridWidth  - 1 - dst_x);
+				UINT ydist = (std::min)(dst_y, GridHeight - 1 - dst_y);
 
 				if (xdist < ydist) {
 					dst_x = (dst_x < GridWidth / 2) ? 0 : (GridWidth - 1);
@@ -408,22 +412,22 @@ void CarnageSA::run_single() {
 			}
 
 			// 移動先が空きならそのまま移動
-			if (next_occ[dst_y * GridWidth + dst_x] == IDX_NONE) {
+			if (next_occ[dst_y * GridWidth + dst_x] == POS_INVALID) {
 				SwapChipXY(next_state[SrcIdx].x, next_state[SrcIdx].y, dst_x, dst_y);
 				proposed = true;
 			}else{
 				// 一旦 chip を消す
-				next_occ[p.y * GridWidth + p.x] = IDX_NONE;
+				next_occ[p.y * GridWidth + p.x] = POS_INVALID;
 				
 				// 最も近い空きセルを探す
-				UINT best_x;
-				UINT best_y;
+				UINT best_x = 0;
+				UINT best_y = 0;
 				UINT best_dist = INT_MAX;
 	
 				for(UINT y = 0; y < GridHeight; ++y){
 					for(UINT x = 0; x < GridWidth; ++x){
 						int occIdx = next_occ[y * GridWidth + x];
-						if (occIdx == IDX_NONE) {
+						if (occIdx == POS_INVALID) {
 							UINT dist = std::abs((int)(x - dst_x)) + std::abs((int)(y - dst_y));
 							if (dist < best_dist) {
 								best_dist = dist;
@@ -446,9 +450,9 @@ void CarnageSA::run_single() {
 					for (UINT y = best_y; y > dst_y; --y) SwapChipXY(dst_x, y - 1, dst_x, y);
 				}
 				
-				next_occ[dst_y * GridWidth + dst_x] = SrcIdx;
-				next_state[SrcIdx].x = dst_x;
-				next_state[SrcIdx].y = dst_y;
+				next_occ[dst_y * GridWidth + dst_x] = (ChipID_t)SrcIdx;
+				next_state[SrcIdx].x = (uint8_t)dst_x;
+				next_state[SrcIdx].y = (uint8_t)dst_y;
 				proposed = true;
 			}
 		}
@@ -507,8 +511,9 @@ void CarnageSA::run_single() {
 	#endif
 }
 
-void CarnageSA::run(UINT num_threads){
-	std::vector<CarnageSA> workers;
+template <size_t MAX_CHIPS>
+void CarnageSA<MAX_CHIPS>::run(UINT num_threads){
+	std::vector<CarnageSA<MAX_CHIPS>> workers;
 	std::vector<std::thread> threads;
 	if(num_threads == 0) num_threads = std::thread::hardware_concurrency();
 	
@@ -522,7 +527,7 @@ void CarnageSA::run(UINT num_threads){
 	// 2. 各インスタンスの run を並列実行
 	
 	for (UINT u = 0; u < num_threads; ++u) {
-		threads.emplace_back(&CarnageSA::run_single, &workers[u]);
+		threads.emplace_back(&CarnageSA<MAX_CHIPS>::run_single, &workers[u]);
 	}
 
 	// 3. 終了待機
@@ -532,7 +537,7 @@ void CarnageSA::run(UINT num_threads){
 
 	// 4. 最良の結果を自分自身(*this)に書き戻す
 	auto best_it = std::min_element(workers.begin(), workers.end(), 
-		[](const CarnageSA& a, const CarnageSA& b) {
+		[](const CarnageSA<MAX_CHIPS>& a, const CarnageSA<MAX_CHIPS>& b) {
 			return a.best_E < b.best_E;
 		});
 
@@ -552,12 +557,13 @@ void CarnageSA::run(UINT num_threads){
 //////////////////////////////////////////////////////////////////////////////
 // Nop ルーティング
 
-void CarnageSA::NopRouting(void){
+template <size_t MAX_CHIPS>
+void CarnageSA<MAX_CHIPS>::NopRouting(void){
 	
-	std::vector<UINT> occ(GridWidth * GridHeight, IDX_NONE);
+	std::array<ChipID_t, MAX_CHIPS> occ;
 	rebuild_occ(state, occ);
 	
-	UINT N = (UINT)state.size();
+	UINT N = (UINT)pool.size();
 	
 	for (UINT u = 0; u < N; ++u) {
 		Pos p = state[u];
@@ -566,7 +572,7 @@ void CarnageSA::NopRouting(void){
 		auto PlaceNop = [&](UINT ToIdx, bool rxg){
 			
 			auto IsBrank = [&](int x, int y) -> bool {
-				return occ[y * GridWidth + x] == IDX_NONE;
+				return occ[y * GridWidth + x] == POS_INVALID;
 			};
 			
 			auto Occupy = [&](int x, int y){
@@ -578,15 +584,15 @@ void CarnageSA::NopRouting(void){
 					chip->m_NextG = nop;
 				}
 				
-				occ[y * GridWidth + x] = nop;
+				occ[y * GridWidth + x] = (ChipID_t)nop;
 				chip = pool[nop];
-				state.push_back({(UINT)x, (UINT)y});
+				state[nop] = {(uint8_t)x, (uint8_t)y};
 			};
 			
 			// チップ距離
 			Pos to = state[ToIdx];
 			
-			if(std::max(std::abs((int)p.x - (int)to.x), std::abs((int)p.y - (int)to.y)) == 1) return;
+			if((std::max)(std::abs((int)p.x - (int)to.x), std::abs((int)p.y - (int)to.y)) == 1) return;
 			
 			// チップ path が他のチップを通過
 			int stx = p.x;
@@ -638,7 +644,8 @@ void CarnageSA::NopRouting(void){
 //////////////////////////////////////////////////////////////////////////////
 // RawG/R 設定
 
-void CarnageSA::SetArrow(void){
+template <size_t MAX_CHIPS>
+void CarnageSA<MAX_CHIPS>::SetArrow(void){
 	
 	auto GetArrowCode = [&](UINT from, UINT to) -> int {
 		if(to == IDX_NONE) return 0;
@@ -678,7 +685,8 @@ void CarnageSA::SetArrow(void){
 
 //////////////////////////////////////////////////////////////////////////////
 
-void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_disp) {
+template <size_t MAX_CHIPS>
+void CarnageSA<MAX_CHIPS>::OutputSvg(const char* filename, const std::array<Pos, MAX_CHIPS>& state_disp) {
 	const int CHIP_SIZE = 75;    // チップサイズ
 	const int GAP = 15;          // 隙間
 	const int CELL_SIZE = CHIP_SIZE + GAP; 
@@ -728,7 +736,7 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 	};
 
 	// 3. 特殊エッジ：STARTへの入力
-	if (pool.m_start < (UINT)state_disp.size() && state_disp[pool.m_start].x != POS_INVALID) {
+	if (pool.m_start < (UINT)pool.size() && state_disp[pool.m_start].x != POS_INVALID) {
 		double x = state_disp[pool.m_start].x * CELL_SIZE + CELL_SIZE / 2.0;
 		double y = state_disp[pool.m_start].y * CELL_SIZE + CELL_SIZE / 2.0;
 		// 1マス上にある仮想チップからの接続として描画
@@ -736,7 +744,7 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 	}
 
 	// 4. チップ本体の描画
-	for (int i = 0; i < (int)state_disp.size(); ++i) {
+	for (int i = 0; i < (int)pool.size(); ++i) {
 		if (pool.m_list[i] == nullptr || state_disp[i].x == POS_INVALID) continue;
 
 		int x = state_disp[i].x * CELL_SIZE + OFFSET;
@@ -768,7 +776,7 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 	}
 
 	// 5. 接続線の描画
-	for (int i = 0; i < (int)state_disp.size(); ++i) {
+	for (int i = 0; i < (int)pool.size(); ++i) {
 		if (pool.m_list[i] == nullptr || state_disp[i].x == POS_INVALID) continue;
 
 		double x1 = state_disp[i].x * CELL_SIZE + CELL_SIZE / 2.0;
@@ -788,7 +796,7 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 				return;
 			}
 
-			if (next_idx < state_disp.size() && state_disp[next_idx].x != POS_INVALID) {
+			if (next_idx < pool.size() && state_disp[next_idx].x != POS_INVALID) {
 				double x2 = state_disp[next_idx].x * CELL_SIZE + CELL_SIZE / 2.0;
 				double y2 = state_disp[next_idx].y * CELL_SIZE + CELL_SIZE / 2.0;
 				draw_physical_edge(x1, y1, x2, y2, color);
@@ -804,7 +812,6 @@ void CarnageSA::OutputSvg(const char* filename, const std::vector<Pos>& state_di
 	fprintf(fp, "</svg>\n");
 	fclose(fp);
 }
-
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void);
@@ -862,7 +869,7 @@ int main(void){
 	auto& state = sa.get_result();
 	for(UINT u = 0; u < 23 * 15; ++u) pZeus->Oke[CARD].Software[u] = 0;
 	
-	for(UINT u = 0; u < state.size(); ++u){
+	for(UINT u = 0; u < g_pCurChipPool->size(); ++u){
 		CChipBinary bin;
 		
 		auto& p = state[u];
