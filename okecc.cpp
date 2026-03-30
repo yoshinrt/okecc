@@ -28,6 +28,8 @@ for(int i = 0; i < 4; ++i){
 	)
 		turn_left();
 		exit();
+	endif
+	
 	if(
 		friendly_num(0, 128, 20, OKE_ALL) ||
 		is_barrier_over(0, 160, 40, 24)
