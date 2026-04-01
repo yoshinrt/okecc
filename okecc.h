@@ -322,13 +322,16 @@ public:
 				m_list[u]->m_NextR = GetFinalDst(m_list[u]->m_NextR);
 				m_list[u]->m_NextG = GetFinalDst(m_list[u]->m_NextG);
 				IdxNew2Old.push_back(u);
-			}else{
-				delete m_list[u];
 			}
 			IdxOld2New.push_back((UINT)IdxNew2Old.size() - 1);
 		}
 		
 		//Goto 削除
+		for(UINT u = 0; u < m_list.size(); ++u){
+			if(m_list[u]->m_Id.get() == CHIPID_GOTO) delete m_list[u];
+		}
+		
+		// 空きを詰める
 		for(UINT u = 0; u < IdxNew2Old.size(); ++u){
 			m_list[u] = m_list[IdxNew2Old[u]];
 			if(m_list[u]->ValidG()) m_list[u]->m_NextG = IdxOld2New[m_list[u]->m_NextG];
