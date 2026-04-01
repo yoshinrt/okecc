@@ -1,7 +1,7 @@
 ﻿#include "okecc.h"
 
 void chip_main(){
-for(int i = 0; i < 4; ++i){
+for(int i = 0; i < 1; ++i){
 	// 格闘
 	if(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
 		fight();
