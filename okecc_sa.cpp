@@ -33,6 +33,8 @@
 typedef uint8_t		ChipID_t;
 typedef double		Energy_t;
 
+constexpr int MAX_CHIPS = 225;
+
 //////////////////////////////////////////////////////////////////////////////
 // 焼きなまし法
 
@@ -52,7 +54,6 @@ struct PathNode {
 // 座標が未決定、または論理的に削除されたことを示す定数
 static constexpr ChipID_t POS_INVALID = 0xFF;
 
-template <size_t MAX_CHIPS = 256>
 class CarnageSA {
 	CChipPool& pool;
 	std::vector<std::vector<ChipID_t>> LinkList; // チップごとの接続リスト
@@ -159,8 +160,7 @@ public:
 	}
 };
 
-template <size_t MAX_CHIPS>
-void CarnageSA<MAX_CHIPS>::InitState() {
+void CarnageSA::InitState() {
 	state.fill({POS_INVALID, POS_INVALID});
 	
 	for (UINT u = 0; u < (UINT)pool.size(); ++u) {
@@ -182,8 +182,7 @@ void CarnageSA<MAX_CHIPS>::InitState() {
 	}
 }
 
-template <size_t MAX_CHIPS>
-void CarnageSA<MAX_CHIPS>::MakeLinkList() {
+void CarnageSA::MakeLinkList() {
 	LinkList.resize(pool.size());
 	
 	for (UINT u = 0; u < (UINT)pool.size(); ++u) {
@@ -200,8 +199,7 @@ void CarnageSA<MAX_CHIPS>::MakeLinkList() {
 	}
 }
 
-template <size_t MAX_CHIPS>
-Energy_t CarnageSA<MAX_CHIPS>::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ, bool PlaceNop, bool rxg){
+inline Energy_t CarnageSA::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ, bool PlaceNop, bool rxg){
 	CChip *chip;
 	
 	if(PlaceNop) chip = pool[from];
@@ -350,8 +348,7 @@ Energy_t CarnageSA<MAX_CHIPS>::FindPath(UINT from, UINT to, std::array<Pos, MAX_
 	return 0;
 }
 
-template <size_t MAX_CHIPS>
-Energy_t CarnageSA<MAX_CHIPS>::calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org) {
+Energy_t CarnageSA::calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org) {
 	Energy_t base_energy = 0;
 	
 	// ペナルティ
@@ -403,8 +400,7 @@ Energy_t CarnageSA<MAX_CHIPS>::calculate_energy(std::array<Pos, MAX_CHIPS>& stat
 	return base_energy;
 }
 
-template <size_t MAX_CHIPS>
-void CarnageSA<MAX_CHIPS>::rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ){
+void CarnageSA::rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ){
 	std::fill(occ.begin(), occ.end(), POS_INVALID);
 	
 	for (UINT j = 0; j < (UINT)pool.size(); ++j) {
@@ -415,8 +411,7 @@ void CarnageSA<MAX_CHIPS>::rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, 
 	}
 };
 
-template <size_t MAX_CHIPS>
-void CarnageSA<MAX_CHIPS>::run_single() {
+void CarnageSA::run_single() {
 	
 	constexpr int max_iter	= 5000000;
 	constexpr double StartT	= 2000.0;
@@ -685,9 +680,8 @@ void CarnageSA<MAX_CHIPS>::run_single() {
 	state = best_state;
 }
 
-template <size_t MAX_CHIPS>
-void CarnageSA<MAX_CHIPS>::run(UINT num_threads){
-	std::vector<CarnageSA<MAX_CHIPS>> workers;
+void CarnageSA::run(UINT num_threads){
+	std::vector<CarnageSA> workers;
 	std::vector<std::thread> threads;
 	if(num_threads == 0) num_threads = std::thread::hardware_concurrency();
 	
@@ -701,7 +695,7 @@ void CarnageSA<MAX_CHIPS>::run(UINT num_threads){
 	// 2. 各インスタンスの run を並列実行
 	
 	for (UINT u = 0; u < num_threads; ++u) {
-		threads.emplace_back(&CarnageSA<MAX_CHIPS>::run_single, &workers[u]);
+		threads.emplace_back(&CarnageSA::run_single, &workers[u]);
 	}
 
 	// 3. 終了待機
@@ -711,7 +705,7 @@ void CarnageSA<MAX_CHIPS>::run(UINT num_threads){
 
 	// 4. 最良の結果を自分自身(*this)に書き戻す
 	auto best_it = std::min_element(workers.begin(), workers.end(), 
-		[](const CarnageSA<MAX_CHIPS>& a, const CarnageSA<MAX_CHIPS>& b) {
+		[](const CarnageSA& a, const CarnageSA& b) {
 			return a.best_E < b.best_E;
 		});
 
@@ -731,8 +725,7 @@ void CarnageSA<MAX_CHIPS>::run(UINT num_threads){
 //////////////////////////////////////////////////////////////////////////////
 // Nop ルーティング
 
-template <size_t MAX_CHIPS>
-void CarnageSA<MAX_CHIPS>::NopRouting(void){
+void CarnageSA::NopRouting(void){
 	
 	std::array<ChipID_t, MAX_CHIPS> occ;
 	rebuild_occ(state, occ);
@@ -748,8 +741,7 @@ void CarnageSA<MAX_CHIPS>::NopRouting(void){
 //////////////////////////////////////////////////////////////////////////////
 // RawG/R 設定
 
-template <size_t MAX_CHIPS>
-void CarnageSA<MAX_CHIPS>::SetArrow(void){
+void CarnageSA::SetArrow(void){
 	
 	auto GetArrowCode = [&](UINT from, UINT to) -> int {
 		if(to == IDX_NONE) return 0;
@@ -789,8 +781,7 @@ void CarnageSA<MAX_CHIPS>::SetArrow(void){
 
 //////////////////////////////////////////////////////////////////////////////
 
-template <size_t MAX_CHIPS>
-void CarnageSA<MAX_CHIPS>::OutputSvg(const char* filename, const std::array<Pos, MAX_CHIPS>& state_disp) {
+void CarnageSA::OutputSvg(const char* filename, const std::array<Pos, MAX_CHIPS>& state_disp) {
 	const int CHIP_SIZE = 75;    // チップサイズ
 	const int GAP = 15;          // 隙間
 	const int CELL_SIZE = CHIP_SIZE + GAP; 
