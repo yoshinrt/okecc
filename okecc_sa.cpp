@@ -30,7 +30,8 @@
 #include "okecc.h"
 #include "mcmgr.h"
 
-typedef uint8_t ChipID_t;
+typedef uint8_t		ChipID_t;
+typedef double		Energy_t;
 
 //////////////////////////////////////////////////////////////////////////////
 // 焼きなまし法
@@ -60,7 +61,7 @@ class CarnageSA {
 	UINT GridHeight;
 	std::array<Pos, MAX_CHIPS> state;
 	const char *m_svg_file;
-	double best_E;
+	Energy_t best_E;
 
 	// 8方向のベクトル定義 (N, NE, E, SE, S, SW, W, NW)
 	inline static const int dx[] = { 0,  1,  1,  1,  0, -1, -1, -1, 0};
@@ -100,7 +101,7 @@ public:
 	void InitState(void);
 	void run(UINT num_threads = 0);
 	void run_single();
-	double calculate_energy(const std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org);
+	Energy_t calculate_energy(const std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org);
 	void SetArrow(void);
 	void OutputSvg(const char* filename, const std::array<Pos, MAX_CHIPS>& state_disp);
 	void NopRouting(void);
@@ -199,13 +200,13 @@ void CarnageSA<MAX_CHIPS>::MakeLinkList() {
 }
 
 template <size_t MAX_CHIPS>
-double CarnageSA<MAX_CHIPS>::calculate_energy(const std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org) {
-	double base_energy = 0.0;
+Energy_t CarnageSA<MAX_CHIPS>::calculate_energy(const std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org) {
+	Energy_t base_energy = 0;
 	
 	// ペナルティ
-	const double distance_penalty	= 1.0;		// chip 距離
-	const double overwrap_penalty	= 100.0;	// チップ間 path が他のチップを通過
-	const double start_end_penalty	= 1000.0;	// start/end 枠からの距離
+	const Energy_t distance_penalty		= 1;	// chip 距離
+	const Energy_t overwrap_penalty		= 100;	// チップ間 path が他のチップを通過
+	const Energy_t start_end_penalty	= 1000;	// start/end 枠からの距離
 	
 	const size_t N = pool.size();
 	
@@ -218,7 +219,7 @@ double CarnageSA<MAX_CHIPS>::calculate_energy(const std::array<Pos, MAX_CHIPS>& 
 		CChip* chip = pool[u];
 
 		// 物理制約
-		if (!(p.x < GridWidth) || !(p.y < GridHeight)) base_energy += 5000.0;
+		if (!(p.x < GridWidth) || !(p.y < GridHeight)) base_energy += 5000;
 
 		// Startチップ制約
 		if (u == pool.m_start && p.y != 0) base_energy += p.y * start_end_penalty;
@@ -239,7 +240,7 @@ double CarnageSA<MAX_CHIPS>::calculate_energy(const std::array<Pos, MAX_CHIPS>& 
 			occ[y * GridWidth + x] = 0;
 		};
 		
-		auto ChipE = [&](UINT ToIdx) -> double {
+		auto ChipE = [&](UINT ToIdx) -> Energy_t {
 			// チップ距離
 			Pos to = state[ToIdx];
 			
@@ -297,7 +298,7 @@ double CarnageSA<MAX_CHIPS>::calculate_energy(const std::array<Pos, MAX_CHIPS>& 
 		if(pool[u]->m_NextR < N) base_energy += ChipE(pool[u]->m_NextR);
 	}
 
-	if (base_energy <= 0.0) return 0.0;
+	if (base_energy <= 0) return 0;
 	return base_energy;
 }
 
@@ -367,7 +368,7 @@ void CarnageSA<MAX_CHIPS>::run_single() {
 			}
 		};
 		
-		double current_E	= calculate_energy(state, occ);
+		Energy_t current_E	= calculate_energy(state, occ);
 		bool UpdateBest		= false;
 		
 		if(LoopCnt == 0){
@@ -520,7 +521,7 @@ void CarnageSA<MAX_CHIPS>::run_single() {
 				continue;
 			}
 	
-			double next_E = calculate_energy(next_state, next_occ);
+			Energy_t next_E = calculate_energy(next_state, next_occ);
 			
 			UINT RunningStatus = UpdateStatus(
 				best_E < 1   ? S_FOUND_ZERO :
@@ -532,7 +533,7 @@ void CarnageSA<MAX_CHIPS>::run_single() {
 			}
 			
 			// 早期最適性判定
-			if (next_E < 0.0001) {
+			if (next_E == 0) {
 				state		= next_state;
 				current_E	= next_E;
 				best_state	= next_state;
@@ -542,13 +543,13 @@ void CarnageSA<MAX_CHIPS>::run_single() {
 				break;
 			}
 	
-			double diff = next_E - current_E;
+			double diff = (double)next_E - (double)current_E;
 			if (diff < 0 || dist_prob(gen) < std::exp(-diff / T)) {
 				// accept
 				state		= next_state;
 				occ			= next_occ;
 				current_E	= next_E;
-				if (current_E < best_E - 1e-9) {
+				if (current_E <= best_E) {
 					best_E		= current_E;
 					best_state	= state;
 					UpdateBest	= true;
@@ -563,7 +564,7 @@ void CarnageSA<MAX_CHIPS>::run_single() {
 					if(UpdateBest){
 						UpdateBest = false;
 					}
-					printf("Step:%8d | T: %7.2f Energy: %8.2f | Best: %8.2f\n", iter, T, current_E, best_E);
+					printf("Step:%8d | T: %7.2f Energy: %8d | Best: %8d\n", iter, T, (UINT)current_E, (UINT)best_E);
 				}
 			#endif
 			
@@ -574,7 +575,7 @@ void CarnageSA<MAX_CHIPS>::run_single() {
 			best_E < 100 ? S_FOUND : S_NOT_FOUND
 		);
 		
-		printf("Energy: %.2f %d\n", best_E, RunningStatus);
+		printf("Energy: %d\n", (UINT)best_E);
 		if (RunningStatus == S_FOUND_ZERO || LoopCnt >= 1 && RunningStatus <= S_FOUND){
 			EndRun = true;
 		}
