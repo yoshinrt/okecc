@@ -657,6 +657,8 @@ void CarnageSA<MAX_CHIPS>::NopRouting(void){
 					chip->m_NextG = nop;
 				}
 				
+				rxg = 0;
+				
 				occ[y * GridWidth + x] = (ChipID_t)nop;
 				chip = pool[nop];
 				state[nop] = {(uint8_t)x, (uint8_t)y};
