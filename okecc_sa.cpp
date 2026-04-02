@@ -101,12 +101,13 @@ public:
 	void InitState(void);
 	void run(UINT num_threads = 0);
 	void run_single();
-	Energy_t calculate_energy(const std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org);
+	Energy_t calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org);
 	void SetArrow(void);
 	void OutputSvg(const char* filename, const std::array<Pos, MAX_CHIPS>& state_disp);
 	void NopRouting(void);
 	void rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ);
 	void MakeLinkList();
+	Energy_t FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ, bool PlaceNop = false, bool rxg = false);
 	
 	const std::array<Pos, MAX_CHIPS>& get_result() const { return state; }
 	
@@ -200,7 +201,157 @@ void CarnageSA<MAX_CHIPS>::MakeLinkList() {
 }
 
 template <size_t MAX_CHIPS>
-Energy_t CarnageSA<MAX_CHIPS>::calculate_energy(const std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org) {
+Energy_t CarnageSA<MAX_CHIPS>::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ, bool PlaceNop, bool rxg){
+	CChip *chip;
+	
+	if(PlaceNop) chip = pool[from];
+	
+	auto IsBrank = [&](int x, int y) -> bool {
+		return occ[y * GridWidth + x] == POS_INVALID;
+	};
+	
+	auto Occupy = [&](int x, int y){
+		if(PlaceNop){
+			UINT nop = pool.add(new CChipNop());
+			
+			if(rxg){
+				chip->m_NextR = nop;
+			}else{
+				chip->m_NextG = nop;
+			}
+			
+			rxg = 0;
+			
+			occ[y * GridWidth + x] = (ChipID_t)nop;
+			chip = pool[nop];
+			state[nop] = {(uint8_t)x, (uint8_t)y};
+		}else{
+			occ[y * GridWidth + x] = 0;
+		}
+	};
+	
+	// チップ path が他のチップを通過
+	int stx = state[from].x;
+	int sty = state[from].y;
+	int edx = state[to].x;
+	int edy = state[to].y;
+	
+	if(
+		PlaceNop &&
+		std::max(std::abs(stx - edx), std::abs(sty - edy)) == 1
+	) return 0;
+	
+	if(std::abs(stx - edx) >= std::abs(sty - edy)){
+		int stepx = stx < edx ? 1 : -1;
+		int y = sty;
+		int dx = std::abs(edx - stx) - 1;
+		
+		for(int x = stx + stepx; x != edx; x += stepx){
+			if(y == edy){
+				if(IsBrank(x, y)){
+					Occupy(x, y);
+				}else if(y >= 1 && IsBrank(x, y - 1)){
+					Occupy(x, y - 1);
+					--y;
+				}else if(y < (int)GridHeight - 1 && IsBrank(x, y + 1)){
+					Occupy(x, y + 1);
+					++y;
+				}else{
+					return 1;
+				}
+			}
+			
+			else if(y > edy){
+				if(y >= 1 && IsBrank(x, y - 1)){
+					Occupy(x, y - 1);
+					--y;
+				}else if(std::abs(y - edy) <= dx && IsBrank(x, y)){
+					Occupy(x, y);
+				}else if(std::abs(y - edy) <  dx && y < (int)GridHeight - 1 && IsBrank(x, y + 1)){
+					Occupy(x, y + 1);
+					++y;
+				}else{
+					return 1;
+				}
+			}
+			
+			else{
+				if(y < (int)GridHeight - 1 && IsBrank(x, y + 1)){
+					Occupy(x, y + 1);
+					++y;
+				}else if(std::abs(y - edy) <= dx && IsBrank(x, y)){
+					Occupy(x, y);
+				}else if(std::abs(y - edy) <  dx && y >= 1 && IsBrank(x, y - 1)){
+					Occupy(x, y - 1);
+					--y;
+				}else{
+					return 1;
+				}
+			}
+			
+			--dx;
+		}
+	}else{
+		int stepy = sty < edy ? 1 : -1;
+		int x = stx;
+		int dy = std::abs(edy - sty) - 1;
+		
+		for(int y = sty + stepy; y != edy; y += stepy){
+			if(x == edx){
+				if(IsBrank(x, y)){
+					Occupy(x, y);
+				}else if(x >= 1 && IsBrank(x - 1, y)){
+					Occupy(x - 1, y);
+					--x;
+				}else if(x < (int)GridWidth - 1 && IsBrank(x + 1, y)){
+					Occupy(x + 1, y);
+					++x;
+				}else{
+					return 1;
+				}
+			}
+			
+			else if(x > edx){
+				if(x >= 1 && IsBrank(x - 1, y)){
+					Occupy(x - 1, y);
+					--x;
+				}else if(std::abs(x - edx) <= dy && IsBrank(x, y)){
+					Occupy(x, y);
+				}else if(std::abs(x - edx) <  dy && x < (int)GridWidth - 1 && IsBrank(x + 1, y)){
+					Occupy(x + 1, y);
+					++x;
+				}else{
+					return 1;
+				}
+			}
+			
+			else{
+				if(x < (int)GridWidth - 1 && IsBrank(x + 1, y)){
+					Occupy(x + 1, y);
+					++x;
+				}else if(std::abs(x - edx) <= dy && IsBrank(x, y)){
+					Occupy(x, y);
+				}else if(std::abs(x - edx) <  dy && x >= 1 && IsBrank(x - 1, y)){
+					Occupy(x - 1, y);
+					--x;
+				}else{
+					return 1;
+				}
+			}
+			
+			--dy;
+		}
+	}
+	
+	if(PlaceNop){
+		chip->m_NextG = to;
+	}
+	
+	return 0;
+}
+
+template <size_t MAX_CHIPS>
+Energy_t CarnageSA<MAX_CHIPS>::calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org) {
 	Energy_t base_energy = 0;
 	
 	// ペナルティ
@@ -232,14 +383,6 @@ Energy_t CarnageSA<MAX_CHIPS>::calculate_energy(const std::array<Pos, MAX_CHIPS>
 			);
 		}
 		
-		auto IsBrank = [&](int x, int y) -> bool {
-			return occ[y * GridWidth + x] == POS_INVALID;
-		};
-		
-		auto Occupy = [&](int x, int y){
-			occ[y * GridWidth + x] = 0;
-		};
-		
 		auto ChipE = [&](UINT ToIdx) -> Energy_t {
 			// チップ距離
 			Pos to = state[ToIdx];
@@ -249,49 +392,7 @@ Energy_t CarnageSA<MAX_CHIPS>::calculate_energy(const std::array<Pos, MAX_CHIPS>
 			) - 1);
 			
 			if(e == 0) return e;
-			
-			// チップ path が他のチップを通過
-			int stx = p.x;
-			int sty = p.y;
-			int edx = state[ToIdx].x;
-			int edy = state[ToIdx].y;
-			
-			if(std::abs(stx - edx) >= std::abs(sty - edy)){
-				int stepx = stx < edx ? 1 : -1;
-				
-				for(int x = stx + stepx; x != edx; x += stepx){
-					auto [y, mod] = std::div((edy - sty) * (x - stx) * stepx, (edx - stx) * stepx);
-					y += sty;
-					
-					if(IsBrank(x, y)){
-						Occupy(x, y);
-					}else if(mod < 0 && IsBrank(x, y - 1)){
-						Occupy(x, y - 1);
-					}else if(mod > 0 && IsBrank(x, y + 1)){
-						Occupy(x, y + 1);
-					}else{
-						e += overwrap_penalty;
-					}
-				}
-			}else{
-				int stepy = sty < edy ? 1 : -1;
-				
-				for(int y = sty + stepy; y != edy; y += stepy){
-					auto [x, mod] = std::div((edx - stx) * (y - sty) * stepy, (edy - sty) * stepy);
-					x += stx;
-					
-					if(IsBrank(x, y)){
-						Occupy(x, y);
-					}else if(mod < 0 && IsBrank(x - 1, y)){
-						Occupy(x - 1, y);
-					}else if(mod > 0 && IsBrank(x + 1, y)){
-						Occupy(x + 1, y);
-					}else{
-						e += overwrap_penalty;
-					}
-				}
-			}
-			return e;
+			return e + FindPath(u, ToIdx, state, occ) * overwrap_penalty;
 		};
 		
 		if(pool[u]->m_NextG < N) base_energy += ChipE(pool[u]->m_NextG);
@@ -639,80 +740,8 @@ void CarnageSA<MAX_CHIPS>::NopRouting(void){
 	UINT N = (UINT)pool.size();
 	
 	for (UINT u = 0; u < N; ++u) {
-		Pos p = state[u];
-		CChip* chip = pool[u];
-		
-		auto PlaceNop = [&](UINT ToIdx, bool rxg){
-			
-			auto IsBrank = [&](int x, int y) -> bool {
-				return occ[y * GridWidth + x] == POS_INVALID;
-			};
-			
-			auto Occupy = [&](int x, int y){
-				UINT nop = pool.add(new CChipNop());
-				
-				if(rxg){
-					chip->m_NextR = nop;
-				}else{
-					chip->m_NextG = nop;
-				}
-				
-				rxg = 0;
-				
-				occ[y * GridWidth + x] = (ChipID_t)nop;
-				chip = pool[nop];
-				state[nop] = {(uint8_t)x, (uint8_t)y};
-			};
-			
-			// チップ距離
-			Pos to = state[ToIdx];
-			
-			if((std::max)(std::abs((int)p.x - (int)to.x), std::abs((int)p.y - (int)to.y)) == 1) return;
-			
-			// チップ path が他のチップを通過
-			int stx = p.x;
-			int sty = p.y;
-			int edx = state[ToIdx].x;
-			int edy = state[ToIdx].y;
-			
-			if(std::abs(stx - edx) >= std::abs(sty - edy)){
-				int stepx = stx < edx ? 1 : -1;
-				
-				for(int x = stx + stepx; x != edx; x += stepx){
-					auto [y, mod] = std::div((edy - sty) * (x - stx) * stepx, (edx - stx) * stepx);
-					y += sty;
-					
-					if(IsBrank(x, y)){
-						Occupy(x, y);
-					}else if(mod < 0 && IsBrank(x, y - 1)){
-						Occupy(x, y - 1);
-					}else if(mod > 0 && IsBrank(x, y + 1)){
-						Occupy(x, y + 1);
-					}
-				}
-			}else{
-				int stepy = sty < edy ? 1 : -1;
-				
-				for(int y = sty + stepy; y != edy; y += stepy){
-					auto [x, mod] = std::div((edx - stx) * (y - sty) * stepy, (edy - sty) * stepy);
-					x += stx;
-					
-					if(IsBrank(x, y)){
-						Occupy(x, y);
-					}else if(mod < 0 && IsBrank(x - 1, y)){
-						Occupy(x - 1, y);
-					}else if(mod > 0 && IsBrank(x + 1, y)){
-						Occupy(x + 1, y);
-					}
-				}
-			}
-			
-			chip->m_NextG = ToIdx;
-		};
-		
-		if(pool[u]->m_NextG < N) PlaceNop(pool[u]->m_NextG, 0);
-		chip = pool[u];
-		if(pool[u]->m_NextR < N) PlaceNop(pool[u]->m_NextR, 1);
+		if(pool[u]->m_NextG < N) FindPath(u, pool[u]->m_NextG, state, occ, true, false);
+		if(pool[u]->m_NextR < N) FindPath(u, pool[u]->m_NextR, state, occ, true, true);
 	}
 }
 
@@ -917,6 +946,7 @@ int main(void){
 	sa.run();
 	sa.SetArrow();
 	sa.OutputSvg("chip.svg", sa.get_result());
+	//sa.dump();
 	
 	const std::string mcFile = "memcard1.mcd";
 	const std::string gameId = "SLPS-01666";
