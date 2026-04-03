@@ -104,7 +104,10 @@ public:
 	void run_single();
 	Energy_t calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org);
 	void SetArrow(void);
-	void OutputSvg(const char* filename, const std::array<Pos, MAX_CHIPS>& state_disp);
+	
+	void OutputSvg(const std::array<Pos, MAX_CHIPS>& state_disp, const char* filename);
+	void OutputSvg(){OutputSvg(state, m_svg_file);}
+	
 	void NopRouting(void);
 	void rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ);
 	void MakeLinkList();
@@ -422,6 +425,8 @@ void CarnageSA::run_single() {
 	constexpr UINT p_nearby_swap	= 5;	// 隣接スワップ
 	constexpr UINT p_move_mid		= 50;	// 接続chip の真ん中に移動
 	
+	Status = S_NOT_FOUND;
+	
 	std::mt19937_64 gen;
 	gen.seed(std::random_device{}());
 	
@@ -714,6 +719,7 @@ void CarnageSA::run(UINT num_threads){
 	
 	if(best_E < 100){
 		NopRouting();
+		SetArrow();
 	}
 	
 	auto end = std::chrono::steady_clock::now();
@@ -781,7 +787,7 @@ void CarnageSA::SetArrow(void){
 
 //////////////////////////////////////////////////////////////////////////////
 
-void CarnageSA::OutputSvg(const char* filename, const std::array<Pos, MAX_CHIPS>& state_disp) {
+void CarnageSA::OutputSvg(const std::array<Pos, MAX_CHIPS>& state_disp, const char* filename) {
 	const int CHIP_SIZE = 75;    // チップサイズ
 	const int GAP = 15;          // 隙間
 	const int CELL_SIZE = CHIP_SIZE + GAP; 
@@ -912,9 +918,10 @@ void CarnageSA::OutputSvg(const char* filename, const std::array<Pos, MAX_CHIPS>
 void chip_main(void);
 
 int main(void){
-	g_pCurTree		= new CChipTree;
-	g_pCurChipPool	= new CChipPool(15, 15);
-	g_pCurBlockInfo	= new CBlockInfo;
+	g_pCurField =
+	g_pField[0]	= new CField("main", 15, 15);
+	g_pField[1]	= new CField("sub1", 7, 7);
+	g_pField[2]	= new CField("sub2", 7, 7);
 	
 	try{
 		chip_main();
@@ -923,21 +930,19 @@ int main(void){
 		return 0;
 	}
 	
-	g_pCurTree->AddToG(IDX_EXIT);
-	g_pCurChipPool->m_start = g_pCurTree->m_start;
-	//g_pCurChipPool->dump();
+	CarnageSA *sa[3];
 	
-	// Goto 最適化
-	g_pCurChipPool->CleanupGoto();
-	
-	printf("Number of chip(s): %d\n", (UINT)g_pCurChipPool->m_list.size());
-	//g_pCurChipPool->dump();
-	
-	CarnageSA sa(*g_pCurChipPool, "chip.svg");
-	sa.run();
-	sa.SetArrow();
-	sa.OutputSvg("chip.svg", sa.get_result());
-	//sa.dump();
+	for(int i = 0; i < 3; ++i){
+		g_pField[i]->FinalizeCompile();
+		
+		sa[i] = new CarnageSA(g_pField[i]->m_pool, std::string(g_pField[i]->m_name).append(".svg").c_str());
+		
+		if(g_pField[i]->m_pool.size()){
+			sa[i]->run();
+			sa[i]->OutputSvg();
+			//sa[i]->dump();
+		}
+	}
 	
 	const std::string mcFile = "memcard1.mcd";
 	const std::string gameId = "SLPS-01666";
@@ -960,21 +965,39 @@ int main(void){
 	SaveDataZeus *pZeus = (SaveDataZeus *)saveBuffer.data();
 	
 	// ソフト書き込み
-	constexpr int CARD = 0;
+	constexpr UINT CARD		= 0;
+	constexpr UINT width	= 23;
+	constexpr UINT height	= 15;
 	
-	auto& state = sa.get_result();
-	for(UINT u = 0; u < 23 * 15; ++u) pZeus->Oke[CARD].Software[u] = 0;
+	for(UINT u = 0; u < width * height; ++u) pZeus->Oke[CARD].Software[u] = 0;
 	
-	for(UINT u = 0; u < g_pCurChipPool->size(); ++u){
-		CChipBinary bin;
+	UINT offx = 0, offy = 0;
+	for(UINT fld = 0; fld < 3; ++fld){
+		auto& state = sa[fld]->get_result();
 		
-		auto& p = state[u];
-		g_pCurChipPool->m_list[u]->GetBin(bin);
-		pZeus->Oke[CARD].Software[p.y * 23 + p.x] = bin.m_val;
+		if(fld == 0){
+			pZeus->Oke[CARD].StartMainX = state[g_pCurField->m_pool.m_start].x + offx + 2;
+			pZeus->Oke[CARD].StartMainY = offy + 2;
+		}else if(fld == 1){
+			offx = 16;
+			
+			pZeus->Oke[CARD].StartSub1X = state[g_pCurField->m_pool.m_start].x + offx + 2;
+			pZeus->Oke[CARD].StartSub1Y = offy + 2;
+		}else if(fld == 2){
+			offy = 8;
+			
+			pZeus->Oke[CARD].StartSub2X = state[g_pCurField->m_pool.m_start].x + offx + 2;
+			pZeus->Oke[CARD].StartSub2Y = offy + 2;
+		}
+		
+		for(UINT u = 0; u < g_pCurField->m_pool.size(); ++u){
+			CChipBinary bin;
+			
+			auto& p = state[u];
+			g_pCurField->m_pool.m_list[u]->GetBin(bin);
+			pZeus->Oke[CARD].Software[(p.y + offy) * width + p.x + offx] = bin.m_val;
+		}
 	}
-	
-	pZeus->Oke[CARD].StartMainX = state[g_pCurChipPool->m_start].x + 2;
-	pZeus->Oke[CARD].StartMainY = 2;
 	
 	// chksum
 	uint8_t ChkSum = 0;

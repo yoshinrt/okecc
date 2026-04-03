@@ -359,8 +359,6 @@ public:
 	}
 };
 
-inline CChipPool	*g_pCurChipPool;
-
 //////////////////////////////////////////////////////////////////////////////
 // Chip tree
 
@@ -370,30 +368,33 @@ public:
 	UINT m_start	= IDX_NONE;	// 開始 chip
 	UINT m_LastG	= IDX_NONE;	// 最後の緑矢印を出している chip
 	UINT m_LastR	= IDX_NONE; // 最後の赤矢印を出している chip
-
+	CChipPool&	m_pool;
+	
+	CChipTree(CChipPool& pool) : m_pool(pool){}
+	
 	// g, r を update
 	void AddToG(UINT idx){
 		if(m_start == IDX_NONE) m_start = idx;
-		if(ValidG()) (*g_pCurChipPool)[m_LastG]->m_NextG = idx;
+		if(ValidG()) m_pool[m_LastG]->m_NextG = idx;
 		m_LastG = idx;
 	}
 
 	void AddToR(UINT idx){
 		if(m_start == IDX_NONE) m_start = idx;
-		if(ValidR()) (*g_pCurChipPool)[m_LastR]->m_NextG = idx;
+		if(ValidR()) m_pool[m_LastR]->m_NextG = idx;
 		m_LastR = idx;
 	}
 
-	bool ValidStart(void) const {return m_start < g_pCurChipPool->m_list.size();}
-	bool ValidG    (void) const {return m_LastG < g_pCurChipPool->m_list.size();}
-	bool ValidR    (void) const {return m_LastR < g_pCurChipPool->m_list.size();}
+	bool ValidStart(void) const {return m_start < m_pool.m_list.size();}
+	bool ValidG    (void) const {return m_LastG < m_pool.m_list.size();}
+	bool ValidR    (void) const {return m_LastR < m_pool.m_list.size();}
 
 	// Tree にチップ追加
 	CChipTree& add(CChip *pchip){
-		UINT idx = g_pCurChipPool->add(pchip);		// チップ追加
+		UINT idx = m_pool.add(pchip);		// チップ追加
 
 		if(ValidStart()){
-			(*g_pCurChipPool)[m_LastG]->m_NextG = idx;	// リスト後端に追加したチップをつなげる
+			m_pool[m_LastG]->m_NextG = idx;	// リスト後端に追加したチップをつなげる
 		}else{
 			m_start = idx;
 		}
@@ -410,7 +411,7 @@ public:
 		cc_a.AddToR(cc_b.m_start);
 	
 		// False 側: GOTO を生成し a.g, cc_b.g, tree.g はそれを指す
-		UINT idx = g_pCurChipPool->add(new CChipGoto);
+		UINT idx = m_pool.add(new CChipGoto);
 		cc_a.AddToG(idx);
 		cc_b.AddToG(idx);
 	
@@ -428,7 +429,7 @@ public:
 		cc_a.AddToG(cc_b.m_start);
 	
 		// True 側: GOTO を生成し a.r, cc_r.g, tree.r はそれを指す
-		UINT idx = g_pCurChipPool->add(new CChipGoto);
+		UINT idx = m_pool.add(new CChipGoto);
 		cc_a.AddToR(idx);
 		cc_b.AddToR(idx);
 	
@@ -439,7 +440,7 @@ public:
 	}
 	
 	CChipTree operator!(void) const {
-		CChipTree tree = CChipTree();
+		CChipTree tree = CChipTree(m_pool);
 		
 		tree.m_start = m_start;
 		tree.m_LastG = m_LastR;
@@ -449,7 +450,56 @@ public:
 	}
 };
 
-inline CChipTree *g_pCurTree;
+//////////////////////////////////////////////////////////////////////////////
+// field info
+
+class CField {
+public:
+	CChipPool	m_pool;
+	CChipTree	m_tree;
+	const char	*m_name;
+	std::vector<UINT>	m_BlockStack;
+	
+	CField(const char *name, UINT width, UINT height) : m_name(name), m_pool(width, height), m_tree(m_pool){}
+	
+	void FinalizeCompile(){
+		m_tree.AddToG(IDX_EXIT);
+		m_pool.m_start = m_tree.m_start;
+		//m_pool.dump();
+		
+		if(m_pool.size() > 0){
+			// Goto 最適化
+			m_pool.CleanupGoto();
+		}
+		printf("%s: Number of chip(s): %d\n", m_name, (UINT)m_pool.m_list.size());
+	}
+	
+	static constexpr UINT BLOCK_TOP = 0xFFFFFFFF;
+	
+	enum {
+		BM_NONE,
+		BM_IF_TOP,	// top of if block
+		BM_IF,		// if / elseif 中
+		BM_ELSE,	// else 中
+		BM_LOOP,	// loop 中
+	};
+	
+	UINT m_Break;
+	
+	// stack 構造
+	// low <--> high
+	// IF:   [BM_IF_TOP] [飛び先] [BM_*] [飛び先] [BM_*] ...
+	// Loop: [break先保存] [loop先頭] [BM_LOOP]
+	
+	
+	UINT GetMode(void){
+		return m_BlockStack.size() < 1 ? BM_NONE :
+			m_BlockStack.back();
+	}
+};
+
+inline CField *g_pField[3];
+inline CField *g_pCurField;
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -481,15 +531,15 @@ public:
 	CChip *m_pchip;
 	
 	CChipTree GetCChipTree(void) const {
-		CChipTree tree;
+		CChipTree tree(g_pCurField->m_pool);
 		
 		// チップ単体からツリーに変換 (Condition chip)
 		// R 側に Goto を足して，常に m_NextG を触ればいいようにする
 		tree.m_start = 
-		tree.m_LastG = g_pCurChipPool->add(m_pchip);
+		tree.m_LastG = tree.m_pool.add(m_pchip);
 		
-		(*g_pCurChipPool)[tree.m_start]->m_NextR =
-		tree.m_LastR = g_pCurChipPool->add(new CChipGoto);
+		tree.m_pool[tree.m_start]->m_NextR =
+		tree.m_LastR = tree.m_pool.add(new CChipGoto);
 		
 		return tree;
 	}
@@ -662,7 +712,7 @@ static void wait(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurTree->add(new CChipNop(param));
+	g_pCurField->m_tree.add(new CChipNop(param));
 }
 
 static void nop    (LastLocationArg){wait(0,      location);}
@@ -714,7 +764,7 @@ public:
 };
 
 static void put_move_chip(UINT param){
-	g_pCurTree->add(new CChipMove(param));
+	g_pCurField->m_tree.add(new CChipMove(param));
 }
 
 static void move_forward (LastLocationArg){LastLocation(); put_move_chip(CChipMove::FWD);}
@@ -758,7 +808,7 @@ public:
 };
 
 static void put_turn_chip(UINT param){
-	g_pCurTree->add(new CChipTurn(param));
+	g_pCurField->m_tree.add(new CChipTurn(param));
 }
 
 static void turn_left (LastLocationArg){LastLocation(); put_turn_chip(CChipTurn::LEFT);}
@@ -804,7 +854,7 @@ public:
 };
 
 static void put_jump_chip(UINT param){
-	g_pCurTree->add(new CChipJump(param));
+	g_pCurField->m_tree.add(new CChipJump(param));
 }
 
 static void jump_forward (LastLocationArg){LastLocation(); put_jump_chip(CChipJump::FWD);}
@@ -856,7 +906,7 @@ public:
 };
 
 static void put_action_chip(UINT param){
-	g_pCurTree->add(new CChipAction(param));
+	g_pCurField->m_tree.add(new CChipAction(param));
 }
 
 static void fight (LastLocationArg){LastLocation(); put_action_chip(CChipAction::FIGHT);}
@@ -902,7 +952,7 @@ public:
 };
 
 static void put_alt_chip(UINT param){
-	g_pCurTree->add(new CChipAlt(param));
+	g_pCurField->m_tree.add(new CChipAlt(param));
 }
 
 static void move_high(LastLocationArg){LastLocation(); put_alt_chip(CChipAlt::HIGH);}
@@ -982,7 +1032,7 @@ static void fire(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurTree->add(new CChipFireNearest(
+	g_pCurField->m_tree.add(new CChipFireNearest(
 		angleCenter,
 		angleRange,
 		distance,
@@ -1049,7 +1099,7 @@ static void fire_direction(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurTree->add(new CChipFireFixedDir(
+	g_pCurField->m_tree.add(new CChipFireFixedDir(
 		direction,
 		elevation,
 		weapon,
@@ -1101,7 +1151,7 @@ static void fire_target(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurTree->add(new CChipFireTarget(
+	g_pCurField->m_tree.add(new CChipFireTarget(
 		weapon,
 		cnt
 	));
@@ -1167,7 +1217,7 @@ static void fire_direction(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurTree->add(new CChipFireCounter(
+	g_pCurField->m_tree.add(new CChipFireCounter(
 		direction.m_var,
 		elevation.m_var,
 		weapon,
@@ -1206,7 +1256,7 @@ public:
 
 static void option(UINT param, LastLocationArg){
 	LastLocation();
-	g_pCurTree->add(new CChipOption(param));
+	g_pCurField->m_tree.add(new CChipOption(param));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1680,12 +1730,12 @@ public:
 	ScaledInt<1,1,1> m_no;
 };
 
-static void sub(
+static void put_sub_chip(
 	int no,
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurTree->add(new CChipSubroutine(no));
+	g_pCurField->m_tree.add(new CChipSubroutine(no));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1843,7 +1893,7 @@ static void lockon(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurTree->add(new CChipLockon(
+	g_pCurField->m_tree.add(new CChipLockon(
 		angleCenter,
 		angleRange,
 		distance,
@@ -1998,7 +2048,7 @@ static void get_target_direction(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurTree->add(new CChipGetTgtDirection(var_dir.m_var, var_elev.m_var));
+	g_pCurField->m_tree.add(new CChipGetTgtDirection(var_dir.m_var, var_elev.m_var));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -2223,7 +2273,7 @@ static void sound(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurTree->add(new CChipSound(snd, cnt));
+	g_pCurField->m_tree.add(new CChipSound(snd, cnt));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2372,7 +2422,7 @@ static void clamp(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurTree->add(new CChipClamp(var.m_var, max, min));
+	g_pCurField->m_tree.add(new CChipClamp(var.m_var, max, min));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2418,7 +2468,7 @@ static void ch_send(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurTree->add(new CChipChSend(ch, var.m_var));
+	g_pCurField->m_tree.add(new CChipChSend(ch, var.m_var));
 }
 
 class CChipChReceive : public CChip {
@@ -2528,7 +2578,7 @@ CChipVar& CChipVar::operator=(const CChipVal& val){
 			pchip = new CChipGetStatus(CChipGetStatus::AMMO + val.m_type, m_var);
 	}
 	
-	g_pCurTree->add(pchip);
+	g_pCurField->m_tree.add(pchip);
 	return *this;
 }
 
@@ -2639,19 +2689,19 @@ public:
 };
 
 #ifndef NO_OKECC_SYNTAX
-CChipVar& CChipVar::operator+=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::ADD, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator-=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::SUB, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator*=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MUL, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator/=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::DIV, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator%=(const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOD, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator= (const CChipVar& op2){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOV, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator+=(const CChipVar& op2){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::ADD, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator-=(const CChipVar& op2){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::SUB, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator*=(const CChipVar& op2){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::MUL, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator/=(const CChipVar& op2){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::DIV, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator%=(const CChipVar& op2){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::MOD, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator= (const CChipVar& op2){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::MOV, 0, op2.m_var)); return *this;}
 
-CChipVar& CChipVar::operator+=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::ADD, 1, imm)); return *this;}
-CChipVar& CChipVar::operator-=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::SUB, 1, imm)); return *this;}
-CChipVar& CChipVar::operator*=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MUL, 1, imm)); return *this;}
-CChipVar& CChipVar::operator/=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::DIV, 1, imm)); return *this;}
-CChipVar& CChipVar::operator%=(const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOD, 1, imm)); return *this;}
-CChipVar& CChipVar::operator= (const int imm){g_pCurTree->add(new CChipCalc(m_var, CChipCalc::MOV, 1, imm)); return *this;}
+CChipVar& CChipVar::operator+=(const int imm){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::ADD, 1, imm)); return *this;}
+CChipVar& CChipVar::operator-=(const int imm){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::SUB, 1, imm)); return *this;}
+CChipVar& CChipVar::operator*=(const int imm){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::MUL, 1, imm)); return *this;}
+CChipVar& CChipVar::operator/=(const int imm){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::DIV, 1, imm)); return *this;}
+CChipVar& CChipVar::operator%=(const int imm){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::MOD, 1, imm)); return *this;}
+CChipVar& CChipVar::operator= (const int imm){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::MOV, 1, imm)); return *this;}
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2721,9 +2771,6 @@ CChipTree CChipVar::operator< (const int imm) const {return CCond(new CChipCmp(m
 //////////////////////////////////////////////////////////////////////////////
 // if - else - endif
 
-class CBlockInfo;
-inline CBlockInfo *g_pCurBlockInfo;
-
 class CBlockInfo {
 public:
 	static constexpr UINT BLOCK_TOP = 0xFFFFFFFF;
@@ -2746,8 +2793,8 @@ public:
 	std::vector<UINT>	m_BlockStack;
 	
 	UINT GetMode(void){
-		return g_pCurBlockInfo->m_BlockStack.size() < 1 ? BM_NONE :
-			g_pCurBlockInfo->m_BlockStack.back();
+		return g_pCurField->m_BlockStack.size() < 1 ? BM_NONE :
+			g_pCurField->m_BlockStack.back();
 	}
 };
 
@@ -2755,18 +2802,18 @@ static void if_statement(const CChipTree& cc, LastLocationArg, bool BlockStart =
 	LastLocation();
 	
 	if(BlockStart){
-		g_pCurBlockInfo->m_BlockStack.push_back(CBlockInfo::BM_IF_TOP);
+		g_pCurField->m_BlockStack.push_back(CBlockInfo::BM_IF_TOP);
 	}
 	
 	// CurTree に if 条件のツリーを接続
-	g_pCurTree->AddToG(cc.m_start);
-	g_pCurTree->m_LastG = cc.m_LastR;
+	g_pCurField->m_tree.AddToG(cc.m_start);
+	g_pCurField->m_tree.m_LastG = cc.m_LastR;
 
 	// false 飛び先を push
-	g_pCurBlockInfo->m_BlockStack.push_back(cc.m_LastG);
+	g_pCurField->m_BlockStack.push_back(cc.m_LastG);
 	
 	// mode
-	g_pCurBlockInfo->m_BlockStack.push_back(CBlockInfo::BM_IF);
+	g_pCurField->m_BlockStack.push_back(CBlockInfo::BM_IF);
 }
 
 static void if_statement(const CCond& chip, LastLocationArg){if_statement(chip.GetCChipTree(), location);}
@@ -2778,23 +2825,23 @@ static void else_statement(
 ){
 	LastLocation();
 
-	if(g_pCurBlockInfo->GetMode() != CBlockInfo::BM_IF){
+	if(g_pCurField->GetMode() != CBlockInfo::BM_IF){
 		throw OkeccError("Unexpected else / elseif");
 	}
 	
-	g_pCurBlockInfo->m_BlockStack.pop_back(); // mode
+	g_pCurField->m_BlockStack.pop_back(); // mode
 	
-	UINT idx = g_pCurTree->m_LastG;	// then 節の最後
+	UINT idx = g_pCurField->m_tree.m_LastG;	// then 節の最後
 
 	// else 節先頭は，BlockStack に積んでいた false 飛び先
-	g_pCurTree->m_LastG = g_pCurBlockInfo->m_BlockStack.back();
-	g_pCurBlockInfo->m_BlockStack.pop_back();
+	g_pCurField->m_tree.m_LastG = g_pCurField->m_BlockStack.back();
+	g_pCurField->m_BlockStack.pop_back();
 
 	// then 節の最後を block statck に積む
-	g_pCurBlockInfo->m_BlockStack.push_back(idx);
+	g_pCurField->m_BlockStack.push_back(idx);
 	
 	// mode
-	g_pCurBlockInfo->m_BlockStack.push_back(CBlockInfo::BM_ELSE);
+	g_pCurField->m_BlockStack.push_back(CBlockInfo::BM_ELSE);
 }
 
 static void elseif_statement(CChipTree &&cc, LastLocationArg){
@@ -2813,32 +2860,32 @@ static void endif_statement(
 	LastLocation();
 	
 	if(
-		g_pCurBlockInfo->GetMode() != CBlockInfo::BM_IF &&
-		g_pCurBlockInfo->GetMode() != CBlockInfo::BM_ELSE
+		g_pCurField->GetMode() != CBlockInfo::BM_IF &&
+		g_pCurField->GetMode() != CBlockInfo::BM_ELSE
 	){
 		throw OkeccError("Unexpected endif");
 	}
 	
 	while(
-		g_pCurBlockInfo->GetMode() == CBlockInfo::BM_IF ||
-		g_pCurBlockInfo->GetMode() == CBlockInfo::BM_ELSE
+		g_pCurField->GetMode() == CBlockInfo::BM_IF ||
+		g_pCurField->GetMode() == CBlockInfo::BM_ELSE
 	){
-		if(g_pCurBlockInfo->m_BlockStack.size() < 3){
+		if(g_pCurField->m_BlockStack.size() < 3){
 			throw OkeccError("Internal error: BlockStack broken");
 		}
 		
-		g_pCurBlockInfo->m_BlockStack.pop_back(); // mode
+		g_pCurField->m_BlockStack.pop_back(); // mode
 		
 		// 合流 GOTO 生成
-		UINT merge = g_pCurChipPool->add(new CChipGoto);
-		g_pCurTree->AddToG(merge);
+		UINT merge = g_pCurField->m_pool.add(new CChipGoto);
+		g_pCurField->m_tree.AddToG(merge);
 		
 		// false 条件の飛び先合流
-		(*g_pCurChipPool)[g_pCurBlockInfo->m_BlockStack.back()]->m_NextG = merge;
-		g_pCurBlockInfo->m_BlockStack.pop_back();
+		g_pCurField->m_pool[g_pCurField->m_BlockStack.back()]->m_NextG = merge;
+		g_pCurField->m_BlockStack.pop_back();
 		
-		if(g_pCurBlockInfo->GetMode() == CBlockInfo::BM_IF_TOP){
-			g_pCurBlockInfo->m_BlockStack.pop_back();
+		if(g_pCurField->GetMode() == CBlockInfo::BM_IF_TOP){
+			g_pCurField->m_BlockStack.pop_back();
 			break;
 		}
 	}
@@ -2853,51 +2900,51 @@ static void loop_statement(LastLocationArg){
 	UINT LoopTop;
 	
 	// goto を 2個生成
-	g_pCurBlockInfo->m_BlockStack.push_back(g_pCurBlockInfo->m_Break);	// 直前の break 先を保存
-	g_pCurBlockInfo->m_BlockStack.push_back(LoopTop = g_pCurChipPool->add(new CChipGoto));	// loop 先頭
-	g_pCurBlockInfo->m_Break = g_pCurChipPool->add(new CChipGoto);	// break 先
+	g_pCurField->m_BlockStack.push_back(g_pCurField->m_Break);	// 直前の break 先を保存
+	g_pCurField->m_BlockStack.push_back(LoopTop = g_pCurField->m_pool.add(new CChipGoto));	// loop 先頭
+	g_pCurField->m_Break = g_pCurField->m_pool.add(new CChipGoto);	// break 先
 	
 	// Top の goto を接続
-	g_pCurTree->AddToG(LoopTop);
+	g_pCurField->m_tree.AddToG(LoopTop);
 	
 	// mode
-	g_pCurBlockInfo->m_BlockStack.push_back(CBlockInfo::BM_LOOP);
+	g_pCurField->m_BlockStack.push_back(CBlockInfo::BM_LOOP);
 }
 
 static void loopend_statement(LastLocationArg){
 	LastLocation();
 	
-	if(g_pCurBlockInfo->GetMode() != CBlockInfo::BM_LOOP){
+	if(g_pCurField->GetMode() != CBlockInfo::BM_LOOP){
 		OkeccError("Unexpected endloop");
 	}
-	g_pCurBlockInfo->m_BlockStack.pop_back(); // mode
+	g_pCurField->m_BlockStack.pop_back(); // mode
 	
-	UINT LoopTop = g_pCurBlockInfo->m_BlockStack.back();	// loop top
-	g_pCurBlockInfo->m_BlockStack.pop_back();
+	UINT LoopTop = g_pCurField->m_BlockStack.back();	// loop top
+	g_pCurField->m_BlockStack.pop_back();
 	
 	// ループ先頭に接続
-	g_pCurTree->AddToG(LoopTop);
-	g_pCurTree->m_LastG = g_pCurBlockInfo->m_Break;
+	g_pCurField->m_tree.AddToG(LoopTop);
+	g_pCurField->m_tree.m_LastG = g_pCurField->m_Break;
 	
 	// break 先を pop
-	g_pCurBlockInfo->m_Break = g_pCurBlockInfo->m_BlockStack.back();
-	g_pCurBlockInfo->m_BlockStack.pop_back();
+	g_pCurField->m_Break = g_pCurField->m_BlockStack.back();
+	g_pCurField->m_BlockStack.pop_back();
 }
 
 static void break_statement(LastLocationArg){
 	LastLocation();
 	
-	if(g_pCurBlockInfo->GetMode() != CBlockInfo::BM_LOOP){
+	if(g_pCurField->GetMode() != CBlockInfo::BM_LOOP){
 		OkeccError("break not within a loop");
 	}
 	
-	UINT idx = g_pCurTree->m_LastG;
+	UINT idx = g_pCurField->m_tree.m_LastG;
 	
 	// LastG の place holder
-	g_pCurTree->AddToG(g_pCurChipPool->add(new CChipGoto));
+	g_pCurField->m_tree.AddToG(g_pCurField->m_pool.add(new CChipGoto));
 	
 	// break 先に分岐
-	(*g_pCurChipPool)[idx]->m_NextG = g_pCurBlockInfo->m_Break;
+	g_pCurField->m_pool[idx]->m_NextG = g_pCurField->m_Break;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2908,11 +2955,50 @@ static void okecc_exit(LastLocationArg){
 	
 	// Goto chip * 2 を置き，1個目を Exit に向ける
 	CChip *p;
-	g_pCurTree->add((p = new CChipGoto()));
-	g_pCurTree->add(new CChipGoto());
+	g_pCurField->m_tree.add((p = new CChipGoto()));
+	g_pCurField->m_tree.add(new CChipGoto());
 	
 	p->m_NextG = IDX_EXIT;
 }
+
+//////////////////////////////////////////////////////////////////////////////
+// start sub
+
+class CFieldSwitch {
+public:
+	CField	*m_field;
+	
+	CFieldSwitch(int num){
+		m_field	= g_pCurField;
+		g_pCurField	= g_pField[num];
+	}
+	
+	~CFieldSwitch(){
+		g_pCurField	= m_field;
+	}
+};
+
+inline bool g_PutSub[2] = {false, false};
+
+static bool start_sub_internal(int num, LastLocationArg){
+	LastLocation();
+	
+	if(num < 1 || num > 2){
+		OkeccError("Subroutine num. must be between 1 and 2.");
+		return false;
+	}
+	
+	put_sub_chip(num, location);
+	
+	if(g_PutSub[num - 1]) return false; // すでに sub 構築済み
+	
+	g_PutSub[num - 1] = true;
+	return true;
+}
+
+// 黒魔術w
+#define start_sub(num) \
+	for(;!start_sub_internal(num);) return; CFieldSwitch FieldInfo(num)
 
 //////////////////////////////////////////////////////////////////////////////
 // C との命名被り回避
