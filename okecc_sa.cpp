@@ -899,7 +899,7 @@ void CarnageSA::OutputSvg(const char* filename, const std::array<Pos, MAX_CHIPS>
 		};
 
 		process_conn(pool.m_list[i]->m_NextG, "#28a745");
-		if (pool.m_list[i]->ValidR()) {
+		if (pool.m_list[i]->m_NextR != IDX_NONE) {
 			process_conn(pool.m_list[i]->m_NextR, "#dc3545");
 		}
 	}
