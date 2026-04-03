@@ -498,7 +498,7 @@ public:
 	}
 };
 
-inline CField *g_pField[3];
+inline std::vector<CField *>	g_pField;
 inline CField *g_pCurField;
 
 //////////////////////////////////////////////////////////////////////////////

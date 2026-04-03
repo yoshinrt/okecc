@@ -918,10 +918,10 @@ void CarnageSA::OutputSvg(const std::array<Pos, MAX_CHIPS>& state_disp, const ch
 void chip_main(void);
 
 int main(void){
-	g_pCurField =
-	g_pField[0]	= new CField("main", 15, 15);
-	g_pField[1]	= new CField("sub1", 7, 7);
-	g_pField[2]	= new CField("sub2", 7, 7);
+	g_pField.push_back(new CField("main", 15, 15));
+	g_pField.push_back(new CField("sub1", 7, 7));
+	g_pField.push_back(new CField("sub2", 7, 7));
+	g_pCurField = g_pField[0];
 	
 	try{
 		chip_main();
@@ -930,12 +930,12 @@ int main(void){
 		return 0;
 	}
 	
-	CarnageSA *sa[3];
+	std::vector<CarnageSA *>	sa;
 	
 	for(int i = 0; i < 3; ++i){
 		g_pField[i]->FinalizeCompile();
 		
-		sa[i] = new CarnageSA(g_pField[i]->m_pool, std::string(g_pField[i]->m_name).append(".svg").c_str());
+		sa.push_back(new CarnageSA(g_pField[i]->m_pool, std::string(g_pField[i]->m_name).append(".svg").c_str()));
 		
 		if(g_pField[i]->m_pool.size()){
 			sa[i]->run();
