@@ -55,22 +55,22 @@ struct PathNode {
 static constexpr ChipID_t POS_INVALID = 0xFF;
 
 class CarnageSA {
+public:
 	CChipPool& pool;
 	std::vector<std::vector<ChipID_t>> LinkList; // チップごとの接続リスト
 
 	UINT GridWidth;
 	UINT GridHeight;
 	std::array<Pos, MAX_CHIPS> state;
-	const char *m_svg_file;
+	const char *m_name;
 	Energy_t best_E;
 
 	// 8方向のベクトル定義 (N, NE, E, SE, S, SW, W, NW)
 	inline static const int dx[] = { 0,  1,  1,  1,  0, -1, -1, -1, 0};
 	inline static const int dy[] = {-1, -1,  0,  1,  1,  1,  0, -1, 0};
 	
-public:
-	CarnageSA(CChipPool& p, const char *svg_file = nullptr)
-		: pool(p), GridWidth(p.m_width), GridHeight(p.m_height), m_svg_file(svg_file){
+	CarnageSA(CChipPool& p, const char *name = nullptr)
+		: pool(p), GridWidth(p.m_width), GridHeight(p.m_height), m_name(name){
 		MakeLinkList();
 	}
 	
@@ -104,9 +104,6 @@ public:
 	void run_single();
 	Energy_t calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org);
 	void SetArrow(void);
-	
-	void OutputSvg(const std::array<Pos, MAX_CHIPS>& state_disp, const char* filename);
-	void OutputSvg(){OutputSvg(state, m_svg_file);}
 	
 	void NopRouting(void);
 	void rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ);
@@ -787,132 +784,150 @@ void CarnageSA::SetArrow(void){
 
 //////////////////////////////////////////////////////////////////////////////
 
-void CarnageSA::OutputSvg(const std::array<Pos, MAX_CHIPS>& state_disp, const char* filename) {
+void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 	const int CHIP_SIZE = 75;    // チップサイズ
 	const int GAP = 15;          // 隙間
 	const int CELL_SIZE = CHIP_SIZE + GAP; 
 	const int OFFSET = (CELL_SIZE - CHIP_SIZE) / 2;
+	const int SECTION_GAP = 60;  // セクション間の余白（タイトル含む）
 
 	FILE* fp = fopen(filename, "w");
 	if (!fp) return;
 
-	// 1. 描画範囲の計算
-	int min_x = 0;
-	int min_y = 0;
-	int max_x = pool.m_width - 1;
-	int max_y = pool.m_height - 1;
+	// 各 SA の有効な高さを計算するためのラムダ
+	auto get_effective_height = [&](CarnageSA* sa) {
+		int max_y = -1;
+		const auto& state = sa->get_result();
+		for (int i = 0; i < (int)sa->pool.size(); ++i) {
+			if (sa->pool.m_list[i] != nullptr && state[i].x != 255) {
+				if ((int)state[i].y > max_y) max_y = (int)state[i].y;
+			}
+		}
+		return max_y + 1; // 0-indexed なので +1
+	};
 
-	int vb_width = (max_x - min_x + 1) * CELL_SIZE + 100;
-	int vb_height = (max_y - min_y + 1) * CELL_SIZE + 100;
-	int vb_x = min_x * CELL_SIZE - 50;
-	int vb_y = min_y * CELL_SIZE - 50;
+	// 全体の描画サイズを計算
+	int max_width = 0;
+	int total_height = 0;
+	std::vector<int> effective_heights;
+	for (auto sa : sa_list) {
+		if (sa->pool.size() == 0) {
+			effective_heights.push_back(0);
+			continue;
+		}
+		int h = get_effective_height(sa);
+		effective_heights.push_back(h);
+		max_width = std::max(max_width, (int)sa->pool.m_width * CELL_SIZE);
+		total_height += h * CELL_SIZE + SECTION_GAP;
+	}
 
 	fprintf(fp, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-	fprintf(fp, "<svg width=\"%d\" height=\"%d\" viewBox=\"%d %d %d %d\" xmlns=\"http://www.w3.org/2000/svg\">\n", 
-			vb_width, vb_height, vb_x, vb_y, vb_width, vb_height);
+	fprintf(fp, "<svg width=\"%d\" height=\"%d\" viewBox=\"0 0 %d %d\" xmlns=\"http://www.w3.org/2000/svg\">\n", 
+			max_width, total_height + 20, max_width, total_height + 20);
 	
-	// マーカー定義
 	fprintf(fp, "  <defs>\n");
 	fprintf(fp, "    <marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"3\" orient=\"auto\" markerUnits=\"strokeWidth\">\n");
 	fprintf(fp, "      <path d=\"M0,0 L0,6 L9,3 z\" fill=\"context-stroke\" />\n");
 	fprintf(fp, "    </marker>\n");
 	fprintf(fp, "  </defs>\n");
 
-	// 背景
-	fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" fill=\"#f8f9fa\" />\n", vb_x, vb_y, vb_width, vb_height);
+	int current_y_offset = 0;
 
-	// 2. 接続線描画用ラムダ（チップの縁で止まる計算を共通化）
-	auto draw_physical_edge = [&](double x1, double y1, double x2, double y2, const char* color, bool dashed = false) {
-		double dx = x2 - x1;
-		double dy = y2 - y1;
-		double dist = sqrt(dx*dx + dy*dy);
-		if (dist < 0.1) return;
+	for (size_t sa_idx = 0; sa_idx < sa_list.size(); ++sa_idx) {
+		CarnageSA* sa = sa_list[sa_idx];
+		int h = effective_heights[sa_idx];
+		if (sa->pool.size() == 0 || h <= 0) continue;
 
-		double margin = (CHIP_SIZE / 2.0) + 2;
-		const char* dash = dashed ? " stroke-dasharray=\"4\"" : "";
+		const auto& pool = sa->pool;
+		const auto& state_disp = sa->get_result();
 
-		fprintf(fp, "  <line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"2.5\"%s marker-end=\"url(#arrow)\" />\n",
-				x1 + dx * (margin/dist), y1 + dy * (margin/dist), 
-				x2 - dx * (margin/dist), y2 - dy * (margin/dist), color, dash);
-	};
+		// タイトル表示
+		fprintf(fp, "  <text x=\"0\" y=\"%d\" font-family=\"Meiryo, sans-serif\" font-size=\"18\" font-weight=\"bold\" fill=\"#333\">%s</text>\n", 
+				current_y_offset + 25, sa->m_name);
 
-	// 3. 特殊エッジ：STARTへの入力
-	if (pool.m_start < (UINT)pool.size() && state_disp[pool.m_start].x != POS_INVALID) {
-		double x = state_disp[pool.m_start].x * CELL_SIZE + CELL_SIZE / 2.0;
-		double y = state_disp[pool.m_start].y * CELL_SIZE + CELL_SIZE / 2.0;
-		// 1マス上にある仮想チップからの接続として描画
-		draw_physical_edge(x, y - CELL_SIZE, x, y, "#28a745");
-	}
+		int draw_y_start = current_y_offset + 40;
 
-	// 4. チップ本体の描画
-	for (int i = 0; i < (int)pool.size(); ++i) {
-		if (pool.m_list[i] == nullptr || state_disp[i].x == POS_INVALID) continue;
-
-		int x = state_disp[i].x * CELL_SIZE + OFFSET;
-		int y = state_disp[i].y * CELL_SIZE + OFFSET;
-		int centerX = x + CHIP_SIZE / 2;
-
-		const char* fill_color = (pool.m_list[i]->m_Id.get() == CHIPID_GOTO) ? "#e9ecef" : "white";
-		fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"%s\" stroke=\"#343a40\" stroke-width=\"2\" />\n",
-				x, y, CHIP_SIZE, CHIP_SIZE, fill_color);
-		
-		fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Meiryo, sans-serif\" text-anchor=\"middle\">\n", centerX, y + 25);
-		std::string txt = pool.m_list[i]->GetLayoutText();
-		if (txt.empty()) {
-			fprintf(fp, "    <tspan x=\"%d\" dy=\"1.2em\" font-size=\"10\" fill=\"#6c757d\">ID:%d</tspan>\n", centerX, i);
-		} else {
-			size_t s = 0, e = 0;
-			int line_count = 0;
-			while ((e = txt.find('\n', s)) != std::string::npos) {
-				fprintf(fp, "    <tspan x=\"%d\" dy=\"%s\" font-size=\"11\" fill=\"#333\">%s</tspan>\n",
-						centerX, (line_count == 0 ? "0" : "1.2em"), txt.substr(s, e - s).c_str());
-				s = e + 1;
-				line_count++;
-			}
-			fprintf(fp, "    <tspan x=\"%d\" dy=\"%s\" font-size=\"11\" fill=\"#333\">%s</tspan>\n",
-					centerX, (line_count == 0 ? "0" : "1.2em"), txt.substr(s).c_str());
-			fprintf(fp, "    <tspan x=\"%d\" dy=\"1.5em\" font-size=\"9\" fill=\"#999\">#%d</tspan>\n", centerX, i);
-		}
-		fprintf(fp, "  </text>\n");
-	}
-
-	// 5. 接続線の描画
-	for (int i = 0; i < (int)pool.size(); ++i) {
-		if (pool.m_list[i] == nullptr || state_disp[i].x == POS_INVALID) continue;
-
-		double x1 = state_disp[i].x * CELL_SIZE + CELL_SIZE / 2.0;
-		double y1 = state_disp[i].y * CELL_SIZE + CELL_SIZE / 2.0;
-
-		auto process_conn = [&](UINT next_idx, const char* color) {
-			if (next_idx == IDX_NONE) return;
-			
-			if (next_idx == IDX_EXIT) {
-				// 枠外の仮想座標へ向けて描画
-				double tx = x1, ty = y1;
-				if (state_disp[i].x == 0) tx -= CELL_SIZE;
-				else if (state_disp[i].x == pool.m_width - 1) tx += CELL_SIZE;
-				else if (state_disp[i].y == 0) ty -= CELL_SIZE;
-				else ty += CELL_SIZE;
-				draw_physical_edge(x1, y1, tx, ty, color, true);
-				return;
-			}
-
-			if (next_idx < pool.size() && state_disp[next_idx].x != POS_INVALID) {
-				double x2 = state_disp[next_idx].x * CELL_SIZE + CELL_SIZE / 2.0;
-				double y2 = state_disp[next_idx].y * CELL_SIZE + CELL_SIZE / 2.0;
-				draw_physical_edge(x1, y1, x2, y2, color);
-			}
+		auto draw_physical_edge = [&](double x1, double y1, double x2, double y2, const char* color, bool dashed = false) {
+			double dx = x2 - x1;
+			double dy = y2 - y1;
+			double dist = sqrt(dx*dx + dy*dy);
+			if (dist < 0.1) return;
+			double margin = (CHIP_SIZE / 2.0) + 2;
+			const char* dash = dashed ? " stroke-dasharray=\"4\"" : "";
+			fprintf(fp, "  <line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"2.5\"%s marker-end=\"url(#arrow)\" />\n",
+					x1 + dx * (margin/dist), draw_y_start + y1 + dy * (margin/dist), 
+					x2 - dx * (margin/dist), draw_y_start + y2 - dy * (margin/dist), color, dash);
 		};
 
-		process_conn(pool.m_list[i]->m_NextG, "#28a745");
-		if (pool.m_list[i]->m_NextR != IDX_NONE) {
-			process_conn(pool.m_list[i]->m_NextR, "#dc3545");
+		// STARTへの入力
+		if (pool.m_start < (UINT)state_disp.size() && state_disp[pool.m_start].x != 255) {
+			double x = state_disp[pool.m_start].x * CELL_SIZE + CELL_SIZE / 2.0;
+			double y = state_disp[pool.m_start].y * CELL_SIZE + CELL_SIZE / 2.0;
+			draw_physical_edge(x, y - CELL_SIZE, x, y, "#28a745");
 		}
-	}
 
+		// チップ描画
+		for (int i = 0; i < (int)state_disp.size(); ++i) {
+			if (pool.m_list[i] == nullptr || state_disp[i].x == 255) continue;
+			int x = state_disp[i].x * CELL_SIZE + OFFSET;
+			int y = state_disp[i].y * CELL_SIZE + OFFSET;
+			int centerX = x + CHIP_SIZE / 2;
+			const char* fill_color = (pool.m_list[i]->m_Id.get() == 14) ? "#e9ecef" : "white";
+			fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"%s\" stroke=\"#343a40\" stroke-width=\"2\" />\n",
+					x, draw_y_start + y, CHIP_SIZE, CHIP_SIZE, fill_color);
+			fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Meiryo, sans-serif\" text-anchor=\"middle\">\n", centerX, draw_y_start + y + 25);
+			std::string txt = pool.m_list[i]->GetLayoutText();
+			if (txt.empty()) {
+				fprintf(fp, "    <tspan x=\"%d\" dy=\"1.2em\" font-size=\"10\" fill=\"#6c757d\">ID:%d</tspan>\n", centerX, i);
+			} else {
+				size_t s = 0, e = 0; int line_count = 0;
+				while ((e = txt.find('\n', s)) != std::string::npos) {
+					fprintf(fp, "    <tspan x=\"%d\" dy=\"%s\" font-size=\"11\" fill=\"#333\">%s</tspan>\n",
+							centerX, (line_count == 0 ? "0" : "1.2em"), txt.substr(s, e - s).c_str());
+					s = e + 1; line_count++;
+				}
+				fprintf(fp, "    <tspan x=\"%d\" dy=\"%s\" font-size=\"11\" fill=\"#333\">%s</tspan>\n",
+						centerX, (line_count == 0 ? "0" : "1.2em"), txt.substr(s).c_str());
+				fprintf(fp, "    <tspan x=\"%d\" dy=\"1.5em\" font-size=\"9\" fill=\"#999\">#%d</tspan>\n", centerX, i);
+			}
+			fprintf(fp, "  </text>\n");
+		}
+
+		// 接続線描画
+		for (int i = 0; i < (int)state_disp.size(); ++i) {
+			if (pool.m_list[i] == nullptr || state_disp[i].x == 255) continue;
+			double x1 = state_disp[i].x * CELL_SIZE + CELL_SIZE / 2.0;
+			double y1 = state_disp[i].y * CELL_SIZE + CELL_SIZE / 2.0;
+			auto process_conn = [&](UINT next_idx, const char* color) {
+				if (next_idx == 0xFFFFFFFF) return;
+				if (next_idx == 0xFFFFFFFE) {
+					double tx = x1, ty = y1;
+					if (state_disp[i].x == 0) tx -= CELL_SIZE;
+					else if (state_disp[i].x == pool.m_width - 1) tx += CELL_SIZE;
+					else if (state_disp[i].y == 0) ty -= CELL_SIZE;
+					else ty += CELL_SIZE;
+					draw_physical_edge(x1, y1, tx, ty, color, true);
+					return;
+				}
+				if (next_idx < state_disp.size() && state_disp[next_idx].x != 255) {
+					draw_physical_edge(x1, y1, state_disp[next_idx].x * CELL_SIZE + CELL_SIZE / 2.0, state_disp[next_idx].y * CELL_SIZE + CELL_SIZE / 2.0, color);
+				}
+			};
+			process_conn(pool.m_list[i]->m_NextG, "#28a745");
+			if (pool.m_list[i]->ValidR()) process_conn(pool.m_list[i]->m_NextR, "#dc3545");
+		}
+		
+		current_y_offset += h * CELL_SIZE + SECTION_GAP;
+	}
 	fprintf(fp, "</svg>\n");
 	fclose(fp);
 }
+
+void OutputSvg(const char* filename, CarnageSA* sa) {
+	std::vector<CarnageSA*> sa_list = { sa };
+	OutputSvg(filename, sa_list);
+}
+
 //////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void);
@@ -935,14 +950,15 @@ int main(void){
 	for(int i = 0; i < 3; ++i){
 		g_pField[i]->FinalizeCompile();
 		
-		sa.push_back(new CarnageSA(g_pField[i]->m_pool, std::string(g_pField[i]->m_name).append(".svg").c_str()));
+		sa.push_back(new CarnageSA(g_pField[i]->m_pool, g_pField[i]->m_name));
 		
 		if(g_pField[i]->m_pool.size()){
 			sa[i]->run();
-			sa[i]->OutputSvg();
 			//sa[i]->dump();
 		}
 	}
+	
+	OutputSvg("chip.svg", sa);
 	
 	const std::string mcFile = "memcard1.mcd";
 	const std::string gameId = "SLPS-01666";
