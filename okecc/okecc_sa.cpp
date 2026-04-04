@@ -662,7 +662,7 @@ void CarnageSA::run_single() {
 					if(UpdateBest){
 						UpdateBest = false;
 					}
-					printf("Step:%8d | T: %7.2f Energy: %8d | Best: %8d\n", iter, T, (UINT)current_E, (UINT)best_E);
+					printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)best_E);
 				}
 			#endif
 			
@@ -673,7 +673,7 @@ void CarnageSA::run_single() {
 			best_E < 100 ? S_FOUND : S_NOT_FOUND
 		);
 		
-		printf("Energy: %d\n", (UINT)best_E);
+		printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)best_E);
 		if (RunningStatus == S_FOUND_ZERO || LoopCnt >= 1 && RunningStatus <= S_FOUND){
 			EndRun = true;
 		}
@@ -722,7 +722,7 @@ void CarnageSA::run(UINT num_threads){
 	auto end = std::chrono::steady_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 	
-	std::cout << "Parallel run finished in " << elapsed << "ms. Best energy: " << this->best_E << std::endl;
+	printf("Parallel run finished in %.2fs. Best score: %d\n", elapsed / 1000.0, (UINT)this->best_E);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -947,6 +947,7 @@ int main(void){
 	std::vector<CarnageSA *>	sa;
 	
 	for(int i = 0; i < 3; ++i){
+		g_pField[i]->m_pool.dump();
 		g_pField[i]->FinalizeCompile();
 		
 		sa.push_back(new CarnageSA(g_pField[i]->m_pool, g_pField[i]->m_name));
@@ -978,7 +979,6 @@ int main(void){
 		}
 		
 		std::cout << "Game ID: " << gameId[i] << " detected" << std::endl;
-		std::cout << "Data size: " << dataSize << "Byte(s) (" << (dataSize / 1024) << " KB)" << std::endl;
 		
 		SaveDataZeus *pZeus = (SaveDataZeus *)(((char *)saveBuffer.data()) + i * 8);
 		
@@ -1027,14 +1027,14 @@ int main(void){
 			
 			mcr.write(saveBuffer);
 		}
-		
-		// 3. データの書き込み
-		if (mcr.saveToFile()) {
-			std::cout << "Successfully wrote to " << mcFile << std::endl;
-		} else {
-			std::cerr << "Failed to write to " << mcFile << std::endl;
-			continue;
-		}
+	}
+	
+	// 3. データの書き込み
+	if (mcr.saveToFile()) {
+		std::cout << "Successfully wrote to " << mcFile << std::endl;
+	} else {
+		std::cerr << "Failed to write to " << mcFile << std::endl;
+		return 1;
 	}
 	
 	return 0;
