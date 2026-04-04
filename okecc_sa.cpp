@@ -960,75 +960,81 @@ int main(void){
 	OutputSvg("chip.svg", sa);
 	
 	const std::string mcFile = "memcard1.mcd";
-	const std::string gameId = "SLPS-01666";
-
-	// 1. インスタンス生成（ファイル読み込みとID設定）
-	MemoryCardManager manager(mcFile, gameId);
-
-	// 2. データの読み出し
-	std::vector<uint8_t> saveBuffer;
-	size_t dataSize = manager.read(saveBuffer);
-
-	if (dataSize == 0) {
-		std::cerr << "Not found Game ID '" << gameId << std::endl;
-		exit(1);
-	}
+	const char *gameId[] = {"SLPS-01666", "SLPSP02318"};
 	
-	std::cout << "Game ID: " << gameId << " detected" << std::endl;
-	std::cout << "Data size: " << dataSize << "Byte(s) (" << (dataSize / 1024) << " KB)" << std::endl;
+	MemoryCardManager mcr(mcFile);
 	
-	SaveDataZeus *pZeus = (SaveDataZeus *)saveBuffer.data();
-	
-	// ソフト書き込み
-	constexpr UINT CARD		= 0;
-	constexpr UINT width	= 23;
-	constexpr UINT height	= 15;
-	
-	for(UINT u = 0; u < width * height; ++u) pZeus->Oke[CARD].Software[u] = 0;
-	
-	UINT offx = 0, offy = 0;
-	for(UINT fld = 0; fld < 3; ++fld){
-		auto& state = sa[fld]->get_result();
-		auto pFld = g_pField[fld];
+	for(int i = 0; i < 2; ++i){
+		// 1. インスタンス生成（ファイル読み込みとID設定）
+		mcr.setGameId(gameId[i]);
 		
-		auto GetStartX = [&]() -> UINT {
-			return pFld->m_pool.size() == 0 ? 0 : state[pFld->m_pool.m_start].x;
-		};
-		
-		if(fld == 0){
-			pZeus->Oke[CARD].StartMainX = GetStartX() + offx + 2;
-			pZeus->Oke[CARD].StartMainY = offy + 2;
-		}else if(fld == 1){
-			offx = 16;
-			pZeus->Oke[CARD].StartSub1X = GetStartX() + offx + 2;
-			pZeus->Oke[CARD].StartSub1Y = offy + 2;
-		}else if(fld == 2){
-			offy = 8;
-			
-			pZeus->Oke[CARD].StartSub2X = GetStartX() + offx + 2;
-			pZeus->Oke[CARD].StartSub2Y = offy + 2;
+		// 2. データの読み出し
+		std::vector<uint8_t> saveBuffer;
+		size_t dataSize = mcr.read(saveBuffer);
+	
+		if (dataSize == 0) {
+			std::cerr << "Not found Game ID '" << gameId[i] << std::endl;
+			continue;
 		}
 		
-		for(UINT u = 0; u < pFld->m_pool.size(); ++u){
-			CChipBinary bin;
+		std::cout << "Game ID: " << gameId[i] << " detected" << std::endl;
+		std::cout << "Data size: " << dataSize << "Byte(s) (" << (dataSize / 1024) << " KB)" << std::endl;
+		
+		SaveDataZeus *pZeus = (SaveDataZeus *)(((char *)saveBuffer.data()) + i * 8);
+		
+		// ソフト書き込み
+		constexpr UINT CARD		= 0;
+		constexpr UINT width	= 23;
+		constexpr UINT height	= 15;
+		
+		for(UINT u = 0; u < width * height; ++u) pZeus->Oke[CARD].Software[u] = 0;
+		
+		UINT offx = 0, offy = 0;
+		for(UINT fld = 0; fld < 3; ++fld){
+			auto& state = sa[fld]->get_result();
+			auto pFld = g_pField[fld];
 			
-			auto& p = state[u];
-			pFld->m_pool[u]->GetBin(bin);
-			pZeus->Oke[CARD].Software[(p.y + offy) * width + p.x + offx] = bin.m_val;
+			auto GetStartX = [&]() -> UINT {
+				return pFld->m_pool.size() == 0 ? 0 : state[pFld->m_pool.m_start].x;
+			};
+			
+			if(fld == 0){
+				pZeus->Oke[CARD].StartMainX = GetStartX() + offx + 2;
+				pZeus->Oke[CARD].StartMainY = offy + 2;
+			}else if(fld == 1){
+				offx = 16;
+				pZeus->Oke[CARD].StartSub1X = GetStartX() + offx + 2;
+				pZeus->Oke[CARD].StartSub1Y = offy + 2;
+			}else if(fld == 2){
+				offy = 8;
+				
+				pZeus->Oke[CARD].StartSub2X = GetStartX() + offx + 2;
+				pZeus->Oke[CARD].StartSub2Y = offy + 2;
+			}
+			
+			for(UINT u = 0; u < pFld->m_pool.size(); ++u){
+				CChipBinary bin;
+				
+				auto& p = state[u];
+				pFld->m_pool[u]->GetBin(bin);
+				pZeus->Oke[CARD].Software[(p.y + offy) * width + p.x + offx] = bin.m_val;
+			}
+			
+			// chksum
+			uint8_t ChkSum = 0;
+			for(int i = 0; i < dataSize - 1; ++i) ChkSum += saveBuffer[i];
+			saveBuffer[dataSize - 1] = ChkSum;
+			
+			mcr.write(saveBuffer);
 		}
-	}
-	
-	// chksum
-	uint8_t ChkSum = 0;
-	for(int i = 0; i < dataSize - 1; ++i) ChkSum += saveBuffer[i];
-	pZeus->ChkSum = ChkSum;
-
-	// 3. データの書き込み
-	if (manager.write(saveBuffer) && manager.saveToFile()) {
-		std::cout << "Successfully wrote to " << mcFile << std::endl;
-	} else {
-		std::cerr << "Failed to write to " << mcFile << std::endl;
-		return 1;
+		
+		// 3. データの書き込み
+		if (mcr.saveToFile()) {
+			std::cout << "Successfully wrote to " << mcFile << std::endl;
+		} else {
+			std::cerr << "Failed to write to " << mcFile << std::endl;
+			continue;
+		}
 	}
 	
 	return 0;

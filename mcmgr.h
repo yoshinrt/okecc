@@ -9,7 +9,7 @@
 class MemoryCardManager {
 private:
 	std::string filePath;
-	std::string targetGameId;
+	const char *targetGameId;
 	std::vector<uint8_t> cardData; // 128KBのメモリーカード全体を保持
 
 	static const int MC_SIZE = 128 * 1024;   // 131,072 バイト
@@ -22,7 +22,7 @@ public:
 	 * @param path メモリーカードファイルのパス (.mcd / .mcr)
 	 * @param gameId ターゲットとするゲームID (例: "SLPS-01234")
 	 */
-	explicit MemoryCardManager(const std::string& path, const std::string& gameId) 
+	explicit MemoryCardManager(const std::string& path, const char *gameId = nullptr) 
 		: filePath(path), targetGameId(gameId) 
 	{
 		std::ifstream file(path, std::ios::binary);
@@ -35,7 +35,11 @@ public:
 			cardData.resize(MC_SIZE, 0x00);
 		}
 	}
-
+	
+	void setGameId(const char *gameId){
+		targetGameId = gameId;
+	}
+	
 	/**
 	 * 指定されたゲームIDのセーブデータを抽出し、その合計サイズを返す
 	 * @param outData 抽出したデータを格納する配列
