@@ -62,7 +62,7 @@ void chip_main(){
 	// ミサイルタイマを過ぎるか，破損が多ければミサイルを撃つ
 	if(B >= C || damage() >= 60)
 		// ミサイル射撃
-		ch_send(1, B += 4);
+		ch_send(B += 4, 1);
 		
 		if(ammo_num(2))
 			fire(0, 512, 320, OKE_ALL, 2, 1);

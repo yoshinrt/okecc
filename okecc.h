@@ -1902,6 +1902,23 @@ static void lockon(
 	));
 }
 
+static void lockon_friendly(
+	int angleCenter,
+	int angleRange,
+	int distance,
+	int type,
+	LastLocationArg
+){
+	LastLocation();
+	g_pCurField->m_tree.add(new CChipLockon(
+		angleCenter,
+		angleRange,
+		distance,
+		type,
+		CChip::FRIENDLY
+	));
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // ターゲット距離
 
@@ -2463,8 +2480,8 @@ public:
 };
 
 static void ch_send(
-	int ch,
 	CChipVar& var,
+	int ch,
 	LastLocationArg
 ){
 	LastLocation();
