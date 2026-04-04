@@ -751,11 +751,10 @@ void CarnageSA::SetArrow(void){
 
 		if(to == IDX_EXIT){
 			// EXIT は外枠への矢印とする
-			if(state[from].y == 0)						return 0; // N
-			else if(state[from].y == (GridHeight - 1))	return 4; // S
+			if     (state[from].y == (GridHeight - 1))	return 4; // S
 			else if(state[from].x == 0)					return 6; // W
 			else if(state[from].x == (GridWidth - 1))	return 2; // E
-			else										return 0; // 内部にある場合はとりあえず N
+			else										return (pool.m_start == from) ? 7 : 0;
 		}
 		
 		int dx = (int)state[to].x - (int)state[from].x;
@@ -860,14 +859,14 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 		};
 
 		// STARTへの入力
-		if (pool.m_start < (UINT)state_disp.size() && state_disp[pool.m_start].x != 255) {
+		if (pool.m_start < (UINT)sa->pool.size() && state_disp[pool.m_start].x != 255) {
 			double x = state_disp[pool.m_start].x * CELL_SIZE + CELL_SIZE / 2.0;
 			double y = state_disp[pool.m_start].y * CELL_SIZE + CELL_SIZE / 2.0;
 			draw_physical_edge(x, y - CELL_SIZE, x, y, "#28a745");
 		}
 
 		// チップ描画
-		for (int i = 0; i < (int)state_disp.size(); ++i) {
+		for (int i = 0; i < (int)sa->pool.size(); ++i) {
 			if (pool.m_list[i] == nullptr || state_disp[i].x == 255) continue;
 			int x = state_disp[i].x * CELL_SIZE + OFFSET;
 			int y = state_disp[i].y * CELL_SIZE + OFFSET;
@@ -894,7 +893,7 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 		}
 
 		// 接続線描画
-		for (int i = 0; i < (int)state_disp.size(); ++i) {
+		for (int i = 0; i < (int)sa->pool.size(); ++i) {
 			if (pool.m_list[i] == nullptr || state_disp[i].x == 255) continue;
 			double x1 = state_disp[i].x * CELL_SIZE + CELL_SIZE / 2.0;
 			double y1 = state_disp[i].y * CELL_SIZE + CELL_SIZE / 2.0;
@@ -909,7 +908,7 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 					draw_physical_edge(x1, y1, tx, ty, color, true);
 					return;
 				}
-				if (next_idx < state_disp.size() && state_disp[next_idx].x != 255) {
+				if (next_idx < sa->pool.size() && state_disp[next_idx].x != 255) {
 					draw_physical_edge(x1, y1, state_disp[next_idx].x * CELL_SIZE + CELL_SIZE / 2.0, state_disp[next_idx].y * CELL_SIZE + CELL_SIZE / 2.0, color);
 				}
 			};
@@ -933,9 +932,9 @@ void OutputSvg(const char* filename, CarnageSA* sa) {
 void chip_main(void);
 
 int main(void){
-	g_pField.push_back(new CField("main", 15, 15));
-	g_pField.push_back(new CField("sub1", 7, 7));
-	g_pField.push_back(new CField("sub2", 7, 7));
+	g_pField.push_back(new CField("MAIN", 15, 15));
+	g_pField.push_back(new CField("SUB1", 7, 7));
+	g_pField.push_back(new CField("SUB2", 7, 7));
 	g_pCurField = g_pField[0];
 	
 	try{
@@ -990,27 +989,31 @@ int main(void){
 	UINT offx = 0, offy = 0;
 	for(UINT fld = 0; fld < 3; ++fld){
 		auto& state = sa[fld]->get_result();
+		auto pFld = g_pField[fld];
+		
+		auto GetStartX = [&]() -> UINT {
+			return pFld->m_pool.size() == 0 ? 0 : state[pFld->m_pool.m_start].x;
+		};
 		
 		if(fld == 0){
-			pZeus->Oke[CARD].StartMainX = state[g_pCurField->m_pool.m_start].x + offx + 2;
+			pZeus->Oke[CARD].StartMainX = GetStartX() + offx + 2;
 			pZeus->Oke[CARD].StartMainY = offy + 2;
 		}else if(fld == 1){
 			offx = 16;
-			
-			pZeus->Oke[CARD].StartSub1X = state[g_pCurField->m_pool.m_start].x + offx + 2;
+			pZeus->Oke[CARD].StartSub1X = GetStartX() + offx + 2;
 			pZeus->Oke[CARD].StartSub1Y = offy + 2;
 		}else if(fld == 2){
 			offy = 8;
 			
-			pZeus->Oke[CARD].StartSub2X = state[g_pCurField->m_pool.m_start].x + offx + 2;
+			pZeus->Oke[CARD].StartSub2X = GetStartX() + offx + 2;
 			pZeus->Oke[CARD].StartSub2Y = offy + 2;
 		}
 		
-		for(UINT u = 0; u < g_pCurField->m_pool.size(); ++u){
+		for(UINT u = 0; u < pFld->m_pool.size(); ++u){
 			CChipBinary bin;
 			
 			auto& p = state[u];
-			g_pCurField->m_pool.m_list[u]->GetBin(bin);
+			pFld->m_pool[u]->GetBin(bin);
 			pZeus->Oke[CARD].Software[(p.y + offy) * width + p.x + offx] = bin.m_val;
 		}
 	}
