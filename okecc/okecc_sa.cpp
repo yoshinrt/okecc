@@ -960,7 +960,7 @@ int main(void){
 	
 	OutputSvg("chip.svg", sa);
 	
-	const std::string mcFile = "memcard1.mcd";
+	const std::string mcFile = "memcard.mcd";
 	const char *gameId[] = {"SLPS-01666", "SLPSP02318"};
 	
 	MemoryCardManager mcr(mcFile);
