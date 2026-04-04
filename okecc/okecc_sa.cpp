@@ -947,7 +947,7 @@ int main(void){
 	std::vector<CarnageSA *>	sa;
 	
 	for(int i = 0; i < 3; ++i){
-		g_pField[i]->m_pool.dump();
+		//g_pField[i]->m_pool.dump();
 		g_pField[i]->FinalizeCompile();
 		
 		sa.push_back(new CarnageSA(g_pField[i]->m_pool, g_pField[i]->m_name));

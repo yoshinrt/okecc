@@ -484,7 +484,7 @@ public:
 		BM_LOOP,	// loop 中
 	};
 	
-	UINT m_Break;
+	UINT m_Break = IDX_NONE;
 	
 	// stack 構造
 	// low <--> high
@@ -2788,38 +2788,11 @@ CChipTree CChipVar::operator< (const int imm) const {return CCond(new CChipCmp(m
 //////////////////////////////////////////////////////////////////////////////
 // if - else - endif
 
-class CBlockInfo {
-public:
-	static constexpr UINT BLOCK_TOP = 0xFFFFFFFF;
-	
-	enum {
-		BM_NONE,
-		BM_IF_TOP,	// top of if block
-		BM_IF,		// if / elseif 中
-		BM_ELSE,	// else 中
-		BM_LOOP,	// loop 中
-	};
-	
-	UINT m_Break;
-	
-	// stack 構造
-	// low <--> high
-	// IF:   [BM_IF_TOP] [飛び先] [BM_*] [飛び先] [BM_*] ...
-	// Loop: [break先保存] [loop先頭] [BM_LOOP]
-	
-	std::vector<UINT>	m_BlockStack;
-	
-	UINT GetMode(void){
-		return g_pCurField->m_BlockStack.size() < 1 ? BM_NONE :
-			g_pCurField->m_BlockStack.back();
-	}
-};
-
 static void if_statement(const CChipTree& cc, LastLocationArg, bool BlockStart = true){
 	LastLocation();
 	
 	if(BlockStart){
-		g_pCurField->m_BlockStack.push_back(CBlockInfo::BM_IF_TOP);
+		g_pCurField->m_BlockStack.push_back(CField::BM_IF_TOP);
 	}
 	
 	// CurTree に if 条件のツリーを接続
@@ -2830,7 +2803,7 @@ static void if_statement(const CChipTree& cc, LastLocationArg, bool BlockStart =
 	g_pCurField->m_BlockStack.push_back(cc.m_LastG);
 	
 	// mode
-	g_pCurField->m_BlockStack.push_back(CBlockInfo::BM_IF);
+	g_pCurField->m_BlockStack.push_back(CField::BM_IF);
 }
 
 static void if_statement(const CCond& chip, LastLocationArg){if_statement(chip.GetCChipTree(), location);}
@@ -2842,7 +2815,7 @@ static void else_statement(
 ){
 	LastLocation();
 
-	if(g_pCurField->GetMode() != CBlockInfo::BM_IF){
+	if(g_pCurField->GetMode() != CField::BM_IF){
 		throw OkeccError("Unexpected else / elseif");
 	}
 	
@@ -2858,7 +2831,7 @@ static void else_statement(
 	g_pCurField->m_BlockStack.push_back(idx);
 	
 	// mode
-	g_pCurField->m_BlockStack.push_back(CBlockInfo::BM_ELSE);
+	g_pCurField->m_BlockStack.push_back(CField::BM_ELSE);
 }
 
 static void elseif_statement(CChipTree &&cc, LastLocationArg){
@@ -2877,15 +2850,15 @@ static void endif_statement(
 	LastLocation();
 	
 	if(
-		g_pCurField->GetMode() != CBlockInfo::BM_IF &&
-		g_pCurField->GetMode() != CBlockInfo::BM_ELSE
+		g_pCurField->GetMode() != CField::BM_IF &&
+		g_pCurField->GetMode() != CField::BM_ELSE
 	){
 		throw OkeccError("Unexpected endif");
 	}
 	
 	while(
-		g_pCurField->GetMode() == CBlockInfo::BM_IF ||
-		g_pCurField->GetMode() == CBlockInfo::BM_ELSE
+		g_pCurField->GetMode() == CField::BM_IF ||
+		g_pCurField->GetMode() == CField::BM_ELSE
 	){
 		if(g_pCurField->m_BlockStack.size() < 3){
 			throw OkeccError("Internal error: BlockStack broken");
@@ -2901,7 +2874,7 @@ static void endif_statement(
 		g_pCurField->m_pool[g_pCurField->m_BlockStack.back()]->m_NextG = merge;
 		g_pCurField->m_BlockStack.pop_back();
 		
-		if(g_pCurField->GetMode() == CBlockInfo::BM_IF_TOP){
+		if(g_pCurField->GetMode() == CField::BM_IF_TOP){
 			g_pCurField->m_BlockStack.pop_back();
 			break;
 		}
@@ -2925,14 +2898,14 @@ static void loop_statement(LastLocationArg){
 	g_pCurField->m_tree.AddToG(LoopTop);
 	
 	// mode
-	g_pCurField->m_BlockStack.push_back(CBlockInfo::BM_LOOP);
+	g_pCurField->m_BlockStack.push_back(CField::BM_LOOP);
 }
 
 static void loopend_statement(LastLocationArg){
 	LastLocation();
 	
-	if(g_pCurField->GetMode() != CBlockInfo::BM_LOOP){
-		OkeccError("Unexpected endloop");
+	if(g_pCurField->GetMode() != CField::BM_LOOP){
+		throw OkeccError("Unexpected endloop");
 	}
 	g_pCurField->m_BlockStack.pop_back(); // mode
 	
@@ -2951,8 +2924,8 @@ static void loopend_statement(LastLocationArg){
 static void break_statement(LastLocationArg){
 	LastLocation();
 	
-	if(g_pCurField->GetMode() != CBlockInfo::BM_LOOP){
-		OkeccError("break not within a loop");
+	if(g_pCurField->m_Break == IDX_NONE){
+		throw OkeccError("break not within a loop");
 	}
 	
 	UINT idx = g_pCurField->m_tree.m_LastG;
@@ -3001,7 +2974,7 @@ static bool start_sub_internal(int num, LastLocationArg){
 	LastLocation();
 	
 	if(num < 1 || num > 2){
-		OkeccError("Subroutine num. must be between 1 and 2.");
+		throw OkeccError("Subroutine num. must be between 1 and 2.");
 		return false;
 	}
 	
