@@ -898,8 +898,8 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 			double x1 = state_disp[i].x * CELL_SIZE + CELL_SIZE / 2.0;
 			double y1 = state_disp[i].y * CELL_SIZE + CELL_SIZE / 2.0;
 			auto process_conn = [&](UINT next_idx, const char* color) {
-				if (next_idx == 0xFFFFFFFF) return;
-				if (next_idx == 0xFFFFFFFE) {
+				if (next_idx == IDX_NONE) return;
+				if (next_idx == IDX_EXIT) {
 					double tx = x1, ty = y1;
 					if (state_disp[i].x == 0) tx -= CELL_SIZE;
 					else if (state_disp[i].x == pool.m_width - 1) tx += CELL_SIZE;
@@ -913,7 +913,7 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 				}
 			};
 			process_conn(pool.m_list[i]->m_NextG, "#28a745");
-			if (pool.m_list[i]->ValidR()) process_conn(pool.m_list[i]->m_NextR, "#dc3545");
+			process_conn(pool.m_list[i]->m_NextR, "#dc3545");
 		}
 		
 		current_y_offset += h * CELL_SIZE + SECTION_GAP;
