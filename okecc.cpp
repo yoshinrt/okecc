@@ -1,14 +1,7 @@
 ﻿#include "okecc.h"
 
-void chip_main(){
-for(int i = 0; i < 1; ++i){
-	// 格闘
-	if(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
-		fight();
-		exit();
-	endif
-	
-	lockon(0, 512, 320, OKE_ALL);
+void use_option(){
+	start_sub(1);
 	
 	// 冷却
 	if(heat() >= 65)
@@ -20,6 +13,18 @@ for(int i = 0; i < 1; ++i){
 		
 		if(heat() >= 70) option(3); endif
 	endif
+}
+
+void chip_main(){
+	// 格闘
+	if(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
+		fight();
+		exit();
+	endif
+	
+	lockon(0, 512, 320, OKE_ALL);
+	
+	use_option();
 	
 	if(
 		is_target_direction(0, 64) ||
@@ -81,5 +86,4 @@ for(int i = 0; i < 1; ++i){
 		fire(0, 448, 160, OKE_ALL, 1, 1);
 		A = ammo_num(1);
 	endif
-}
 }
