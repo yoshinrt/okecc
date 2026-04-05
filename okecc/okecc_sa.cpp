@@ -955,12 +955,14 @@ int main(void){
 		}
 	}
 	
-	OutputSvg("chip.svg", sa);
+	OutputSvg("okecc.svg", sa);
 	
 	const std::string mcFile = "memcard.mcd";
 	const char *gameId[] = {"SLPS-01666", "SLPSP02318"};
 	
 	MemoryCardManager mcr(mcFile);
+	
+	bool bMcrUpdate = false;
 	
 	for(int i = 0; i < 2; ++i){
 		// 1. インスタンス生成（ファイル読み込みとID設定）
@@ -1024,10 +1026,12 @@ int main(void){
 			
 			mcr.write(saveBuffer);
 		}
+		
+		bMcrUpdate = true;
 	}
 	
 	// 3. データの書き込み
-	if (mcr.saveToFile()) {
+	if (bMcrUpdate && mcr.saveToFile()) {
 		std::cout << "Successfully wrote to " << mcFile << std::endl;
 	} else {
 		std::cerr << "Failed to write to " << mcFile << std::endl;

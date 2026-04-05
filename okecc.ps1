@@ -69,10 +69,10 @@ if (Test-Path $ExePath) {
 	Write-Host "--- Running: $Target ---" -ForegroundColor Magenta
 	& $ExePath
 
-	# 4. chip.svg のリネーム処理
-	if (Test-Path "chip.svg") {
+	# 4. okecc.svg のリネーム処理
+	if (Test-Path "okecc.svg") {
 		$NewName = "$Target.svg"
-		Move-Item -Path "chip.svg" -Destination $NewName -Force
+		Move-Item -Path "okecc.svg" -Destination $NewName -Force
 	}
 } else {
 	Write-Host "Error: Executable not found at $ExePath" -ForegroundColor Red
