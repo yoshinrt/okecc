@@ -1,101 +1,129 @@
-﻿#include "okecc.h"
+/*
++[機体名 ] かのんべいべー１Ｄ
+[OKE CODE] CBAB1D                    重量   VP
+[BODY    ] バッドドリーム            5000  1000
+[CPU     ] MCP112(中速)               100   200
+[Armor   ] 70mm                      5000   300
+[EX Armor] 対徹甲                    1000   300
+[Weapon 1] 185mmカノン        x  70  1260   840
+[Weapon 2] ムラマサ           x   4   480   480
+[Weapon 3] ラプトル           x   8   440   560
+[Option 1] 機体冷却装置               100   100
+[Option 2] 機体冷却装置               100   100
+[Option 3] 誘導妨害装置               150   150
+[Total   ]                    19200/13630  4030
+[Loadage ]                       70.99% (白 / 白)
+[Paint   ] 塗装パターン4     (10,8,16) (4,4,6)
+*/
 
-// バッドドリーム，カノン，武装2, 3 はミサイル，オプションは冷却 x 3 用のサンプルソフト
+#include "okecc.h"
 
-void use_option(){
+#define cur_time			A
+#define cannon_timer		B
+#define missile_timer		C
+#define prev_cannon_ammo	D
+
+void move(){
 	start_sub(1);
 	
-	// 冷却
-	if(heat() >= 65)
-		if(option_num(1))
-			option(1);
+	if(is_barrier_over(0, 384, 20, 3))
+		move_backward();
+		exit();
+	endif
+	
+	if(
+		enemy_num(256, 64, 240, OKE_ALL) ||
+		is_barrier_over(256, 96, 40, 24)
+	)
+		turn_left();
+		exit();
+	endif
+	
+	if(is_barrier_over(256, 96, 20, 3))
+		if(cur_time >= 3)
+			turn_right();
 		else
-			option(2);
+			turn_left();
 		endif
-		
-		if(heat() >= 70) option(3); endif
+		exit();
 	endif
-}
-
-// ミサイルの無駄打ちを避けるために，味方全体で 3秒ごとにミサイル発射
-//   ただし自機ダメージが大きいときは優先的に撃つ
-
-#define current_time		B
-#define next_missle_time	C
-
-void missile(){
-	start_sub(2);
 	
-	current_time = time();
-	next_missle_time = ch_receive(1);
-	
-	// ミサイルタイマを過ぎるか，破損が多ければミサイルを撃つ
-	if(current_time >= next_missle_time || damage() >= 60)
-		// ミサイル射撃
-		ch_send(current_time += 4, 1);
-		
-		if(ammo_num(2))
-			fire(0, 512, 320, OKE_ALL, 2, 1);
-			wait_ae();
-		endif
-		if(ammo_num(3))
-			fire(0, 512, 320, OKE_ALL, 3, 1);
-			wait_ae();
-		endif
+	if(
+		enemy_num(-144, 448, 320, OKE_ALL) ||
+		projectile_num(112, 64, 160, P_ALL) ||
+		enemy_num(0, 512, 80, OKE_ALL)
+	)
+		move_backward();
+		exit();
 	endif
+	
+	if(cur_time < 10)
+		cannon_timer = 10;
+		move_backward();
+		exit();
+	endif
+	
+	move_forward();
 }
 
 void chip_main(){
+	
+	lockon(0, 512, 320, OKE_ALL);
+	
 	// 格闘
-	if(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
+	if(target_z() <= 6 && target_distance() <= 30 && is_target_direction(0, 160))
 		strike();
 		exit();
 	endif
 	
-	lockon(0, 512, 320, OKE_ALL);
+	cur_time = time();
 	
-	use_option();
+	move();
 	
-	if(
-		is_target_direction(0, 64) ||
-		is_barrier_over(0, 128, 20, 3) ||
-		projectile_num(0, 32, 160, P_ALL)
-	)
-		turn_left();
-		exit();
-	endif
-	
-	if(
-		friendly_num(0, 128, 20, OKE_ALL) ||
-		is_barrier_over(0, 160, 40, 24)
-	)
-		turn_left();
-		exit();
-	endif
-	
-	// ターゲットが後方遠くにいる場合は方向転換
-	if(is_target_direction(256, 256) && target_distance() >= 160)
-		if(is_target_direction(-128, 256))
-			turn_left();
-		else
-			turn_right();
+	// 冷却
+	if(heat() > 70)
+		option(1);
+		if(option_num(1) < 1)
+			option(2);
 		endif
-		exit();
+		
+		// 冷却中は移動に徹する
+		(cannon_timer = cur_time) += 4;
+		(missile_timer = cur_time) += 2;
 	endif
 	
-	// 前進
-	move_forward();
+	// ミサイル妨害
+	if(projectile_num(0, 320, 50, P_MISSILE))
+		option(3);
+	endif
 	
-	missile();
-	
-	// 飛行型には積極的にはカノンを撃たない
-	if(!(target_z() >= 6 && heat() >= 50))
+	// カノン
+	if(cur_time >= cannon_timer && ammo_num(1))
+		
 		loop
-			if(A != (B = ammo_num(1)) || !is_self_firing()) break; endif
+			if(!is_self_firing() || prev_cannon_ammo != (F = ammo_num(1))) break; endif
 		endloop
+		
+		// 被弾したら 3秒間移動
+		if(is_self_stun())
+			(cannon_timer = cur_time) += 3;
+			missile_timer = cannon_timer;
+			exit();
+		endif
 		
 		fire(0, 448, 160, OKE_ALL, 3, 1);
 		fire(0, 448, 160, OKE_ALL, 1, 1);
-		A = ammo_num(1);
+		prev_cannon_ammo = ammo_num(1);
+	endif
+	
+	// ミサイル
+	if(cur_time >= missile_timer && is_self_moving())
+		(missile_timer = cur_time) += 4;
+		
+		if(ammo_num(2))
+			fire(0, 512, 320, OKE_ALL, 2, 1);
+		elseif(ammo_num(3))
+			fire(0, 512, 320, OKE_ALL, 3, 1);
+		endif
 	endif
 }
