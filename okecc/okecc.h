@@ -458,7 +458,6 @@ public:
 	CChipPool	m_pool;
 	CChipTree	m_tree;
 	const char	*m_name;
-	std::vector<UINT>	m_BlockStack;
 	
 	CField(const char *name, UINT width, UINT height) : m_name(name), m_pool(width, height), m_tree(m_pool){}
 	
@@ -474,7 +473,7 @@ public:
 		printf("%s: Number of chip(s): %d\n", m_name, (UINT)m_pool.m_list.size());
 	}
 	
-	static constexpr UINT BLOCK_TOP = 0xFFFFFFFF;
+	// ブロック制御
 	
 	enum {
 		BM_NONE,
@@ -484,17 +483,57 @@ public:
 		BM_LOOP,	// loop 中
 	};
 	
+	class BlockInfo {
+	public:
+		std::source_location m_location;
+		
+		BlockInfo(std::source_location location, UINT idx = IDX_NONE) : m_location(location), m_TargetIdx(idx){}
+		virtual ~BlockInfo(){}
+		
+		virtual UINT GetMode(){return BM_NONE;}
+		
+		UINT m_TargetIdx;
+	};
+	
+	class BiIfTop : public BlockInfo {
+	public:
+		BiIfTop(std::source_location location, UINT idx = IDX_NONE) : BlockInfo(location, idx){}
+		virtual ~BiIfTop(){}
+		virtual UINT GetMode(){return BM_IF_TOP;}
+	};
+	
+	class BiIf : public BlockInfo {
+	public:
+		BiIf(std::source_location location, UINT idx) : BlockInfo(location, idx){}
+		virtual ~BiIf(){}
+		virtual UINT GetMode(){return BM_IF;}
+	};
+	
+	class BiElse : public BlockInfo {
+	public:
+		BiElse(std::source_location location, UINT idx) : BlockInfo(location, idx){}
+		virtual ~BiElse(){}
+		virtual UINT GetMode(){return BM_ELSE;}
+	};
+	
+	class BiLoop : public BlockInfo {
+	public:
+		BiLoop(std::source_location location, UINT idx, UINT brk) : BlockInfo(location, idx), m_SavePrevBreak(brk){}
+		
+		virtual ~BiLoop(){}
+		virtual UINT GetMode(){return BM_LOOP;}
+		
+		UINT m_SavePrevBreak;
+	};
+	
+	static constexpr UINT BLOCK_TOP = 0xFFFFFFFF;
+	
+	std::vector<BlockInfo *>	m_BlockStack;
 	UINT m_Break = IDX_NONE;
-	
-	// stack 構造
-	// low <--> high
-	// IF:   [BM_IF_TOP] [飛び先] [BM_*] [飛び先] [BM_*] ...
-	// Loop: [break先保存] [loop先頭] [BM_LOOP]
-	
 	
 	UINT GetMode(void){
 		return m_BlockStack.size() < 1 ? BM_NONE :
-			m_BlockStack.back();
+			m_BlockStack.back()->GetMode();
 	}
 };
 
@@ -2792,18 +2831,15 @@ static void if_statement(const CChipTree& cc, LastLocationArg, bool BlockStart =
 	LastLocation();
 	
 	if(BlockStart){
-		g_pCurField->m_BlockStack.push_back(CField::BM_IF_TOP);
+		g_pCurField->m_BlockStack.push_back(new CField::BiIfTop(location));
 	}
 	
 	// CurTree に if 条件のツリーを接続
 	g_pCurField->m_tree.AddToG(cc.m_start);
 	g_pCurField->m_tree.m_LastG = cc.m_LastR;
-
-	// false 飛び先を push
-	g_pCurField->m_BlockStack.push_back(cc.m_LastG);
 	
-	// mode
-	g_pCurField->m_BlockStack.push_back(CField::BM_IF);
+	// false 飛び先
+	g_pCurField->m_BlockStack.push_back(new CField::BiIf(location, cc.m_LastG));
 }
 
 static void if_statement(const CCond& chip, LastLocationArg){if_statement(chip.GetCChipTree(), location);}
@@ -2819,19 +2855,18 @@ static void else_statement(
 		throw OkeccError("Unexpected else / elseif");
 	}
 	
-	g_pCurField->m_BlockStack.pop_back(); // mode
+	CField::BlockInfo *bi = g_pCurField->m_BlockStack.back();
+	g_pCurField->m_BlockStack.pop_back();
 	
 	UINT idx = g_pCurField->m_tree.m_LastG;	// then 節の最後
 
 	// else 節先頭は，BlockStack に積んでいた false 飛び先
-	g_pCurField->m_tree.m_LastG = g_pCurField->m_BlockStack.back();
-	g_pCurField->m_BlockStack.pop_back();
+	g_pCurField->m_tree.m_LastG = bi->m_TargetIdx;
 
 	// then 節の最後を block statck に積む
-	g_pCurField->m_BlockStack.push_back(idx);
+	g_pCurField->m_BlockStack.push_back(new CField::BiElse(location, idx));
 	
-	// mode
-	g_pCurField->m_BlockStack.push_back(CField::BM_ELSE);
+	delete bi;
 }
 
 static void elseif_statement(CChipTree &&cc, LastLocationArg){
@@ -2860,25 +2895,25 @@ static void endif_statement(
 		g_pCurField->GetMode() == CField::BM_IF ||
 		g_pCurField->GetMode() == CField::BM_ELSE
 	){
-		if(g_pCurField->m_BlockStack.size() < 3){
-			throw OkeccError("Internal error: BlockStack broken");
-		}
-		
-		g_pCurField->m_BlockStack.pop_back(); // mode
+		CField::BlockInfo *bi = g_pCurField->m_BlockStack.back();
+		g_pCurField->m_BlockStack.pop_back();
 		
 		// 合流 GOTO 生成
 		UINT merge = g_pCurField->m_pool.add(new CChipGoto);
 		g_pCurField->m_tree.AddToG(merge);
 		
 		// false 条件の飛び先合流
-		g_pCurField->m_pool[g_pCurField->m_BlockStack.back()]->m_NextG = merge;
-		g_pCurField->m_BlockStack.pop_back();
+		g_pCurField->m_pool[bi->m_TargetIdx]->m_NextG = merge;
 		
-		if(g_pCurField->GetMode() == CField::BM_IF_TOP){
-			g_pCurField->m_BlockStack.pop_back();
-			break;
-		}
+		delete bi;
 	}
+	
+	if(g_pCurField->GetMode() != CField::BM_IF_TOP){
+		throw OkeccError("Internal Error: Block stack broken");
+	}
+
+	delete g_pCurField->m_BlockStack.back();
+	g_pCurField->m_BlockStack.pop_back();
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2890,15 +2925,18 @@ static void loop_statement(LastLocationArg){
 	UINT LoopTop;
 	
 	// goto を 2個生成
-	g_pCurField->m_BlockStack.push_back(g_pCurField->m_Break);	// 直前の break 先を保存
-	g_pCurField->m_BlockStack.push_back(LoopTop = g_pCurField->m_pool.add(new CChipGoto));	// loop 先頭
+	g_pCurField->m_BlockStack.push_back(
+		new CField::BiLoop(
+			location,
+			LoopTop = g_pCurField->m_pool.add(new CChipGoto),	// loop 先頭
+			g_pCurField->m_Break								// 直前の break 先を保存
+		)
+	);
+	
 	g_pCurField->m_Break = g_pCurField->m_pool.add(new CChipGoto);	// break 先
 	
 	// Top の goto を接続
 	g_pCurField->m_tree.AddToG(LoopTop);
-	
-	// mode
-	g_pCurField->m_BlockStack.push_back(CField::BM_LOOP);
 }
 
 static void loopend_statement(LastLocationArg){
@@ -2907,18 +2945,17 @@ static void loopend_statement(LastLocationArg){
 	if(g_pCurField->GetMode() != CField::BM_LOOP){
 		throw OkeccError("Unexpected endloop");
 	}
-	g_pCurField->m_BlockStack.pop_back(); // mode
-	
-	UINT LoopTop = g_pCurField->m_BlockStack.back();	// loop top
+	CField::BiLoop *bi = dynamic_cast<CField::BiLoop *>(g_pCurField->m_BlockStack.back()); // mode
 	g_pCurField->m_BlockStack.pop_back();
 	
 	// ループ先頭に接続
-	g_pCurField->m_tree.AddToG(LoopTop);
+	g_pCurField->m_tree.AddToG(bi->m_TargetIdx);
 	g_pCurField->m_tree.m_LastG = g_pCurField->m_Break;
 	
 	// break 先を pop
-	g_pCurField->m_Break = g_pCurField->m_BlockStack.back();
-	g_pCurField->m_BlockStack.pop_back();
+	g_pCurField->m_Break = bi->m_SavePrevBreak;
+	
+	delete bi;
 }
 
 static void break_statement(LastLocationArg){
