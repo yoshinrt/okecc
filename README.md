@@ -73,7 +73,7 @@ endif
 ```
 // 正面 30m 以内の地上敵に格闘攻撃をする
 if(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
-	fight();
+	strike();
 endif
 
 if(!is_target_stop())
@@ -165,7 +165,7 @@ void chip_main(){
 
 ### アクション
 
-`fight()` : 格闘攻撃をする
+`strike()` : 格闘攻撃をする
 
 `crouch()` : その場に伏せる
 

@@ -967,7 +967,7 @@ static void put_action_chip(UINT param){
 	g_pCurField->m_tree.add(new CChipAction(param));
 }
 
-static void fight (LastLocationArg){LastLocation(); put_action_chip(CChipAction::FIGHT);}
+static void strike (LastLocationArg){LastLocation(); put_action_chip(CChipAction::FIGHT);}
 static void crouch(LastLocationArg){LastLocation(); put_action_chip(CChipAction::CROUCH);}
 static void guard (LastLocationArg){LastLocation(); put_action_chip(CChipAction::GUARD);}
 static void action(UINT param, LastLocationArg){LastLocation(); put_action_chip(CChipAction::ACTION1 + param - 1);}

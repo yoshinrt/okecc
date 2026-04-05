@@ -16,7 +16,7 @@ void chip_main(){
 	jump_backward();
 	jump_left();
 	jump_right();
-	fight();
+	strike();
 	crouch();
 	guard();
 	action(1);

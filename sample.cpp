@@ -48,7 +48,7 @@ void missile(){
 void chip_main(){
 	// 格闘
 	if(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
-		fight();
+		strike();
 		exit();
 	endif
 	
