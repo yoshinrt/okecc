@@ -31,7 +31,7 @@
 #include "mcmgr.h"
 
 typedef uint8_t		ChipID_t;
-typedef double		Energy_t;
+typedef uint32_t	Energy_t;
 
 constexpr int MAX_CHIPS = 225;
 
