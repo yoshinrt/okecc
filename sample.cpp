@@ -1,5 +1,7 @@
 ﻿#include "okecc.h"
 
+// バッドドリーム，カノン，武装2, 3 はミサイル，オプションは冷却 x 3 用のサンプルソフト
+
 void use_option(){
 	start_sub(1);
 	
@@ -12,6 +14,34 @@ void use_option(){
 		endif
 		
 		if(heat() >= 70) option(3); endif
+	endif
+}
+
+// ミサイルの無駄打ちを避けるために，味方全体で 3秒ごとにミサイル発射
+//   ただし自機ダメージが大きいときは優先的に撃つ
+
+#define current_time		B
+#define next_missle_time	C
+
+void missile(){
+	start_sub(2);
+	
+	current_time = time();
+	next_missle_time = ch_receive(1);
+	
+	// ミサイルタイマを過ぎるか，破損が多ければミサイルを撃つ
+	if(current_time >= next_missle_time || damage() >= 60)
+		// ミサイル射撃
+		ch_send(current_time += 4, 1);
+		
+		if(ammo_num(2))
+			fire(0, 512, 320, OKE_ALL, 2, 1);
+			wait_ae();
+		endif
+		if(ammo_num(3))
+			fire(0, 512, 320, OKE_ALL, 3, 1);
+			wait_ae();
+		endif
 	endif
 }
 
@@ -56,30 +86,12 @@ void chip_main(){
 	// 前進
 	move_forward();
 	
-	B = time();
-	C = ch_receive(1);
-	
-	// ミサイルタイマを過ぎるか，破損が多ければミサイルを撃つ
-	if(B >= C || damage() >= 60)
-		// ミサイル射撃
-		ch_send(B += 4, 1);
-		
-		if(ammo_num(2))
-			fire(0, 512, 320, OKE_ALL, 2, 1);
-			wait_ae();
-		endif
-		if(ammo_num(3))
-			fire(0, 512, 320, OKE_ALL, 3, 1);
-			wait_ae();
-		endif
-		exit();
-	endif
+	missile();
 	
 	// 飛行型には積極的にはカノンを撃たない
 	if(!(target_z() >= 6 && heat() >= 50))
 		loop
-			B = ammo_num(1);
-			if(A != B || !is_self_firing()) break; endif
+			if(A != (B = ammo_num(1)) || !is_self_firing()) break; endif
 		endloop
 		
 		fire(0, 448, 160, OKE_ALL, 3, 1);
