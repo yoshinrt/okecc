@@ -937,12 +937,9 @@ int main(void){
 	g_pField.push_back(new CField("SUB2", 7, 7));
 	g_pCurField = g_pField[0];
 	
-	try{
-		chip_main();
-	}catch(const OkeccError& e){
-		puts(e.what());
-		return 0;
-	}
+	chip_main();
+	g_pCurField->CheckBlockStack();
+	if(g_uErrorCnt) exit(1);
 	
 	std::vector<CarnageSA *>	sa;
 	

@@ -82,16 +82,12 @@ inline std::source_location g_LastLocation = std::source_location::current();
 #define LastLocation()	(g_LastLocation = location)
 #define LastLocationArg	const std::source_location location = std::source_location::current()
 
-class OkeccError : public std::runtime_error {
-public:
-	explicit OkeccError(const std::string& message)
-		: std::runtime_error(FormatMessage(message)) {}
+inline UINT g_uErrorCnt = 0;
 
-private:
-	std::string FormatMessage(const std::string& message){
-		return std::format("{}({}): Error: {}\n", g_LastLocation.file_name(), g_LastLocation.line(), message);
-	}
-};
+static inline void Error(const std::string& message){
+	puts(std::format("{}({}): Error: {}", g_LastLocation.file_name(), g_LastLocation.line(), message).c_str());
+	++g_uErrorCnt;
+}
 
 //////////////////////////////////////////////////////////////////////////////
 // bit scaled int
@@ -119,7 +115,8 @@ public:
 
 	void set(int val){
 		if(val < min || max < val){
-			throw OkeccError(std::format("Value {} is out of range [{} - {}]", val, min, max));
+			Error(std::format("Value {} is out of range [{} - {}]", val, min, max));
+			return;
 		}
 
 		m_value = ((((val - offset) << 1)/ step + 1) >> 1) & ((1 << width) - 1);
@@ -486,13 +483,12 @@ public:
 	class BlockInfo {
 	public:
 		std::source_location m_location;
+		UINT m_TargetIdx;
 		
 		BlockInfo(std::source_location location, UINT idx = IDX_NONE) : m_location(location), m_TargetIdx(idx){}
 		virtual ~BlockInfo(){}
 		
 		virtual UINT GetMode(){return BM_NONE;}
-		
-		UINT m_TargetIdx;
 	};
 	
 	class BiIfTop : public BlockInfo {
@@ -534,6 +530,29 @@ public:
 	UINT GetMode(void){
 		return m_BlockStack.size() < 1 ? BM_NONE :
 			m_BlockStack.back()->GetMode();
+	}
+	
+	void CheckBlockStack(){
+		while(m_BlockStack.size() > 0){
+			g_LastLocation = m_BlockStack.back()->m_location;
+			Error("Unterminated block statement");
+			delete m_BlockStack.back();
+			m_BlockStack.pop_back();
+		}
+	}
+	
+	std::string GetBlockErrorMsg(const std::string& message){
+		if(m_BlockStack.size() == 0) return message;
+		
+		return std::format("{}\n  Corresponging statement: {}({})",
+			message,
+			m_BlockStack.back()->m_location.file_name(),
+			m_BlockStack.back()->m_location.line()
+		);
+	}
+	
+	void BlockError(const std::string& message){
+		Error(GetBlockErrorMsg(message));
 	}
 };
 
@@ -2656,11 +2675,11 @@ CCond CChipVal::GetCChipCond(void) const {
 		case CChipVal::FRIENDLY:
 		case CChipVal::ENEMY:
 		case CChipVal::RAND:
-			throw OkeccError("Invalid parameter");
+			Error("Invalid parameter");
 			break;
 			
 		case CChipVal::CH_RECV:
-			throw OkeccError("Invalid use of ch_receive()");
+			Error("Invalid use of ch_receive()");
 			break;
 			
 		case CChipVal::SELF_POS_X:
@@ -2852,7 +2871,7 @@ static void else_statement(
 	LastLocation();
 
 	if(g_pCurField->GetMode() != CField::BM_IF){
-		throw OkeccError("Unexpected else / elseif");
+		g_pCurField->BlockError("Unexpected else / elseif");
 	}
 	
 	CField::BlockInfo *bi = g_pCurField->m_BlockStack.back();
@@ -2888,7 +2907,7 @@ static void endif_statement(
 		g_pCurField->GetMode() != CField::BM_IF &&
 		g_pCurField->GetMode() != CField::BM_ELSE
 	){
-		throw OkeccError("Unexpected endif");
+		g_pCurField->BlockError("Unexpected endif");
 	}
 	
 	while(
@@ -2909,7 +2928,7 @@ static void endif_statement(
 	}
 	
 	if(g_pCurField->GetMode() != CField::BM_IF_TOP){
-		throw OkeccError("Internal Error: Block stack broken");
+		g_pCurField->BlockError("Internal Error: Block stack broken");
 	}
 
 	delete g_pCurField->m_BlockStack.back();
@@ -2943,7 +2962,7 @@ static void loopend_statement(LastLocationArg){
 	LastLocation();
 	
 	if(g_pCurField->GetMode() != CField::BM_LOOP){
-		throw OkeccError("Unexpected endloop");
+		g_pCurField->BlockError("Unexpected endloop");
 	}
 	CField::BiLoop *bi = dynamic_cast<CField::BiLoop *>(g_pCurField->m_BlockStack.back()); // mode
 	g_pCurField->m_BlockStack.pop_back();
@@ -2962,7 +2981,7 @@ static void break_statement(LastLocationArg){
 	LastLocation();
 	
 	if(g_pCurField->m_Break == IDX_NONE){
-		throw OkeccError("break not within a loop");
+		g_pCurField->BlockError("break not within a loop");
 	}
 	
 	UINT idx = g_pCurField->m_tree.m_LastG;
@@ -3001,6 +3020,9 @@ public:
 	}
 	
 	~CFieldSwitch(){
+		// block stack チェック
+		g_pCurField->CheckBlockStack();
+		
 		g_pCurField	= m_field;
 	}
 };
@@ -3011,7 +3033,7 @@ static bool start_sub_internal(int num, LastLocationArg){
 	LastLocation();
 	
 	if(num < 1 || num > 2){
-		throw OkeccError("Subroutine num. must be between 1 and 2.");
+		Error("Subroutine num. must be between 1 and 2.");
 		return false;
 	}
 	
