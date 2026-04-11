@@ -214,6 +214,12 @@ public:
 		return "";
 	}
 	
+	std::string GetDslText(void){
+		std::string s = GetLayoutText();
+		std::replace(s.begin(), s.end(), '\n', ' ');
+		return s;
+	}
+	
 	virtual void set_num(int num){}
 	virtual void set_operator(int opr){}
 	
@@ -617,7 +623,7 @@ public:
 	}
 
 	CChipTree operator>(int num) const {
-		return *this >= (num - 1);
+		return !(*this <= num);
 	}
 
 	CChipTree operator<=(int num) const {
@@ -627,7 +633,7 @@ public:
 	}
 
 	CChipTree operator<(int num) const {
-		return *this <= (num + 1);
+		return !(*this >= num);
 	}
 };
 
@@ -2659,7 +2665,7 @@ CChipVar& CChipVar::operator=(const CChipVal& val){
 
 CCond CChipVal::GetCChipCond(void) const {
 	
-	CChip *pchip;
+	CChip *pchip = nullptr;
 	
 	switch(m_type){
 		case CChipVal::HEAT:
@@ -2839,8 +2845,8 @@ CChipTree CChipVar::operator>=(const int imm) const {return CCond(new CChipCmp(m
 CChipTree CChipVar::operator<=(const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm)).GetCChipTree();}
 CChipTree CChipVar::operator==(const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_EQ, 1, imm)).GetCChipTree();}
 CChipTree CChipVar::operator!=(const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_NE, 1, imm)).GetCChipTree();}
-CChipTree CChipVar::operator> (const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_GE, 1, imm - 1)).GetCChipTree();}
-CChipTree CChipVar::operator< (const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm + 1)).GetCChipTree();}
+CChipTree CChipVar::operator> (const int imm) const {return !(*this <= imm);}
+CChipTree CChipVar::operator< (const int imm) const {return !(*this >= imm);}
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
