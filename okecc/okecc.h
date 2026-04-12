@@ -1584,7 +1584,7 @@ public:
 		m_distance		= distance;
 		m_type			= type;
 		m_operator		= OP_GE;
-		m_num			= 3;
+		m_num			= 1;
 		m_Id			= CHIPID_DET_PROJECTILE;
 	}
 	
