@@ -929,6 +929,10 @@ void OutputSvg(const char* filename, CarnageSA* sa) {
 
 //////////////////////////////////////////////////////////////////////////////
 
+#include "okedcc.cpp"
+
+//////////////////////////////////////////////////////////////////////////////
+
 void chip_main(void);
 
 int main(void){
@@ -947,11 +951,16 @@ int main(void){
 		//g_pField[i]->m_pool.dump();
 		g_pField[i]->FinalizeCompile();
 		
+		if(i == 0){
+			Decompiler decomp(g_pField[i]->m_pool);
+			decomp.run();
+		}
+		
 		sa.push_back(new CarnageSA(g_pField[i]->m_pool, g_pField[i]->m_name));
 		
 		if(g_pField[i]->m_pool.size()){
 			sa[i]->run();
-			//sa[i]->dump();
+			sa[i]->dump();
 		}
 	}
 	
