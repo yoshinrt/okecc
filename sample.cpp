@@ -28,42 +28,33 @@ void move(){
 	
 	if(is_barrier_over(0, 384, 20, 3))
 		move_backward();
-		exit();
-	endif
-	
-	if(
+		
+	elseif(
 		enemy_num(256, 64, 240, OKE_ALL) ||
 		is_barrier_over(256, 96, 40, 24)
 	)
 		turn_left();
-		exit();
-	endif
-	
-	if(is_barrier_over(256, 96, 20, 3))
+		
+	elseif(is_barrier_over(256, 96, 20, 3))
 		if(cur_time >= 3)
 			turn_right();
 		else
 			turn_left();
 		endif
-		exit();
-	endif
-	
-	if(
+		
+	elseif(
 		enemy_num(-144, 448, 320, OKE_ALL) ||
 		projectile_num(112, 64, 160, P_ALL) ||
 		enemy_num(0, 512, 80, OKE_ALL)
 	)
 		move_backward();
-		exit();
-	endif
-	
-	if(cur_time < 10)
+		
+	elseif(cur_time < 10)
 		cannon_timer = 10;
 		move_backward();
-		exit();
+	else
+		move_forward();
 	endif
-	
-	move_forward();
 }
 
 void chip_main(){
@@ -82,8 +73,9 @@ void chip_main(){
 	
 	// 冷却
 	if(heat() > 70)
-		option(1);
-		if(option_num(1) < 1)
+		if(option_num(1) >= 1)
+			option(1);
+		else
 			option(2);
 		endif
 		
