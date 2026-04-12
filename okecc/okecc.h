@@ -2878,6 +2878,7 @@ static void else_statement(
 
 	if(g_pCurField->GetMode() != CField::BM_IF){
 		g_pCurField->BlockError("Unexpected else / elseif");
+		if(!g_pCurField->m_BlockStack.size()) return;
 	}
 	
 	CField::BlockInfo *bi = g_pCurField->m_BlockStack.back();
@@ -2914,6 +2915,7 @@ static void endif_statement(
 		g_pCurField->GetMode() != CField::BM_ELSE
 	){
 		g_pCurField->BlockError("Unexpected endif");
+		if(!g_pCurField->m_BlockStack.size()) return;
 	}
 	
 	while(
@@ -2935,6 +2937,7 @@ static void endif_statement(
 	
 	if(g_pCurField->GetMode() != CField::BM_IF_TOP){
 		g_pCurField->BlockError("Internal Error: Block stack broken");
+		if(!g_pCurField->m_BlockStack.size()) return;
 	}
 
 	delete g_pCurField->m_BlockStack.back();
@@ -2969,6 +2972,7 @@ static void loopend_statement(LastLocationArg){
 	
 	if(g_pCurField->GetMode() != CField::BM_LOOP){
 		g_pCurField->BlockError("Unexpected endloop");
+		if(!g_pCurField->m_BlockStack.size()) return;
 	}
 	CField::BiLoop *bi = dynamic_cast<CField::BiLoop *>(g_pCurField->m_BlockStack.back()); // mode
 	g_pCurField->m_BlockStack.pop_back();
