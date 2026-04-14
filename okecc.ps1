@@ -46,7 +46,7 @@ if (-not (Test-Path "$BuildDir\CMakeCache.txt") -or -not (Test-Path $ProjPath)) 
 	}
 	
 	# CMake を再実行してファイル構成をスキャンし直す
-	cmake -B $BuildDir
+	cmake -S okecc -B $BuildDir -A x64
 	
 	if ($LASTEXITCODE -ne 0) {
 		Write-Host "Error: CMake configuration failed. Check if $Target.cpp exists." -ForegroundColor Red
