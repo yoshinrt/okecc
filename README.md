@@ -2,7 +2,7 @@
 
 ## 概要
 
-OKE Chip Compiler (okecc) は，ゼウス カルネージハートセカンドのソフトを C 言語に似た[プログラミング言語](https://github.com/yoshinrt/okecc/blob/main/sample.cpp)で記述し，チップ配置を自動で行うソフトウェアです．
+OKE Chip Compiler (okecc) は，ゼウス カルネージハートセカンドの OKE ソフトを C 言語に似た[プログラミング言語](https://github.com/yoshinrt/okecc/blob/main/sample.cpp)で記述し，チップ配置を自動で行うソフトウェアです．
 チップ配置ではなくプログラミング言語で OKE ソフトを設計することは，以下のような利点があります．
 
 - 「チップを並べる」行為から開放されます
