@@ -57,6 +57,14 @@ void move(){
 	endif
 }
 
+void fire_missile(int oke_type){
+	if(ammo_num(2))
+		fire(0, 512, 320, oke_type, 2, 1);
+	elseif(ammo_num(3))
+		fire(0, 512, 320, oke_type, 3, 1);
+	endif
+}
+
 void chip_main(){
 	
 	lockon(0, 512, 320, OKE_ALL);
@@ -92,30 +100,33 @@ void chip_main(){
 	// カノン
 	if(cur_time >= cannon_timer && ammo_num(1))
 		
-		loop
-			if(!is_self_firing() || prev_cannon_ammo != (F = ammo_num(1))) break; endif
-		endloop
-		
-		// 被弾したら 3秒間移動
-		if(is_self_stun())
-			(cannon_timer = cur_time) += 3;
-			missile_timer = cannon_timer;
-			exit();
+		get_target_direction(E, F);
+		if(F <= 32)
+			loop
+				if(!is_self_firing() || prev_cannon_ammo != (F = ammo_num(1))) break; endif
+			endloop
+			
+			// 被弾したら 3秒間移動
+			if(is_self_stun())
+				(cannon_timer = cur_time) += 3;
+				missile_timer = cannon_timer;
+				exit();
+			endif
+			
+			fire(0, 448, 160, OKE_ALL, 3, 1);
+			fire(0, 448, 160, OKE_ALL, 1, 1);
+			prev_cannon_ammo = ammo_num(1);
 		endif
-		
-		fire(0, 448, 160, OKE_ALL, 3, 1);
-		fire(0, 448, 160, OKE_ALL, 1, 1);
-		prev_cannon_ammo = ammo_num(1);
 	endif
 	
 	// ミサイル
 	if(cur_time >= missile_timer && is_self_moving())
 		(missile_timer = cur_time) += 4;
 		
-		if(ammo_num(2))
-			fire(0, 512, 320, OKE_ALL, 2, 1);
-		elseif(ammo_num(3))
-			fire(0, 512, 320, OKE_ALL, 3, 1);
+		if(enemy_num(0, 512, 320, OKE_FLIGHT))
+			fire_missile(OKE_FLIGHT);
+		else
+			fire_missile(OKE_ALL);
 		endif
 	endif
 }
