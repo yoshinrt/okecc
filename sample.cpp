@@ -121,7 +121,7 @@ void chip_main(){
 	
 	// ミサイル
 	if(cur_time >= missile_timer && is_self_moving())
-		(missile_timer = cur_time) += 4;
+		(missile_timer = time()) += 4;
 		
 		if(enemy_num(0, 512, 320, OKE_FLIGHT))
 			fire_missile(OKE_FLIGHT);
