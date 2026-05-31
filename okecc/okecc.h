@@ -328,7 +328,8 @@ public:
 			}
 			IdxOld2New.push_back((UINT)IdxNew2Old.size() - 1);
 		}
-		
+		m_start = GetFinalDst(m_start);
+
 		//Goto 削除
 		for(UINT u = 0; u < m_list.size(); ++u){
 			if(m_list[u]->m_Id.get() == CHIPID_GOTO) delete m_list[u];
