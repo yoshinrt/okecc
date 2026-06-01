@@ -96,7 +96,7 @@ class CChipBinary {
 public:
 	CChipBinary(uint32_t val = 0) : m_val(val), m_pos(32){}
 	
-	uint32_t GetVal(void){return m_val;}
+	uint32_t GetVal(void) const { return m_val; }
 	
 	uint32_t	m_val;
 	int			m_pos;
@@ -223,8 +223,8 @@ public:
 	virtual void set_num(int num){}
 	virtual void set_operator(int opr){}
 	
-	bool ValidG(void){return m_NextG < IDX_EXIT;}
-	bool ValidR(void){return m_NextR < IDX_EXIT;}
+	bool ValidG(void) const { return m_NextG < IDX_EXIT; }
+	bool ValidR(void) const { return m_NextR < IDX_EXIT; }
 	
 	virtual void GetBin(CChipBinary& bin){
 		m_Id.GetBin(bin);
@@ -288,7 +288,7 @@ public:
 		return (UINT)m_list.size() - 1;
 	}
 
-	size_t size(void){return m_list.size();}
+	size_t size(void) const { return m_list.size(); }
 
 	CChip*& operator[](size_t index) {
 		return m_list[index];
@@ -2951,7 +2951,7 @@ static void endif_statement(
 static void loop_statement(LastLocationArg){
 	LastLocation();
 	
-	UINT LoopTop;
+	UINT LoopTop = 0;
 	
 	// goto を 2個生成
 	g_pCurField->m_BlockStack.push_back(
