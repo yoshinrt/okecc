@@ -4,6 +4,7 @@
 #include <source_location>
 #include <stdexcept>
 #include <vector>
+#include <memory>
 
 #ifdef NO_OKECC_SYNTAX
 	#define EXTERN extern
@@ -276,26 +277,22 @@ public:
 
 class CChipPool {
 public:
-	std::vector<CChip*> m_list;
+	std::vector<std::unique_ptr<CChip>> m_list;
 	UINT m_start = IDX_NONE;	// 開始チップの index
 	UINT m_width;
 	UINT m_height;
 
 	CChipPool(UINT width, UINT height) : m_width(width), m_height(height) {}
 
-	UINT add(CChip *chip){
-		m_list.push_back(chip);
+	UINT add(std::unique_ptr<CChip> chip){
+		m_list.push_back(std::move(chip));
 		return (UINT)m_list.size() - 1;
 	}
 
 	size_t size(void) const { return m_list.size(); }
 
-	CChip*& operator[](size_t index) {
-		return m_list[index];
-	}
-
 	CChip* operator[](size_t index) const {
-		return m_list[index];
+		return m_list[index].get();
 	}
 
 	// Goto を辿って最終地点を取得
@@ -332,12 +329,12 @@ public:
 
 		//Goto 削除
 		for(UINT u = 0; u < m_list.size(); ++u){
-			if(m_list[u]->m_Id.get() == CHIPID_GOTO) delete m_list[u];
+			if(m_list[u]->m_Id.get() == CHIPID_GOTO) m_list[u].reset();
 		}
 		
 		// 空きを詰める
 		for(UINT u = 0; u < IdxNew2Old.size(); ++u){
-			m_list[u] = m_list[IdxNew2Old[u]];
+			m_list[u] = std::move(m_list[IdxNew2Old[u]]);
 			if(m_list[u]->ValidG()) m_list[u]->m_NextG = IdxOld2New[m_list[u]->m_NextG];
 			if(m_list[u]->ValidR()) m_list[u]->m_NextR = IdxOld2New[m_list[u]->m_NextR];
 		}
@@ -394,8 +391,8 @@ public:
 	bool ValidR    (void) const {return m_LastR < m_pool.m_list.size();}
 
 	// Tree にチップ追加
-	CChipTree& add(CChip *pchip){
-		UINT idx = m_pool.add(pchip);		// チップ追加
+	CChipTree& add(std::unique_ptr<CChip> chip){
+		UINT idx = m_pool.add(std::move(chip));		// チップ追加
 
 		if(ValidStart()){
 			m_pool[m_LastG]->m_NextG = idx;	// リスト後端に追加したチップをつなげる
@@ -415,7 +412,7 @@ public:
 		cc_a.AddToR(cc_b.m_start);
 	
 		// False 側: GOTO を生成し a.g, cc_b.g, tree.g はそれを指す
-		UINT idx = m_pool.add(new CChipGoto);
+		UINT idx = m_pool.add(std::make_unique<CChipGoto>());
 		cc_a.AddToG(idx);
 		cc_b.AddToG(idx);
 	
@@ -433,7 +430,7 @@ public:
 		cc_a.AddToG(cc_b.m_start);
 	
 		// True 側: GOTO を生成し a.r, cc_r.g, tree.r はそれを指す
-		UINT idx = m_pool.add(new CChipGoto);
+		UINT idx = m_pool.add(std::make_unique<CChipGoto>());
 		cc_a.AddToR(idx);
 		cc_b.AddToR(idx);
 	
@@ -531,7 +528,7 @@ public:
 	
 	static constexpr UINT BLOCK_TOP = 0xFFFFFFFF;
 	
-	std::vector<BlockInfo *>	m_BlockStack;
+	std::vector<std::unique_ptr<BlockInfo>>	m_BlockStack;
 	UINT m_Break = IDX_NONE;
 	
 	UINT GetMode(void){
@@ -543,7 +540,6 @@ public:
 		while(m_BlockStack.size() > 0){
 			g_LastLocation = m_BlockStack.back()->m_location;
 			Error("Unterminated block statement");
-			delete m_BlockStack.back();
 			m_BlockStack.pop_back();
 		}
 	}
@@ -563,7 +559,7 @@ public:
 	}
 };
 
-inline std::vector<CField *>	g_pField;
+inline std::vector<std::unique_ptr<CField>>	g_pField;
 inline CField *g_pCurField;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -591,49 +587,49 @@ CChipTree operator||(T&& lhs, U&& rhs) {
 class CCond {
 public:
 	
-	CCond(CChip *pchip) : m_pchip(pchip){}
+	CCond(std::unique_ptr<CChip> pchip) : m_pchip(std::move(pchip)) {}
 	
-	CChip *m_pchip;
+	std::unique_ptr<CChip> m_pchip;
 	
-	CChipTree GetCChipTree(void) const {
+	CChipTree GetCChipTree(void) {
 		CChipTree tree(g_pCurField->m_pool);
 		
 		// チップ単体からツリーに変換 (Condition chip)
 		// R 側に Goto を足して，常に m_NextG を触ればいいようにする
-		tree.m_start = 
-		tree.m_LastG = tree.m_pool.add(m_pchip);
+		tree.m_start = tree.m_pool.add(std::move(m_pchip));
+		tree.m_LastG = tree.m_start;
 		
-		tree.m_pool[tree.m_start]->m_NextR =
-		tree.m_LastR = tree.m_pool.add(new CChipGoto);
+		tree.m_LastR = tree.m_pool.add(std::make_unique<CChipGoto>());
+		tree.m_pool[tree.m_start]->m_NextR = tree.m_LastR;
 		
 		return tree;
 	}
 	
-	operator CChipTree() const {
+	operator CChipTree() {
 		return GetCChipTree();
 	}
 	
-	CChipTree operator!(void) const {
+	CChipTree operator!(void) {
 		return !GetCChipTree();
 	}
 	
-	CChipTree operator>=(int num) const {
+	CChipTree operator>=(int num) {
 		m_pchip->set_num(num);
 		m_pchip->set_operator(CChip::OP_GE);
 		return GetCChipTree();
 	}
 
-	CChipTree operator>(int num) const {
+	CChipTree operator>(int num) {
 		return !(*this <= num);
 	}
 
-	CChipTree operator<=(int num) const {
+	CChipTree operator<=(int num) {
 		m_pchip->set_num(num);
 		m_pchip->set_operator(CChip::OP_LE);
 		return GetCChipTree();
 	}
 
-	CChipTree operator<(int num) const {
+	CChipTree operator<(int num) {
 		return !(*this >= num);
 	}
 };
@@ -777,7 +773,7 @@ static void wait(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurField->m_tree.add(new CChipNop(param));
+	g_pCurField->m_tree.add(std::make_unique<CChipNop>(param));
 }
 
 static void nop    (LastLocationArg){wait(0,      location);}
@@ -829,7 +825,7 @@ public:
 };
 
 static void put_move_chip(UINT param){
-	g_pCurField->m_tree.add(new CChipMove(param));
+	g_pCurField->m_tree.add(std::make_unique<CChipMove>(param));
 }
 
 static void move_forward (LastLocationArg){LastLocation(); put_move_chip(CChipMove::FWD);}
@@ -873,7 +869,7 @@ public:
 };
 
 static void put_turn_chip(UINT param){
-	g_pCurField->m_tree.add(new CChipTurn(param));
+	g_pCurField->m_tree.add(std::make_unique<CChipTurn>(param));
 }
 
 static void turn_left (LastLocationArg){LastLocation(); put_turn_chip(CChipTurn::LEFT);}
@@ -919,7 +915,7 @@ public:
 };
 
 static void put_jump_chip(UINT param){
-	g_pCurField->m_tree.add(new CChipJump(param));
+	g_pCurField->m_tree.add(std::make_unique<CChipJump>(param));
 }
 
 static void jump_forward (LastLocationArg){LastLocation(); put_jump_chip(CChipJump::FWD);}
@@ -971,7 +967,7 @@ public:
 };
 
 static void put_action_chip(UINT param){
-	g_pCurField->m_tree.add(new CChipAction(param));
+	g_pCurField->m_tree.add(std::make_unique<CChipAction>(param));
 }
 
 static void strike (LastLocationArg){LastLocation(); put_action_chip(CChipAction::FIGHT);}
@@ -1017,7 +1013,7 @@ public:
 };
 
 static void put_alt_chip(UINT param){
-	g_pCurField->m_tree.add(new CChipAlt(param));
+	g_pCurField->m_tree.add(std::make_unique<CChipAlt>(param));
 }
 
 static void move_high(LastLocationArg){LastLocation(); put_alt_chip(CChipAlt::HIGH);}
@@ -1097,7 +1093,7 @@ static void fire(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurField->m_tree.add(new CChipFireNearest(
+	g_pCurField->m_tree.add(std::make_unique<CChipFireNearest>(
 		angleCenter,
 		angleRange,
 		distance,
@@ -1164,7 +1160,7 @@ static void fire_direction(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurField->m_tree.add(new CChipFireFixedDir(
+	g_pCurField->m_tree.add(std::make_unique<CChipFireFixedDir>(
 		direction,
 		elevation,
 		weapon,
@@ -1216,7 +1212,7 @@ static void fire_target(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurField->m_tree.add(new CChipFireTarget(
+	g_pCurField->m_tree.add(std::make_unique<CChipFireTarget>(
 		weapon,
 		cnt
 	));
@@ -1282,7 +1278,7 @@ static void fire_direction(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurField->m_tree.add(new CChipFireCounter(
+	g_pCurField->m_tree.add(std::make_unique<CChipFireCounter>(
 		direction.m_var,
 		elevation.m_var,
 		weapon,
@@ -1321,7 +1317,7 @@ public:
 
 static void option(UINT param, LastLocationArg){
 	LastLocation();
-	g_pCurField->m_tree.add(new CChipOption(param));
+	g_pCurField->m_tree.add(std::make_unique<CChipOption>(param));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1379,7 +1375,7 @@ static CCond option_num(
 	LastLocationArg
 ){
 	LastLocation();
-	return CCond(new CChipAmmoNum(weapon + 4));
+	return CCond(std::make_unique<CChipAmmoNum>(weapon + 4));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1457,7 +1453,7 @@ static CCond oke_num(
 	int type,
 	int enemy
 ){
-	return CCond(new CChipOkeNum(angleCenter, angleRange, distance, type, enemy));
+	return CCond(std::make_unique<CChipOkeNum>(angleCenter, angleRange, distance, type, enemy));
 }
 
 static CCond enemy_num(
@@ -1551,7 +1547,7 @@ static CCond is_barrier_over(
 	LastLocationArg
 ){
 	LastLocation();
-	return CCond(new CChipBarrier(angleCenter, angleRange, distance, CChip::OP_GE, height));
+	return CCond(std::make_unique<CChipBarrier>(angleCenter, angleRange, distance, CChip::OP_GE, height));
 }
 
 static CCond is_barrier_under(
@@ -1562,7 +1558,7 @@ static CCond is_barrier_under(
 	LastLocationArg
 ){
 	LastLocation();
-	return CCond(new CChipBarrier(angleCenter, angleRange, distance, CChip::OP_LE, height));
+	return CCond(std::make_unique<CChipBarrier>(angleCenter, angleRange, distance, CChip::OP_LE, height));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1640,7 +1636,7 @@ static CCond projectile_num(
 	LastLocationArg
 ){
 	LastLocation();
-	return CCond(new CChipProjectileNum(angleCenter, angleRange, distance, type));
+	return CCond(std::make_unique<CChipProjectileNum>(angleCenter, angleRange, distance, type));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1708,7 +1704,7 @@ static CCond is_mappoint(
 	LastLocationArg
 ){
 	LastLocation();
-	return CCond(new CChipMapPoint(angleCenter, angleRange, distance, map_x, map_y));
+	return CCond(std::make_unique<CChipMapPoint>(angleCenter, angleRange, distance, map_x, map_y));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1800,7 +1796,7 @@ static void put_sub_chip(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurField->m_tree.add(new CChipSubroutine(no));
+	g_pCurField->m_tree.add(std::make_unique<CChipSubroutine>(no));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1850,7 +1846,7 @@ static CChipTree is_rand(
 	LastLocationArg
 ){
 	LastLocation();
-	return CCond(new CChipIsRand(num1, num2)).GetCChipTree();
+	return CCond(std::make_unique<CChipIsRand>(num1, num2)).GetCChipTree();
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1958,7 +1954,7 @@ static void lockon(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurField->m_tree.add(new CChipLockon(
+	g_pCurField->m_tree.add(std::make_unique<CChipLockon>(
 		angleCenter,
 		angleRange,
 		distance,
@@ -1975,7 +1971,7 @@ static void lockon_friendly(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurField->m_tree.add(new CChipLockon(
+	g_pCurField->m_tree.add(std::make_unique<CChipLockon>(
 		angleCenter,
 		angleRange,
 		distance,
@@ -2029,7 +2025,7 @@ static CCond target_distance(
 	LastLocationArg
 ){
 	LastLocation();
-	return CCond(new CChipTgtDistance());
+	return CCond(std::make_unique<CChipTgtDistance>());
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2079,7 +2075,7 @@ static CChipTree is_target_direction(
 	LastLocationArg
 ){
 	LastLocation();
-	return CCond(new CChipTgtDirection(angleCenter, angleRange)).GetCChipTree();
+	return CCond(std::make_unique<CChipTgtDirection>(angleCenter, angleRange)).GetCChipTree();
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2130,7 +2126,7 @@ static void get_target_direction(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurField->m_tree.add(new CChipGetTgtDirection(var_dir.m_var, var_elev.m_var));
+	g_pCurField->m_tree.add(std::make_unique<CChipGetTgtDirection>(var_dir.m_var, var_elev.m_var));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -2290,7 +2286,7 @@ static CChipTree is_self_target_status(
 	int self_tgt,
 	int param
 ){
-	return CCond(new CChipTgtAction(self_tgt, param)).GetCChipTree();
+	return CCond(std::make_unique<CChipTgtAction>(self_tgt, param)).GetCChipTree();
 }
 
 #ifndef NO_OKECC_SYNTAX
@@ -2355,7 +2351,7 @@ static void sound(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurField->m_tree.add(new CChipSound(snd, cnt));
+	g_pCurField->m_tree.add(std::make_unique<CChipSound>(snd, cnt));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2504,7 +2500,7 @@ static void clamp(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurField->m_tree.add(new CChipClamp(var.m_var, max, min));
+	g_pCurField->m_tree.add(std::make_unique<CChipClamp>(var.m_var, max, min));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2550,7 +2546,7 @@ static void ch_send(
 	LastLocationArg
 ){
 	LastLocation();
-	g_pCurField->m_tree.add(new CChipChSend(ch, var.m_var));
+	g_pCurField->m_tree.add(std::make_unique<CChipChSend>(ch, var.m_var));
 }
 
 class CChipChReceive : public CChip {
@@ -2614,33 +2610,33 @@ static CChipVal ammo_num(int weapon, LastLocationArg){
 #ifndef NO_OKECC_SYNTAX
 CChipVar& CChipVar::operator=(const CChipVal& val){
 	
-	CChip *pchip;
+	std::unique_ptr<CChip> pchip;
 	
 	switch(val.m_type){
 		case CChipVal::HEAT:
 		case CChipVal::FUEL:
 		case CChipVal::DAMAGE:
-			pchip = new CChipGetStatus(val.m_type - CChipVal::HEAT, m_var);
+			pchip = std::make_unique<CChipGetStatus>(val.m_type - CChipVal::HEAT, m_var);
 			break;
 		
 		case CChipVal::TIME:
-			pchip = new CChipGetMiscNum(CChipGetMiscNum::TIME, m_var);
+			pchip = std::make_unique<CChipGetMiscNum>(CChipGetMiscNum::TIME, m_var);
 			break;
 			
 		case CChipVal::FRIENDLY:
-			pchip = new CChipGetMiscNum(CChipGetMiscNum::FRIENDLY_NUM, m_var);
+			pchip = std::make_unique<CChipGetMiscNum>(CChipGetMiscNum::FRIENDLY_NUM, m_var);
 			break;
 			
 		case CChipVal::ENEMY:
-			pchip = new CChipGetMiscNum(CChipGetMiscNum::ENEMY_NUM, m_var);
+			pchip = std::make_unique<CChipGetMiscNum>(CChipGetMiscNum::ENEMY_NUM, m_var);
 			break;
 			
 		case CChipVal::RAND:
-			pchip = new CChipGetMiscNum(CChipGetMiscNum::RAND, m_var);
+			pchip = std::make_unique<CChipGetMiscNum>(CChipGetMiscNum::RAND, m_var);
 			break;
 		
 		case CChipVal::CH_RECV:
-			pchip = new CChipChReceive(val.m_param, m_var);
+			pchip = std::make_unique<CChipChReceive>(val.m_param, m_var);
 			break;
 		
 		case CChipVal::SELF_POS_X:
@@ -2649,7 +2645,7 @@ CChipVar& CChipVar::operator=(const CChipVal& val){
 		case CChipVal::TGT_POS_X:
 		case CChipVal::TGT_POS_Y:
 		case CChipVal::TGT_POS_Z:
-			pchip = new CChipGetCoordinate(
+			pchip = std::make_unique<CChipGetCoordinate>(
 				val.m_type >= CChipVal::TGT_POS_X ? CChip::TARGET : CChip::SELF,
 				(val.m_type - CChipVal::SELF_POS_X) % 3,
 				m_var
@@ -2657,26 +2653,26 @@ CChipVar& CChipVar::operator=(const CChipVal& val){
 			break;
 		
 		default:
-			pchip = new CChipGetStatus(CChipGetStatus::AMMO + val.m_type, m_var);
+			pchip = std::make_unique<CChipGetStatus>(CChipGetStatus::AMMO + val.m_type, m_var);
 	}
 	
-	g_pCurField->m_tree.add(pchip);
+	g_pCurField->m_tree.add(std::move(pchip));
 	return *this;
 }
 
 CCond CChipVal::GetCChipCond(void) const {
 	
-	CChip *pchip = nullptr;
+	std::unique_ptr<CChip> pchip;
 	
 	switch(m_type){
 		case CChipVal::HEAT:
 		case CChipVal::FUEL:
 		case CChipVal::DAMAGE:
-			pchip = new CChipSelfStatus(m_type - CChipVal::HEAT);
+			pchip = std::make_unique<CChipSelfStatus>(m_type - CChipVal::HEAT);
 			break;
 		
 		case CChipVal::TIME:
-			pchip = new CChipTime();
+			pchip = std::make_unique<CChipTime>();
 			break;
 		
 		case CChipVal::FRIENDLY:
@@ -2695,17 +2691,17 @@ CCond CChipVal::GetCChipCond(void) const {
 		case CChipVal::TGT_POS_X:
 		case CChipVal::TGT_POS_Y:
 		case CChipVal::TGT_POS_Z:
-			pchip = new CChipIsCoordinate(
+			pchip = std::make_unique<CChipIsCoordinate>(
 				m_type >= CChipVal::TGT_POS_X ? CChip::TARGET : CChip::SELF,
 				(m_type - CChipVal::SELF_POS_X) % 3
 			);
 			break;
 		
 		default:
-			pchip = new CChipAmmoNum(m_type);
+			pchip = std::make_unique<CChipAmmoNum>(m_type);
 	}
 	
-	return CCond(pchip);
+	return CCond(std::move(pchip));
 }
 
 CChipTree CChipVal::operator<=(int num) const {return GetCChipCond() <= num;}
@@ -2771,19 +2767,19 @@ public:
 };
 
 #ifndef NO_OKECC_SYNTAX
-CChipVar& CChipVar::operator+=(const CChipVar& op2){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::ADD, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator-=(const CChipVar& op2){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::SUB, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator*=(const CChipVar& op2){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::MUL, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator/=(const CChipVar& op2){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::DIV, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator%=(const CChipVar& op2){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::MOD, 0, op2.m_var)); return *this;}
-CChipVar& CChipVar::operator= (const CChipVar& op2){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::MOV, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator+=(const CChipVar& op2){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::ADD, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator-=(const CChipVar& op2){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::SUB, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator*=(const CChipVar& op2){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::MUL, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator/=(const CChipVar& op2){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::DIV, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator%=(const CChipVar& op2){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::MOD, 0, op2.m_var)); return *this;}
+CChipVar& CChipVar::operator= (const CChipVar& op2){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::MOV, 0, op2.m_var)); return *this;}
 
-CChipVar& CChipVar::operator+=(const int imm){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::ADD, 1, imm)); return *this;}
-CChipVar& CChipVar::operator-=(const int imm){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::SUB, 1, imm)); return *this;}
-CChipVar& CChipVar::operator*=(const int imm){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::MUL, 1, imm)); return *this;}
-CChipVar& CChipVar::operator/=(const int imm){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::DIV, 1, imm)); return *this;}
-CChipVar& CChipVar::operator%=(const int imm){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::MOD, 1, imm)); return *this;}
-CChipVar& CChipVar::operator= (const int imm){g_pCurField->m_tree.add(new CChipCalc(m_var, CChipCalc::MOV, 1, imm)); return *this;}
+CChipVar& CChipVar::operator+=(const int imm){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::ADD, 1, imm)); return *this;}
+CChipVar& CChipVar::operator-=(const int imm){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::SUB, 1, imm)); return *this;}
+CChipVar& CChipVar::operator*=(const int imm){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::MUL, 1, imm)); return *this;}
+CChipVar& CChipVar::operator/=(const int imm){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::DIV, 1, imm)); return *this;}
+CChipVar& CChipVar::operator%=(const int imm){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::MOD, 1, imm)); return *this;}
+CChipVar& CChipVar::operator= (const int imm){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::MOV, 1, imm)); return *this;}
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2835,17 +2831,17 @@ public:
 };
 
 #ifndef NO_OKECC_SYNTAX
-CChipTree CChipVar::operator>=(const CChipVar& op2) const {return CCond(new CChipCmp(m_var, CChip::OP_GE, 0, op2.m_var)).GetCChipTree();}
-CChipTree CChipVar::operator<=(const CChipVar& op2) const {return CCond(new CChipCmp(m_var, CChip::OP_LE, 0, op2.m_var)).GetCChipTree();}
-CChipTree CChipVar::operator==(const CChipVar& op2) const {return CCond(new CChipCmp(m_var, CChip::OP_EQ, 0, op2.m_var)).GetCChipTree();}
-CChipTree CChipVar::operator!=(const CChipVar& op2) const {return CCond(new CChipCmp(m_var, CChip::OP_NE, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator>=(const CChipVar& op2) const {return CCond(std::make_unique<CChipCmp>(m_var, CChip::OP_GE, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator<=(const CChipVar& op2) const {return CCond(std::make_unique<CChipCmp>(m_var, CChip::OP_LE, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator==(const CChipVar& op2) const {return CCond(std::make_unique<CChipCmp>(m_var, CChip::OP_EQ, 0, op2.m_var)).GetCChipTree();}
+CChipTree CChipVar::operator!=(const CChipVar& op2) const {return CCond(std::make_unique<CChipCmp>(m_var, CChip::OP_NE, 0, op2.m_var)).GetCChipTree();}
 CChipTree CChipVar::operator> (const CChipVar& op2) const {return !(*this <= op2);}
 CChipTree CChipVar::operator< (const CChipVar& op2) const {return !(*this >= op2);}
 
-CChipTree CChipVar::operator>=(const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_GE, 1, imm)).GetCChipTree();}
-CChipTree CChipVar::operator<=(const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_LE, 1, imm)).GetCChipTree();}
-CChipTree CChipVar::operator==(const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_EQ, 1, imm)).GetCChipTree();}
-CChipTree CChipVar::operator!=(const int imm) const {return CCond(new CChipCmp(m_var, CChip::OP_NE, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator>=(const int imm) const {return CCond(std::make_unique<CChipCmp>(m_var, CChip::OP_GE, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator<=(const int imm) const {return CCond(std::make_unique<CChipCmp>(m_var, CChip::OP_LE, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator==(const int imm) const {return CCond(std::make_unique<CChipCmp>(m_var, CChip::OP_EQ, 1, imm)).GetCChipTree();}
+CChipTree CChipVar::operator!=(const int imm) const {return CCond(std::make_unique<CChipCmp>(m_var, CChip::OP_NE, 1, imm)).GetCChipTree();}
 CChipTree CChipVar::operator> (const int imm) const {return !(*this <= imm);}
 CChipTree CChipVar::operator< (const int imm) const {return !(*this >= imm);}
 #endif
@@ -2857,7 +2853,7 @@ static void if_statement(const CChipTree& cc, LastLocationArg, bool BlockStart =
 	LastLocation();
 	
 	if(BlockStart){
-		g_pCurField->m_BlockStack.push_back(new CField::BiIfTop(location));
+		g_pCurField->m_BlockStack.push_back(std::make_unique<CField::BiIfTop>(location));
 	}
 	
 	// CurTree に if 条件のツリーを接続
@@ -2865,10 +2861,10 @@ static void if_statement(const CChipTree& cc, LastLocationArg, bool BlockStart =
 	g_pCurField->m_tree.m_LastG = cc.m_LastR;
 	
 	// false 飛び先
-	g_pCurField->m_BlockStack.push_back(new CField::BiIf(location, cc.m_LastG));
+	g_pCurField->m_BlockStack.push_back(std::make_unique<CField::BiIf>(location, cc.m_LastG));
 }
 
-static void if_statement(const CCond& chip, LastLocationArg){if_statement(chip.GetCChipTree(), location);}
+static void if_statement(CCond&& chip, LastLocationArg){if_statement(std::move(chip).GetCChipTree(), location);}
 static void if_statement(const CChipVal&  chip, LastLocationArg){if_statement(chip >= 1, location);}
 static void if_statement(const CChipVar&  chip, LastLocationArg){if_statement(chip != 0, location);}
 
@@ -2882,7 +2878,7 @@ static void else_statement(
 		if(!g_pCurField->m_BlockStack.size()) return;
 	}
 	
-	CField::BlockInfo *bi = g_pCurField->m_BlockStack.back();
+	auto bi = std::move(g_pCurField->m_BlockStack.back());
 	g_pCurField->m_BlockStack.pop_back();
 	
 	UINT idx = g_pCurField->m_tree.m_LastG;	// then 節の最後
@@ -2891,9 +2887,7 @@ static void else_statement(
 	g_pCurField->m_tree.m_LastG = bi->m_TargetIdx;
 
 	// then 節の最後を block statck に積む
-	g_pCurField->m_BlockStack.push_back(new CField::BiElse(location, idx));
-	
-	delete bi;
+	g_pCurField->m_BlockStack.push_back(std::make_unique<CField::BiElse>(location, idx));
 }
 
 static void elseif_statement(CChipTree &&cc, LastLocationArg){
@@ -2902,7 +2896,7 @@ static void elseif_statement(CChipTree &&cc, LastLocationArg){
 	if_statement(cc, location, false);
 }
 
-static void elseif_statement(const CCond& chip, LastLocationArg){elseif_statement(chip.GetCChipTree(), location);}
+static void elseif_statement(CCond&& chip, LastLocationArg){elseif_statement(std::move(chip).GetCChipTree(), location);}
 static void elseif_statement(const CChipVal&  chip, LastLocationArg){elseif_statement(chip >= 1, location);}
 static void elseif_statement(const CChipVar&  chip, LastLocationArg){elseif_statement(chip != 0, location);}
 
@@ -2923,17 +2917,15 @@ static void endif_statement(
 		g_pCurField->GetMode() == CField::BM_IF ||
 		g_pCurField->GetMode() == CField::BM_ELSE
 	){
-		CField::BlockInfo *bi = g_pCurField->m_BlockStack.back();
+		auto bi = std::move(g_pCurField->m_BlockStack.back());
 		g_pCurField->m_BlockStack.pop_back();
 		
 		// 合流 GOTO 生成
-		UINT merge = g_pCurField->m_pool.add(new CChipGoto);
+		UINT merge = g_pCurField->m_pool.add(std::make_unique<CChipGoto>());
 		g_pCurField->m_tree.AddToG(merge);
 		
 		// false 条件の飛び先合流
 		g_pCurField->m_pool[bi->m_TargetIdx]->m_NextG = merge;
-		
-		delete bi;
 	}
 	
 	if(g_pCurField->GetMode() != CField::BM_IF_TOP){
@@ -2941,7 +2933,6 @@ static void endif_statement(
 		if(!g_pCurField->m_BlockStack.size()) return;
 	}
 
-	delete g_pCurField->m_BlockStack.back();
 	g_pCurField->m_BlockStack.pop_back();
 }
 
@@ -2955,14 +2946,14 @@ static void loop_statement(LastLocationArg){
 	
 	// goto を 2個生成
 	g_pCurField->m_BlockStack.push_back(
-		new CField::BiLoop(
+		std::make_unique<CField::BiLoop>(
 			location,
-			LoopTop = g_pCurField->m_pool.add(new CChipGoto),	// loop 先頭
+			LoopTop = g_pCurField->m_pool.add(std::make_unique<CChipGoto>()),	// loop 先頭
 			g_pCurField->m_Break								// 直前の break 先を保存
 		)
 	);
 	
-	g_pCurField->m_Break = g_pCurField->m_pool.add(new CChipGoto);	// break 先
+	g_pCurField->m_Break = g_pCurField->m_pool.add(std::make_unique<CChipGoto>());	// break 先
 	
 	// Top の goto を接続
 	g_pCurField->m_tree.AddToG(LoopTop);
@@ -2975,7 +2966,7 @@ static void loopend_statement(LastLocationArg){
 		g_pCurField->BlockError("Unexpected endloop");
 		if(!g_pCurField->m_BlockStack.size()) return;
 	}
-	CField::BiLoop *bi = dynamic_cast<CField::BiLoop *>(g_pCurField->m_BlockStack.back()); // mode
+	auto bi = dynamic_cast<CField::BiLoop *>(g_pCurField->m_BlockStack.back().get()); // mode
 	g_pCurField->m_BlockStack.pop_back();
 	
 	// ループ先頭に接続
@@ -2984,8 +2975,6 @@ static void loopend_statement(LastLocationArg){
 	
 	// break 先を pop
 	g_pCurField->m_Break = bi->m_SavePrevBreak;
-	
-	delete bi;
 }
 
 static void break_statement(LastLocationArg){
@@ -2998,7 +2987,7 @@ static void break_statement(LastLocationArg){
 	UINT idx = g_pCurField->m_tree.m_LastG;
 	
 	// LastG の place holder
-	g_pCurField->m_tree.AddToG(g_pCurField->m_pool.add(new CChipGoto));
+	g_pCurField->m_tree.AddToG(g_pCurField->m_pool.add(std::make_unique<CChipGoto>()));
 	
 	// break 先に分岐
 	g_pCurField->m_pool[idx]->m_NextG = g_pCurField->m_Break;
@@ -3011,11 +3000,11 @@ static void okecc_exit(LastLocationArg){
 	LastLocation();
 	
 	// Goto chip * 2 を置き，1個目を Exit に向ける
-	CChip *p;
-	g_pCurField->m_tree.add((p = new CChipGoto()));
-	g_pCurField->m_tree.add(new CChipGoto());
+	auto chip = std::make_unique<CChipGoto>();
+	chip->m_NextG = IDX_EXIT;
 	
-	p->m_NextG = IDX_EXIT;
+	g_pCurField->m_tree.add(std::move(chip));
+	g_pCurField->m_tree.add(std::make_unique<CChipGoto>());
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -3027,7 +3016,7 @@ public:
 	
 	CFieldSwitch(int num){
 		m_field	= g_pCurField;
-		g_pCurField	= g_pField[num];
+		g_pCurField	= g_pField[num].get();
 	}
 	
 	~CFieldSwitch(){

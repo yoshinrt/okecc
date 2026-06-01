@@ -210,7 +210,7 @@ inline Energy_t CarnageSA::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIP
 	
 	auto Occupy = [&](int x, int y){
 		if(PlaceNop){
-			UINT nop = pool.add(new CChipNop());
+			UINT nop = pool.add(std::make_unique<CChipNop>());
 			
 			if(rxg){
 				chip->m_NextR = nop;
@@ -932,22 +932,24 @@ void OutputSvg(const char* filename, CarnageSA* sa) {
 void chip_main(void);
 
 int main(void){
-	g_pField.push_back(new CField("MAIN", 15, 15));
-	g_pField.push_back(new CField("SUB1", 7, 7));
-	g_pField.push_back(new CField("SUB2", 7, 7));
-	g_pCurField = g_pField[0];
+	g_pField.push_back(std::make_unique<CField>("MAIN", 15, 15));
+	g_pField.push_back(std::make_unique<CField>("SUB1", 7, 7));
+	g_pField.push_back(std::make_unique<CField>("SUB2", 7, 7));
+	g_pCurField = g_pField[0].get();
 	
 	chip_main();
 	g_pCurField->CheckBlockStack();
 	if(g_uErrorCnt) exit(1);
 	
-	std::vector<CarnageSA *>	sa;
+	std::vector<std::unique_ptr<CarnageSA>>	sa;
+	std::vector<CarnageSA*> sa_ptrs;
 	
 	for(int i = 0; i < 3; ++i){
 		//g_pField[i]->m_pool.dump();
 		g_pField[i]->FinalizeCompile();
 		
-		sa.push_back(new CarnageSA(g_pField[i]->m_pool, g_pField[i]->m_name));
+		sa.emplace_back(std::make_unique<CarnageSA>(g_pField[i]->m_pool, g_pField[i]->m_name));
+		sa_ptrs.push_back(sa[i].get());
 		
 		if(g_pField[i]->m_pool.size()){
 			sa[i]->run();
@@ -955,7 +957,7 @@ int main(void){
 		}
 	}
 	
-	OutputSvg("okecc.svg", sa);
+	OutputSvg("okecc.svg", sa_ptrs);
 	
 	const std::string mcFile = "memcard.mcd";
 	const char *gameId[] = {"SLPS-01666", "SLPSP02318"};
@@ -991,7 +993,7 @@ int main(void){
 		UINT offx = 0, offy = 0;
 		for(UINT fld = 0; fld < 3; ++fld){
 			auto& state = sa[fld]->get_result();
-			auto pFld = g_pField[fld];
+			auto pFld = g_pField[fld].get();
 			
 			auto GetStartX = [&]() -> UINT {
 				return pFld->m_pool.size() == 0 ? 0 : state[pFld->m_pool.m_start].x;
