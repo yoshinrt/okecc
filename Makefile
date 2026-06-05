@@ -4,7 +4,7 @@
 
 SRCDIR		= ./okecc
 OBJDIR		= ./obj
-CXXFLAGS	= -O3 -march=native -mtune=native -ffast-math -flto=auto -std=c++20 -I$(SRCDIR)
+CXXFLAGS	= -O3 -march=native -mtune=native -ffast-math -flto=auto -pthread -std=c++20 -I$(SRCDIR)
 HEADERS		= $(SRCDIR)/okecc.h $(SRCDIR)/mcmgr.h
 
 $(OBJDIR)/%.o: %.cpp $(HEADERS)

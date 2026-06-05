@@ -17,14 +17,21 @@
 #include <thread>
 #include <vector>
 
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#define VC_EXTRALEAN
-#define NOSERVICE
-#define NOMCX
-#define NOIME
-#define NOSOUND
-#include <windows.h>
+#ifdef _WIN32
+	#define WIN32_LEAN_AND_MEAN
+	#define NOMINMAX
+	#define VC_EXTRALEAN
+	#define NOSERVICE
+	#define NOMCX
+	#define NOIME
+	#define NOSOUND
+	#include <windows.h>
+#else
+	#include <unistd.h>
+	#include <pthread.h>
+	#include <sched.h>
+	extern "C" int nice(int);
+#endif
 
 #define NO_OKECC_SYNTAX
 #include "okecc.h"
@@ -442,11 +449,13 @@ void CarnageSA::run_single() {
 	std::array<ChipID_t, MAX_CHIPS> occ;
 	std::array<ChipID_t, MAX_CHIPS> next_occ;
 	
+#ifdef _WIN32
 	HANDLE hThread = GetCurrentThread();
-	
-	if (!SetThreadPriority(hThread, THREAD_PRIORITY_BELOW_NORMAL)) {
-		// 失敗した場合の処理（通常は無視しても動作に支障はありません）
-	}
+	SetThreadPriority(hThread, THREAD_PRIORITY_BELOW_NORMAL);
+#else
+	// Linux: nice値を下げる（優先度低）
+	nice(10);
+#endif
 	
 	bool EndRun = false;
 	std::array<Pos, MAX_CHIPS> best_state;
