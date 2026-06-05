@@ -108,7 +108,7 @@ public:
 	
 	void InitState(void);
 	void run(UINT num_threads = 0);
-	void run_single();
+	void run_single(UINT uThreadID);
 	Energy_t calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org);
 	void SetArrow(void);
 	
@@ -145,16 +145,16 @@ public:
 		S_NOT_FOUND,
 	};
 	
-	inline static std::atomic<UINT> Status = S_NOT_FOUND;
+	inline static std::atomic<Energy_t> Score = ~0;
 	
-	UINT UpdateStatus(UINT status){
-		UINT NewStatus = status;
-		UINT OtherStatus = Status.load(std::memory_order_relaxed);
+	Energy_t UpdateScore(Energy_t score){
+		Energy_t NewScore = score;
+		Energy_t OtherScore = Score.load(std::memory_order_relaxed);
 		
 		// 現在の共有ベストスコアよりも小さい場合のみ、更新を試みる
-		while (NewStatus < OtherStatus) {
-			if (Status.compare_exchange_weak(
-				OtherStatus, NewStatus, 
+		while (NewScore < OtherScore) {
+			if (Score.compare_exchange_weak(
+				OtherScore, NewScore, 
 				std::memory_order_release,
 				std::memory_order_relaxed
 			)){
@@ -163,7 +163,7 @@ public:
 			}
 		}
 		
-		return std::min<int>(status, OtherStatus);
+		return std::min<Energy_t>(score, OtherScore);
 	}
 };
 
@@ -418,7 +418,7 @@ void CarnageSA::rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<
 	}
 };
 
-void CarnageSA::run_single() {
+void CarnageSA::run_single(UINT uThreadID) {
 	
 	constexpr int max_iter	= 5000000;
 	constexpr double StartT	= 2000.0;
@@ -429,7 +429,7 @@ void CarnageSA::run_single() {
 	constexpr UINT p_nearby_swap	= 5;	// 隣接スワップ
 	constexpr UINT p_move_mid		= 50;	// 接続chip の真ん中に移動
 	
-	Status = S_NOT_FOUND;
+	Score = ~0;
 	
 	std::mt19937_64 gen;
 	gen.seed(std::random_device{}());
@@ -476,7 +476,6 @@ void CarnageSA::run_single() {
 		};
 		
 		Energy_t current_E	= calculate_energy(state, occ);
-		bool UpdateBest		= false;
 		
 		if(LoopCnt == 0){
 			best_state	= state;
@@ -630,27 +629,16 @@ void CarnageSA::run_single() {
 	
 			Energy_t next_E = calculate_energy(next_state, next_occ);
 			
-			UINT RunningStatus = UpdateStatus(
-				best_E < 1   ? S_FOUND_ZERO :
-				best_E < 100 ? S_FOUND : S_NOT_FOUND
-			);
-			
-			if (RunningStatus == S_FOUND_ZERO){
-				EndRun = true;
-			}
-			
 			// 早期最適性判定
 			if (next_E == 0) {
 				state		= next_state;
 				current_E	= next_E;
 				best_state	= next_state;
 				best_E		= next_E;
-				
-				UpdateBest	= true;
 				break;
 			}
 	
-			double diff = (double)next_E - (double)current_E;
+			int diff = (int)next_E - (int)current_E;
 			if (diff < 0 || dist_prob(gen) < std::exp(-diff / T)) {
 				// accept
 				state		= next_state;
@@ -659,31 +647,28 @@ void CarnageSA::run_single() {
 				if (current_E <= best_E) {
 					best_E		= current_E;
 					best_state	= state;
-					UpdateBest	= true;
 				}
 			}
 	
+			Energy_t BestScore = UpdateScore(best_E);
+			
+			if (BestScore == 0) EndRun = true;
+			
 			// cooling
 			T *= cooling;
 			
 			#ifndef DEBUG
 				if (iter % 1000000 == 0){
-					if(UpdateBest){
-						UpdateBest = false;
-					}
-					printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)best_E);
+					if(uThreadID == 0) printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)BestScore);
 				}
 			#endif
 			
 		}
 		
-		UINT RunningStatus = UpdateStatus(
-			best_E < 1   ? S_FOUND_ZERO :
-			best_E < 100 ? S_FOUND : S_NOT_FOUND
-		);
+		Energy_t BestScore = UpdateScore(best_E);
 		
-		printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)best_E);
-		if (RunningStatus == S_FOUND_ZERO || LoopCnt >= 1 && RunningStatus <= S_FOUND){
+		if(uThreadID == 0) printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)BestScore);
+		if (BestScore == 0 || LoopCnt >= 1 && BestScore < 100){
 			EndRun = true;
 		}
 	}
@@ -706,7 +691,7 @@ void CarnageSA::run(UINT num_threads){
 	// 2. 各インスタンスの run を並列実行
 	
 	for (UINT u = 0; u < num_threads; ++u) {
-		threads.emplace_back(&CarnageSA::run_single, &workers[u]);
+		threads.emplace_back(&CarnageSA::run_single, &workers[u], u);
 	}
 
 	// 3. 終了待機
