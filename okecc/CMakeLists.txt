@@ -16,19 +16,19 @@ include_directories(${SRCDIR})
 
 add_library(okecc_common OBJECT "${SRCDIR}/okecc_sa.cpp")
 
-file(GLOB ALL_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../*.cpp")
+if(NOT DEFINED SRC)
+    message(FATAL_ERROR "SRC is not specified")
+endif()
 
-foreach(source_file ${ALL_SOURCES})
-    get_filename_component(exe_name ${source_file} NAME_WE)
+get_filename_component(exe_name ${SRC} NAME_WE)
 
-    if(NOT "${exe_name}" STREQUAL "okecc_sa")
-        add_executable(${exe_name} ${source_file} $<TARGET_OBJECTS:okecc_common>)
-        
-        # 出力先設定（バイナリディレクトリ直下に集める）
-        set_target_properties(${exe_name} PROPERTIES 
-            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-            RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}"
-            RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_BINARY_DIR}"
-        )
-    endif()
-endforeach()
+if(NOT "${exe_name}" STREQUAL "okecc_sa")
+    add_executable(${exe_name} ${SRC} $<TARGET_OBJECTS:okecc_common>)
+    
+    # 出力先設定（バイナリディレクトリ直下に集める）
+    set_target_properties(${exe_name} PROPERTIES 
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_BINARY_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_BINARY_DIR}"
+    )
+endif()

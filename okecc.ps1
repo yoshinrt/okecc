@@ -1,7 +1,21 @@
 ﻿param (
 	[Parameter(Mandatory=$true)]
-	[string]$Target
+	[string]$SourceFile
 )
+
+# フルパス化
+try {
+    $FullPath = (Resolve-Path $SourceFile).Path
+    $FullPath = $FullPath -replace "\\", "/"
+} catch {
+    Write-Host "Error: File not found"
+    exit 1
+}
+
+# exe名
+$Target = [System.IO.Path]::GetFileNameWithoutExtension($FullPath)
+
+$BuildDir = "build"
 
 if (-not (Test-Path Env:VisualStudioVersion)) {
 	# 1. vswhere を使って Visual Studio のインストールパスを取得
@@ -32,7 +46,6 @@ if (-not (Test-Path Env:VisualStudioVersion)) {
 	Write-Host "MSVC $arch environment variables was sucsessfully imported." -ForegroundColor Cyan
 }
 
-$BuildDir = "build"
 $ExePath = Join-Path (Get-Location) "$BuildDir\$Target.exe"
 # 期待されるプロジェクトファイルのパス
 $ProjPath = "$BuildDir\$Target.vcxproj"
@@ -46,7 +59,7 @@ if (-not (Test-Path "$BuildDir\CMakeCache.txt") -or -not (Test-Path $ProjPath)) 
 	}
 	
 	# CMake を再実行してファイル構成をスキャンし直す
-	cmake -S okecc -B $BuildDir -A x64
+	cmake -S okecc -B $BuildDir -A x64 -DSRC="$FullPath"
 	
 	if ($LASTEXITCODE -ne 0) {
 		Write-Host "Error: CMake configuration failed. Check if $Target.cpp exists." -ForegroundColor Red
