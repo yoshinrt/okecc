@@ -865,7 +865,11 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 			int x = state_disp[i].x * CELL_SIZE + OFFSET;
 			int y = state_disp[i].y * CELL_SIZE + OFFSET;
 			int centerX = x + CHIP_SIZE / 2;
-			const char* fill_color = (pool.m_list[i]->m_Id.get() == 14) ? "#e9ecef" : "white";
+			
+			const char* fill_color =
+				pool.m_list[i]->m_Id.get() == CHIPID_NOP && static_cast<CChipNop *>(pool.m_list[i].get())->m_param.get() == 0 ? "#F0F0F0" :
+				pool.m_list[i]->m_NextR != IDX_NONE ? "#FFF0F0" : "white";
+			
 			fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"%s\" stroke=\"#343a40\" stroke-width=\"2\" />\n",
 					x, draw_y_start + y, CHIP_SIZE, CHIP_SIZE, fill_color);
 			fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Meiryo, sans-serif\" text-anchor=\"middle\">\n", centerX, draw_y_start + y + 25);
