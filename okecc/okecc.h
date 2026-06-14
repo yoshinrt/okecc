@@ -318,6 +318,9 @@ public:
 		std::vector<UINT> IdxNew2Old;
 		
 		for(UINT u = 0; u < m_list.size(); ++u){
+			if(u==0x2c){
+				int a = 0;
+			}
 			if(m_list[u]->m_Id.get() != CHIPID_GOTO){
 				m_list[u]->m_NextR = GetFinalDst(m_list[u]->m_NextR);
 				m_list[u]->m_NextG = GetFinalDst(m_list[u]->m_NextG);
@@ -2966,9 +2969,11 @@ static void loopend_statement(LastLocationArg){
 		g_pCurField->BlockError("Unexpected endloop");
 		if(!g_pCurField->m_BlockStack.size()) return;
 	}
-	auto bi = dynamic_cast<CField::BiLoop *>(g_pCurField->m_BlockStack.back().get()); // mode
+	auto bi_ptr = std::move(g_pCurField->m_BlockStack.back());
 	g_pCurField->m_BlockStack.pop_back();
-	
+
+	auto bi = dynamic_cast<CField::BiLoop*>(bi_ptr.get()); // mode
+
 	// ループ先頭に接続
 	g_pCurField->m_tree.AddToG(bi->m_TargetIdx);
 	g_pCurField->m_tree.m_LastG = g_pCurField->m_Break;
