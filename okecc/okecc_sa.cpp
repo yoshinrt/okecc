@@ -444,7 +444,9 @@ void CarnageSA::run_single(UINT uThreadID) {
 	);
 	std::uniform_int_distribution<int> dist_x(0, GridWidth - 1);
 	std::uniform_int_distribution<int> dist_y(0, GridHeight - 1);
-
+	
+	std::uniform_int_distribution<int>	dist_next_itr_state(0, 3);
+	
 	// occupancy
 	std::array<ChipID_t, MAX_CHIPS> occ;
 	std::array<ChipID_t, MAX_CHIPS> next_occ;
@@ -461,7 +463,7 @@ void CarnageSA::run_single(UINT uThreadID) {
 	std::array<Pos, MAX_CHIPS> best_state;
 	
 	for(UINT LoopCnt = 0; !EndRun; ++LoopCnt){
-		InitState();
+		if(LoopCnt == 0) InitState();
 		
 		double T = StartT;
 		rebuild_occ(state, occ);
@@ -481,6 +483,8 @@ void CarnageSA::run_single(UINT uThreadID) {
 			best_state	= state;
 			best_E		= current_E;
 		}
+		
+		Energy_t prev_best_E = best_E;
 		
 		// move probabilities (base)
 		// neighbor-swap が残りの確率
@@ -662,7 +666,6 @@ void CarnageSA::run_single(UINT uThreadID) {
 					if(uThreadID == 0) printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)BestScore);
 				}
 			#endif
-			
 		}
 		
 		Energy_t BestScore = UpdateScore(best_E);
@@ -670,6 +673,11 @@ void CarnageSA::run_single(UINT uThreadID) {
 		if(uThreadID == 0) printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)BestScore);
 		if (BestScore == 0 || LoopCnt >= 1 && BestScore < 100){
 			EndRun = true;
+		}
+		
+		// スレッド内で best_E を更新したら，state を継続して使う，そうでなければ state 初期化してやり直し
+		else if(best_E >= prev_best_E && dist_next_itr_state(gen) == 0){
+			InitState();
 		}
 	}
 	
