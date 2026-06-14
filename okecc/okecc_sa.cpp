@@ -679,7 +679,12 @@ void CarnageSA::run_single(UINT uThreadID) {
 void CarnageSA::run(UINT num_threads){
 	std::vector<CarnageSA> workers;
 	std::vector<std::thread> threads;
-	if(num_threads == 0) num_threads = std::thread::hardware_concurrency();
+	
+	#ifdef _DEBUG
+		num_threads = 1;
+	#else
+		if(num_threads == 0) num_threads = std::thread::hardware_concurrency();
+	#endif
 	
 	auto start = std::chrono::steady_clock::now();
 	
