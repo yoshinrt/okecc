@@ -444,7 +444,7 @@ void CarnageSA::run_single(UINT uThreadID) {
 	);
 	std::uniform_int_distribution<int> dist_x(0, GridWidth - 1);
 	std::uniform_int_distribution<int> dist_y(0, GridHeight - 1);
-
+	
 	// occupancy
 	std::array<ChipID_t, MAX_CHIPS> occ;
 	std::array<ChipID_t, MAX_CHIPS> next_occ;
@@ -461,7 +461,7 @@ void CarnageSA::run_single(UINT uThreadID) {
 	std::array<Pos, MAX_CHIPS> best_state;
 	
 	for(UINT LoopCnt = 0; !EndRun; ++LoopCnt){
-		InitState();
+		if(LoopCnt == 0) InitState();
 		
 		double T = StartT;
 		rebuild_occ(state, occ);
@@ -662,7 +662,6 @@ void CarnageSA::run_single(UINT uThreadID) {
 					if(uThreadID == 0) printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)BestScore);
 				}
 			#endif
-			
 		}
 		
 		Energy_t BestScore = UpdateScore(best_E);
