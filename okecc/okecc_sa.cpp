@@ -75,17 +75,17 @@ public:
 	// 8方向のベクトル定義 (N, NE, E, SE, S, SW, W, NW)
 	inline static const int dx[] = { 0,  1,  1,  1,  0, -1, -1, -1, 0};
 	inline static const int dy[] = {-1, -1,  0,  1,  1,  1,  0, -1, 0};
-	
+
 	CarnageSA(CChipPool& p, const char *name = nullptr)
 		: pool(p), GridWidth(p.m_width), GridHeight(p.m_height), m_name(name){
 		MakeLinkList();
 	}
-	
+
 	// 座標の正規化：最小値を (0, 0) に合わせる
 	void normalize_coordinates() {
 		int min_x = INT_MAX, min_y = INT_MAX;
 		bool has_data = false;
-	
+
 		for (UINT i = 0; i < (UINT)pool.size(); ++i) {
 			const auto& p = state[i];
 			if (p.x != POS_INVALID) {
@@ -94,9 +94,9 @@ public:
 				has_data = true;
 			}
 		}
-	
+
 		if (!has_data) return;
-	
+
 		for (UINT i = 0; i < (UINT)pool.size(); ++i) {
 			auto& p = state[i];
 			if (p.x != POS_INVALID) {
@@ -105,29 +105,29 @@ public:
 			}
 		}
 	}
-	
+
 	void InitState(void);
 	void run(UINT num_threads = 0);
 	void run_single(UINT uThreadID);
-	Energy_t calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org);
+	Energy_t calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org, std::vector<ChipID_t>& move_chip_list);
 	void SetArrow(void);
-	
+
 	void NopRouting(void);
 	void rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ);
 	void MakeLinkList();
 	Energy_t FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ, bool PlaceNop = false, bool rxg = false);
-	
+
 	const std::array<Pos, MAX_CHIPS>& get_result() const { return state; }
-	
+
 	void dump(void){
 		printf("Start=%d\n x  y  ID   G   R  Description\n", pool.m_start);
 		for(UINT u = 0; u < pool.size(); ++u){
 			if(pool[u]){
 				std::string s = pool[u]->GetLayoutText();
 				std::replace(s.begin(), s.end(), '\n', ' ');
-				
+
 				Pos& p = state[u];
-				
+
 				printf("%2d %2d %3d %3d %3d  %s\n",
 					p.x, p.y,
 					u,
@@ -138,23 +138,23 @@ public:
 			}
 		}
 	}
-	
+
 	enum{
 		S_FOUND_ZERO,
 		S_FOUND,
 		S_NOT_FOUND,
 	};
-	
+
 	inline static std::atomic<Energy_t> Score = ~0;
-	
+
 	Energy_t UpdateScore(Energy_t score){
 		Energy_t NewScore = score;
 		Energy_t OtherScore = Score.load(std::memory_order_relaxed);
-		
+
 		// 現在の共有ベストスコアよりも小さい場合のみ、更新を試みる
 		while (NewScore < OtherScore) {
 			if (Score.compare_exchange_weak(
-				OtherScore, NewScore, 
+				OtherScore, NewScore,
 				std::memory_order_release,
 				std::memory_order_relaxed
 			)){
@@ -162,20 +162,20 @@ public:
 				break;
 			}
 		}
-		
+
 		return std::min<Energy_t>(score, OtherScore);
 	}
 };
 
 void CarnageSA::InitState() {
 	state.fill({POS_INVALID, POS_INVALID});
-	
+
 	for (UINT u = 0; u < (UINT)pool.size(); ++u) {
 		UINT y = u / GridWidth;
 		UINT x = u % GridWidth;
 		x = (y % 2 == 0) ? x : (GridWidth - 1 - x);
 		state[u] = {(uint8_t)x, (uint8_t)y};
-		
+
 		// 接続リストの構築
 		UINT v;
 		if ((v = pool[u]->m_NextG) < pool.size()) {
@@ -191,7 +191,7 @@ void CarnageSA::InitState() {
 
 void CarnageSA::MakeLinkList() {
 	LinkList.resize(pool.size());
-	
+
 	for (UINT u = 0; u < (UINT)pool.size(); ++u) {
 		// 接続リストの構築
 		UINT v;
@@ -208,25 +208,25 @@ void CarnageSA::MakeLinkList() {
 
 inline Energy_t CarnageSA::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ, bool PlaceNop, bool rxg){
 	CChip *chip;
-	
+
 	if(PlaceNop) chip = pool[from];
-	
+
 	auto IsBrank = [&](int x, int y) -> bool {
 		return occ[y * GridWidth + x] == POS_INVALID;
 	};
-	
+
 	auto Occupy = [&](int x, int y){
 		if(PlaceNop){
 			UINT nop = pool.add(std::make_unique<CChipNop>());
-			
+
 			if(rxg){
 				chip->m_NextR = nop;
 			}else{
 				chip->m_NextG = nop;
 			}
-			
+
 			rxg = 0;
-			
+
 			occ[y * GridWidth + x] = (ChipID_t)nop;
 			chip = pool[nop];
 			state[nop] = {(uint8_t)x, (uint8_t)y};
@@ -234,23 +234,23 @@ inline Energy_t CarnageSA::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIP
 			occ[y * GridWidth + x] = 0;
 		}
 	};
-	
+
 	// チップ path が他のチップを通過
 	int stx = state[from].x;
 	int sty = state[from].y;
 	int edx = state[to].x;
 	int edy = state[to].y;
-	
+
 	if(
 		PlaceNop &&
 		std::max(std::abs(stx - edx), std::abs(sty - edy)) == 1
 	) return 0;
-	
+
 	if(std::abs(stx - edx) >= std::abs(sty - edy)){
 		int stepx = stx < edx ? 1 : -1;
 		int y = sty;
 		int dx = std::abs(edx - stx) - 1;
-		
+
 		for(int x = stx + stepx; x != edx; x += stepx){
 			if(y == edy){
 				if(IsBrank(x, y)){
@@ -265,7 +265,7 @@ inline Energy_t CarnageSA::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIP
 					return 1;
 				}
 			}
-			
+
 			else if(y > edy){
 				if(y >= 1 && IsBrank(x, y - 1)){
 					Occupy(x, y - 1);
@@ -279,7 +279,7 @@ inline Energy_t CarnageSA::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIP
 					return 1;
 				}
 			}
-			
+
 			else{
 				if(y < (int)GridHeight - 1 && IsBrank(x, y + 1)){
 					Occupy(x, y + 1);
@@ -293,14 +293,14 @@ inline Energy_t CarnageSA::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIP
 					return 1;
 				}
 			}
-			
+
 			--dx;
 		}
 	}else{
 		int stepy = sty < edy ? 1 : -1;
 		int x = stx;
 		int dy = std::abs(edy - sty) - 1;
-		
+
 		for(int y = sty + stepy; y != edy; y += stepy){
 			if(x == edx){
 				if(IsBrank(x, y)){
@@ -315,7 +315,7 @@ inline Energy_t CarnageSA::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIP
 					return 1;
 				}
 			}
-			
+
 			else if(x > edx){
 				if(x >= 1 && IsBrank(x - 1, y)){
 					Occupy(x - 1, y);
@@ -329,7 +329,7 @@ inline Energy_t CarnageSA::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIP
 					return 1;
 				}
 			}
-			
+
 			else{
 				if(x < (int)GridWidth - 1 && IsBrank(x + 1, y)){
 					Occupy(x + 1, y);
@@ -343,64 +343,89 @@ inline Energy_t CarnageSA::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIP
 					return 1;
 				}
 			}
-			
+
 			--dy;
 		}
 	}
-	
+
 	if(PlaceNop){
 		chip->m_NextG = to;
 	}
-	
+
 	return 0;
 }
 
-Energy_t CarnageSA::calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org) {
-	Energy_t base_energy = 0;
-	
+Energy_t CarnageSA::calculate_energy(
+	std::array<Pos, MAX_CHIPS>& state,
+	 const std::array<ChipID_t,
+	 MAX_CHIPS>& occ_org,
+	 std::vector<ChipID_t>& move_chip_list
+){
 	// ペナルティ
 	const Energy_t distance_penalty		= 1;	// chip 距離
 	const Energy_t overwrap_penalty		= 100;	// チップ間 path が他のチップを通過
 	const Energy_t start_end_penalty	= 1000;	// start/end 枠からの距離
-	
+
 	const size_t N = pool.size();
-	
+
 	auto occ = occ_org;
+
+	// 優先移動リスト
+	Energy_t base_energy = 0;
+	move_chip_list.resize(0);
+	std::array<uint8_t, MAX_CHIPS> Added = {};
 
 	// パラメータ（調整可能）
 
 	for (UINT u = 0; u < (UINT)pool.size(); ++u) {
 		Pos p = state[u];
 		CChip* chip = pool[u];
+		Energy_t chip_energy = 0;
 
 		// 物理制約
-		if (!(p.x < GridWidth) || !(p.y < GridHeight)) base_energy += 5000;
+		if (!(p.x < GridWidth) || !(p.y < GridHeight)) chip_energy += 5000;
 
 		// Startチップ制約
-		if (u == pool.m_start && p.y != 0) base_energy += p.y * start_end_penalty;
-		
+		if (u == pool.m_start && p.y != 0) chip_energy += p.y * start_end_penalty;
+
 		// exit チップ制約
 		if(pool[u]->m_NextG == IDX_EXIT || pool[u]->m_NextR == IDX_EXIT){
-			base_energy += start_end_penalty * (std::min)(
+			chip_energy += start_end_penalty * (std::min)(
 				std::min<int>(p.x, GridWidth - p.x - 1),
 				std::min<int>(p.y, GridHeight- p.y - 1)
 			);
 		}
-		
+
 		auto ChipE = [&](UINT ToIdx) -> Energy_t {
 			// チップ距離
 			Pos to = state[ToIdx];
-			
+
 			auto e = distance_penalty * ((std::max)(
 				std::abs((int)p.x - (int)to.x), std::abs((int)p.y - (int)to.y)
 			) - 1);
-			
+
 			if(e == 0) return e;
 			return e + FindPath(u, ToIdx, state, occ) * overwrap_penalty;
 		};
-		
-		if(pool[u]->m_NextG < N) base_energy += ChipE(pool[u]->m_NextG);
-		if(pool[u]->m_NextR < N) base_energy += ChipE(pool[u]->m_NextR);
+
+		if(pool[u]->m_NextG < N) chip_energy += ChipE(pool[u]->m_NextG);
+		if(pool[u]->m_NextR < N) chip_energy += ChipE(pool[u]->m_NextR);
+
+		// 優先移動リストに登録
+		auto AddMoveList = [&](UINT u){
+			if(u < N && !Added[u]){
+				move_chip_list.push_back(u);
+				Added[u] = 1;
+			}
+		};
+
+		if(chip_energy > 0){
+			AddMoveList(u);
+			AddMoveList(pool[u]->m_NextG);
+			AddMoveList(pool[u]->m_NextR);
+		}
+
+		base_energy += chip_energy;
 	}
 
 	if (base_energy <= 0) return 0;
@@ -409,7 +434,7 @@ Energy_t CarnageSA::calculate_energy(std::array<Pos, MAX_CHIPS>& state, const st
 
 void CarnageSA::rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ){
 	std::fill(occ.begin(), occ.end(), POS_INVALID);
-	
+
 	for (UINT j = 0; j < (UINT)pool.size(); ++j) {
 		const Pos& pp = state[j];
 		if (pp.x < GridWidth && pp.y < GridHeight){
@@ -419,21 +444,21 @@ void CarnageSA::rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<
 };
 
 void CarnageSA::run_single(UINT uThreadID) {
-	
+
 	constexpr int max_iter	= 5000000;
 	constexpr double StartT	= 2000.0;
 	constexpr double EndT	= 0.005;
 	const double cooling	= std::pow(EndT / StartT, 1.0 / max_iter);
-	
+
 	constexpr UINT p_random_swap	= 1;	// ランダムスワップ
 	constexpr UINT p_nearby_swap	= 5;	// 隣接スワップ
 	constexpr UINT p_move_mid		= 50;	// 接続chip の真ん中に移動
-	
+
 	Score = ~0;
-	
+
 	std::mt19937_64 gen;
 	gen.seed(std::random_device{}());
-	
+
 	std::uniform_int_distribution<UINT>		dist_idx(0, (UINT)pool.size() - 1);
 	std::uniform_int_distribution<int>		dist_dir8(0, 7);
 	std::uniform_int_distribution<int>		dist_dir9(0, 8);
@@ -444,11 +469,18 @@ void CarnageSA::run_single(UINT uThreadID) {
 	);
 	std::uniform_int_distribution<int> dist_x(0, GridWidth - 1);
 	std::uniform_int_distribution<int> dist_y(0, GridHeight - 1);
-	
+	std::uniform_int_distribution<UINT>	dist_src_strategy(0, 10);	// 移動元はランダム or 優先移動リストから
+	std::uniform_int_distribution<int>	dist_src_pos(0, 24);		// 移動元位置のランダム分布
+
 	// occupancy
 	std::array<ChipID_t, MAX_CHIPS> occ;
 	std::array<ChipID_t, MAX_CHIPS> next_occ;
-	
+
+	// 優先移動対象リスト
+	using param_t = std::uniform_int_distribution<UINT>::param_type;
+	std::vector<ChipID_t> move_chip_list;
+	move_chip_list.reserve(MAX_CHIPS);
+
 #ifdef _WIN32
 	HANDLE hThread = GetCurrentThread();
 	SetThreadPriority(hThread, THREAD_PRIORITY_BELOW_NORMAL);
@@ -456,16 +488,16 @@ void CarnageSA::run_single(UINT uThreadID) {
 	// Linux: nice値を下げる（優先度低）
 	nice(10);
 #endif
-	
+
 	bool EndRun = false;
 	std::array<Pos, MAX_CHIPS> best_state;
-	
+
 	for(UINT LoopCnt = 0; !EndRun; ++LoopCnt){
 		if(LoopCnt == 0) InitState();
-		
+
 		double T = StartT;
 		rebuild_occ(state, occ);
-		
+
 		auto dump_occ = [&](std::array<ChipID_t, MAX_CHIPS>& occ){
 			printf("----------------\n");
 			for(UINT u = 0; u < GridWidth * GridHeight; ++u){
@@ -474,25 +506,25 @@ void CarnageSA::run_single(UINT uThreadID) {
 				if(u % GridWidth == (GridWidth - 1)) printf("\n");
 			}
 		};
-		
-		Energy_t current_E	= calculate_energy(state, occ);
-		
+
+		Energy_t current_E	= calculate_energy(state, occ, move_chip_list);
+
 		if(LoopCnt == 0){
 			best_state	= state;
 			best_E		= current_E;
 		}
-		
+
 		// move probabilities (base)
 		// neighbor-swap が残りの確率
 		auto next_state = state;
-	
+
 		// 1chip 移動
 		auto SwapChipXY = [&](UINT ax, UINT ay, UINT bx, UINT by) {
 			UINT achip = next_occ[ay * GridWidth + ax];
 			UINT bchip = next_occ[by * GridWidth + bx];
-			
+
 			std::swap(next_occ[ay * GridWidth + ax], next_occ[by * GridWidth + bx]);
-			
+
 			if(achip != POS_INVALID){
 				next_state[achip].x = (uint8_t)bx;
 				next_state[achip].y = (uint8_t)by;
@@ -502,133 +534,161 @@ void CarnageSA::run_single(UINT uThreadID) {
 				next_state[bchip].y = (uint8_t)ay;
 			}
 		};
-		
+
 		int iter;
 		for (iter = 0; iter < max_iter && !EndRun; ++iter) {
 			next_state	= state;
 			next_occ	= occ;
-			
-			UINT SrcIdx = dist_idx(gen);
-			UINT rnd = dist_prob(gen);
-			
+
+			UINT move_strategy = dist_prob(gen);
 			bool proposed = false;
-	
-			if (rnd < p_random_swap) {
+
+			if (move_strategy < p_random_swap) {
+				UINT SrcIdx = dist_idx(gen);
+
 				// ランダムセルへのジャンプ（空きがあれば移動、なければスワップ）
 				int nx = dist_x(gen);
 				int ny = dist_y(gen);
-				
+
 				SwapChipXY(next_state[SrcIdx].x, next_state[SrcIdx].y, nx, ny);
 				proposed = true;
 			}
-			else if(rnd < p_random_swap + p_nearby_swap){
-				// 隣接セルとのスワップ（8方向）
-				int dir = dist_dir8(gen);
-				UINT nx = next_state[SrcIdx].x + dx[dir];
-				UINT ny = next_state[SrcIdx].y + dy[dir];
-				if (nx < GridWidth && ny < GridHeight){
-					SwapChipXY(next_state[SrcIdx].x, next_state[SrcIdx].y, nx, ny);
-					proposed = true;
-				}
-			}
 			else {
-				// 接続チップの真ん中に移動
-				if (LinkList[SrcIdx].empty()) continue; // ないはず
-	
-				UINT dst_x = 0, dst_y = 0;
-				for(UINT neighbor : LinkList[SrcIdx]){
-					dst_x += next_state[neighbor].x;
-					dst_y += next_state[neighbor].y;
-				}
-				
-				UINT n = (UINT)LinkList[SrcIdx].size();
-				dst_x = (dst_x + n / 2) / n;
-				dst_y = (dst_y + n / 2) / n;
-	
-				// 隣接セルとのスワップ（8方向）
-				int dir = dist_dir9(gen);
-				dst_x += dx[dir];
-				dst_y += dy[dir];
-				
-				if(dst_x >= GridWidth ){dst_x -= dx[dir];}
-				if(dst_y >= GridHeight){dst_y -= dy[dir];}
-				
-				auto& p = next_state[SrcIdx];
-	
-				// 移動先が同じなら continue
-				if (p.x == dst_x && p.y == dst_y){
-					--iter;
-					continue;
-				}
-				
-				// start チップの場合は dst_y=0 に固定
-				if (SrcIdx == pool.m_start) dst_y = 0;
-	
-				// Exit チップの場合は端に固定
-				else if(pool[SrcIdx]->m_NextG == IDX_EXIT || pool[SrcIdx]->m_NextR == IDX_EXIT){
-					UINT xdist = (std::min)(dst_x, GridWidth  - 1 - dst_x);
-					UINT ydist = (std::min)(dst_y, GridHeight - 1 - dst_y);
-	
-					if (xdist < ydist) {
-						dst_x = (dst_x < GridWidth / 2) ? 0 : (GridWidth - 1);
-					} else {
-						dst_y = (dst_y < GridHeight / 2) ? 0 : (GridHeight - 1);
+				// 移動元選択
+				UINT SrcIdx;
+
+				if(dist_src_strategy(gen) == 0){
+					SrcIdx = dist_idx(gen);
+				}else{
+					// 優先リストから選ぶ
+					SrcIdx = dist_idx(gen, param_t(0, move_chip_list.size() - 1));
+					int x = next_state[SrcIdx].x;
+					int y = next_state[SrcIdx].y;
+
+					// 優先チップの 5x5 周辺からランダムに選ぶ
+					while(1){
+						int pos_rand = dist_src_pos(gen);
+						x += (pos_rand % 5) - 2;
+						if(x < 0) x = 0;
+						else if(x >= (int)GridWidth) x = GridWidth - 1;
+
+						y += (pos_rand / 5) - 2;
+						if(y < 0) y = 0;
+						else if(y >= (int)GridHeight) y = GridHeight - 1;
+
+						if((SrcIdx = next_occ[y * GridWidth + x]) != POS_INVALID) break;
 					}
 				}
-	
-				// 移動先が空きならそのまま移動
-				if (next_occ[dst_y * GridWidth + dst_x] == POS_INVALID) {
-					SwapChipXY(next_state[SrcIdx].x, next_state[SrcIdx].y, dst_x, dst_y);
-					proposed = true;
-				}else{
-					// 一旦 chip を消す
-					next_occ[p.y * GridWidth + p.x] = POS_INVALID;
-					
-					// 最も近い空きセルを探す
-					UINT best_x = 0;
-					UINT best_y = 0;
-					UINT best_dist = INT_MAX;
-		
-					for(UINT y = 0; y < GridHeight; ++y){
-						for(UINT x = 0; x < GridWidth; ++x){
-							int occIdx = next_occ[y * GridWidth + x];
-							if (occIdx == POS_INVALID) {
-								UINT dist = std::abs((int)(x - dst_x)) + std::abs((int)(y - dst_y));
-								if (dist < best_dist) {
-									best_dist = dist;
-									best_x = x;
-									best_y = y;
+
+				if(move_strategy < p_random_swap + p_nearby_swap){
+					// 隣接セルとのスワップ（8方向）
+					int dir = dist_dir8(gen);
+					UINT nx = next_state[SrcIdx].x + dx[dir];
+					UINT ny = next_state[SrcIdx].y + dy[dir];
+					if (nx < GridWidth && ny < GridHeight){
+						SwapChipXY(next_state[SrcIdx].x, next_state[SrcIdx].y, nx, ny);
+						proposed = true;
+					}
+				}
+				else {
+					// 接続チップの真ん中に移動
+					if (LinkList[SrcIdx].empty()) continue; // ないはず
+
+					UINT dst_x = 0, dst_y = 0;
+					for(UINT neighbor : LinkList[SrcIdx]){
+						dst_x += next_state[neighbor].x;
+						dst_y += next_state[neighbor].y;
+					}
+
+					UINT n = (UINT)LinkList[SrcIdx].size();
+					dst_x = (dst_x + n / 2) / n;
+					dst_y = (dst_y + n / 2) / n;
+
+					// 隣接セルとのスワップ（8方向）
+					int dir = dist_dir9(gen);
+					dst_x += dx[dir];
+					dst_y += dy[dir];
+
+					if(dst_x >= GridWidth ){dst_x -= dx[dir];}
+					if(dst_y >= GridHeight){dst_y -= dy[dir];}
+
+					auto& p = next_state[SrcIdx];
+
+					// 移動先が同じなら continue
+					if (p.x == dst_x && p.y == dst_y){
+						--iter;
+						continue;
+					}
+
+					// start チップの場合は dst_y=0 に固定
+					if (SrcIdx == pool.m_start) dst_y = 0;
+
+					// Exit チップの場合は端に固定
+					else if(pool[SrcIdx]->m_NextG == IDX_EXIT || pool[SrcIdx]->m_NextR == IDX_EXIT){
+						UINT xdist = (std::min)(dst_x, GridWidth  - 1 - dst_x);
+						UINT ydist = (std::min)(dst_y, GridHeight - 1 - dst_y);
+
+						if (xdist < ydist) {
+							dst_x = (dst_x < GridWidth / 2) ? 0 : (GridWidth - 1);
+						} else {
+							dst_y = (dst_y < GridHeight / 2) ? 0 : (GridHeight - 1);
+						}
+					}
+
+					// 移動先が空きならそのまま移動
+					if (next_occ[dst_y * GridWidth + dst_x] == POS_INVALID) {
+						SwapChipXY(next_state[SrcIdx].x, next_state[SrcIdx].y, dst_x, dst_y);
+						proposed = true;
+					}else{
+						// 一旦 chip を消す
+						next_occ[p.y * GridWidth + p.x] = POS_INVALID;
+
+						// 最も近い空きセルを探す
+						UINT best_x = 0;
+						UINT best_y = 0;
+						UINT best_dist = INT_MAX;
+
+						for(UINT y = 0; y < GridHeight; ++y){
+							for(UINT x = 0; x < GridWidth; ++x){
+								int occIdx = next_occ[y * GridWidth + x];
+								if (occIdx == POS_INVALID) {
+									UINT dist = std::abs((int)(x - dst_x)) + std::abs((int)(y - dst_y));
+									if (dist < best_dist) {
+										best_dist = dist;
+										best_x = x;
+										best_y = y;
+									}
 								}
 							}
 						}
+
+						// チップ移動
+						if(best_x < dst_x){
+							for (UINT x = best_x; x < dst_x; ++x) SwapChipXY(x + 1, best_y, x, best_y);
+						}else{
+							for (UINT x = best_x; x > dst_x; --x) SwapChipXY(x - 1, best_y, x, best_y);
+						}
+						if(best_y < dst_y){
+							for (UINT y = best_y; y < dst_y; ++y) SwapChipXY(dst_x, y + 1, dst_x, y);
+						}else{
+							for (UINT y = best_y; y > dst_y; --y) SwapChipXY(dst_x, y - 1, dst_x, y);
+						}
+
+						next_occ[dst_y * GridWidth + dst_x] = (ChipID_t)SrcIdx;
+						next_state[SrcIdx].x = (uint8_t)dst_x;
+						next_state[SrcIdx].y = (uint8_t)dst_y;
+						proposed = true;
 					}
-					
-					// チップ移動
-					if(best_x < dst_x){
-						for (UINT x = best_x; x < dst_x; ++x) SwapChipXY(x + 1, best_y, x, best_y);
-					}else{
-						for (UINT x = best_x; x > dst_x; --x) SwapChipXY(x - 1, best_y, x, best_y);
-					}
-					if(best_y < dst_y){
-						for (UINT y = best_y; y < dst_y; ++y) SwapChipXY(dst_x, y + 1, dst_x, y);
-					}else{
-						for (UINT y = best_y; y > dst_y; --y) SwapChipXY(dst_x, y - 1, dst_x, y);
-					}
-					
-					next_occ[dst_y * GridWidth + dst_x] = (ChipID_t)SrcIdx;
-					next_state[SrcIdx].x = (uint8_t)dst_x;
-					next_state[SrcIdx].y = (uint8_t)dst_y;
-					proposed = true;
 				}
 			}
-	
+
 			if (!proposed){
 				--iter;
 				continue;
 			}
-	
-			Energy_t next_E = calculate_energy(next_state, next_occ);
-			
+
+			Energy_t next_E = calculate_energy(next_state, next_occ, move_chip_list);
+
 			// 早期最適性判定
 			if (next_E == 0) {
 				state		= next_state;
@@ -637,7 +697,7 @@ void CarnageSA::run_single(UINT uThreadID) {
 				best_E		= next_E;
 				break;
 			}
-	
+
 			int diff = (int)next_E - (int)current_E;
 			if (diff < 0 || dist_prob(gen) < std::exp(-diff / T)) {
 				// accept
@@ -649,51 +709,51 @@ void CarnageSA::run_single(UINT uThreadID) {
 					best_state	= state;
 				}
 			}
-	
+
 			Energy_t BestScore = UpdateScore(best_E);
-			
+
 			if (BestScore == 0) EndRun = true;
-			
+
 			// cooling
 			T *= cooling;
-			
+
 			#ifndef DEBUG
 				if (iter % 1000000 == 0){
 					if(uThreadID == 0) printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)BestScore);
 				}
 			#endif
 		}
-		
+
 		Energy_t BestScore = UpdateScore(best_E);
-		
+
 		if(uThreadID == 0) printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)BestScore);
 		if (BestScore == 0 || LoopCnt >= 1 && BestScore < 100){
 			EndRun = true;
 		}
 	}
-	
+
 	state = best_state;
 }
 
 void CarnageSA::run(UINT num_threads){
 	std::vector<CarnageSA> workers;
 	std::vector<std::thread> threads;
-	
+
 	#ifdef _DEBUG
 		num_threads = 1;
 	#else
 		if(num_threads == 0) num_threads = std::thread::hardware_concurrency();
 	#endif
-	
+
 	auto start = std::chrono::steady_clock::now();
-	
+
 	// 1. スレッドごとに自分(*this)をコピーして独立したインスタンスを作る
 	for (UINT u = 0; u < num_threads; ++u) {
-		workers.push_back(*this); 
+		workers.push_back(*this);
 	}
 
 	// 2. 各インスタンスの run を並列実行
-	
+
 	for (UINT u = 0; u < num_threads; ++u) {
 		threads.emplace_back(&CarnageSA::run_single, &workers[u], u);
 	}
@@ -704,22 +764,22 @@ void CarnageSA::run(UINT num_threads){
 	}
 
 	// 4. 最良の結果を自分自身(*this)に書き戻す
-	auto best_it = std::min_element(workers.begin(), workers.end(), 
+	auto best_it = std::min_element(workers.begin(), workers.end(),
 		[](const CarnageSA& a, const CarnageSA& b) {
 			return a.best_E < b.best_E;
 		});
 
 	this->state = best_it->state;
 	this->best_E = best_it->best_E;
-	
+
 	if(best_E < 100){
 		NopRouting();
 		SetArrow();
 	}
-	
+
 	auto end = std::chrono::steady_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-	
+
 	printf("Parallel run finished in %.2fs. Best score: %d\n", elapsed / 1000.0, (UINT)this->best_E);
 }
 
@@ -727,12 +787,12 @@ void CarnageSA::run(UINT num_threads){
 // Nop ルーティング
 
 void CarnageSA::NopRouting(void){
-	
+
 	std::array<ChipID_t, MAX_CHIPS> occ;
 	rebuild_occ(state, occ);
-	
+
 	UINT N = (UINT)pool.size();
-	
+
 	for (UINT u = 0; u < N; ++u) {
 		if(pool[u]->m_NextG < N) FindPath(u, pool[u]->m_NextG, state, occ, true, false);
 		if(pool[u]->m_NextR < N) FindPath(u, pool[u]->m_NextR, state, occ, true, true);
@@ -743,7 +803,7 @@ void CarnageSA::NopRouting(void){
 // RawG/R 設定
 
 void CarnageSA::SetArrow(void){
-	
+
 	auto GetArrowCode = [&](UINT from, UINT to) -> int {
 		if(to == IDX_NONE) return 0;
 
@@ -754,10 +814,10 @@ void CarnageSA::SetArrow(void){
 			else if(state[from].x == (GridWidth - 1))	return 2; // E
 			else										return (pool.m_start == from) ? 7 : 0;
 		}
-		
+
 		int dx = (int)state[to].x - (int)state[from].x;
 		int dy = (int)state[to].y - (int)state[from].y;
-		
+
 		if(dy < 0){
 			if(dx < 0)			return 7; // NW
 			else if(dx == 0)	return 0; // N
@@ -771,7 +831,7 @@ void CarnageSA::SetArrow(void){
 		else if(dx == 0)		return 4; // S
 		else					return 3; // SE
 	};
-	
+
 	for(UINT u = 0; u < pool.size(); ++u){
 		CChip* chip = pool[u];
 		chip->m_RawG = GetArrowCode(u, chip->m_NextG);
@@ -784,7 +844,7 @@ void CarnageSA::SetArrow(void){
 void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 	const int CHIP_SIZE = 75;    // チップサイズ
 	const int GAP = 15;          // 隙間
-	const int CELL_SIZE = CHIP_SIZE + GAP; 
+	const int CELL_SIZE = CHIP_SIZE + GAP;
 	const int OFFSET = (CELL_SIZE - CHIP_SIZE) / 2;
 	const int SECTION_GAP = 60;  // セクション間の余白（タイトル含む）
 
@@ -819,9 +879,9 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 	}
 
 	fprintf(fp, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-	fprintf(fp, "<svg width=\"%d\" height=\"%d\" viewBox=\"0 0 %d %d\" xmlns=\"http://www.w3.org/2000/svg\">\n", 
+	fprintf(fp, "<svg width=\"%d\" height=\"%d\" viewBox=\"0 0 %d %d\" xmlns=\"http://www.w3.org/2000/svg\">\n",
 			max_width, total_height + 20, max_width, total_height + 20);
-	
+
 	fprintf(fp, "  <defs>\n");
 	fprintf(fp, "    <marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"3\" orient=\"auto\" markerUnits=\"strokeWidth\">\n");
 	fprintf(fp, "      <path d=\"M0,0 L0,6 L9,3 z\" fill=\"context-stroke\" />\n");
@@ -839,7 +899,7 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 		const auto& state_disp = sa->get_result();
 
 		// タイトル表示
-		fprintf(fp, "  <text x=\"0\" y=\"%d\" font-family=\"Meiryo, sans-serif\" font-size=\"18\" font-weight=\"bold\" fill=\"#333\">%s</text>\n", 
+		fprintf(fp, "  <text x=\"0\" y=\"%d\" font-family=\"Meiryo, sans-serif\" font-size=\"18\" font-weight=\"bold\" fill=\"#333\">%s</text>\n",
 				current_y_offset + 25, sa->m_name);
 
 		int draw_y_start = current_y_offset + 40;
@@ -852,7 +912,7 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 			double margin = (CHIP_SIZE / 2.0) + 2;
 			const char* dash = dashed ? " stroke-dasharray=\"4\"" : "";
 			fprintf(fp, "  <line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"2.5\"%s marker-end=\"url(#arrow)\" />\n",
-					x1 + dx * (margin/dist), draw_y_start + y1 + dy * (margin/dist), 
+					x1 + dx * (margin/dist), draw_y_start + y1 + dy * (margin/dist),
 					x2 - dx * (margin/dist), draw_y_start + y2 - dy * (margin/dist), color, dash);
 		};
 
@@ -869,11 +929,11 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 			int x = state_disp[i].x * CELL_SIZE + OFFSET;
 			int y = state_disp[i].y * CELL_SIZE + OFFSET;
 			int centerX = x + CHIP_SIZE / 2;
-			
+
 			const char* fill_color =
 				pool.m_list[i]->m_Id.get() == CHIPID_NOP && static_cast<CChipNop *>(pool.m_list[i].get())->m_param.get() == 0 ? "#F0F0F0" :
 				pool.m_list[i]->m_NextR != IDX_NONE ? "#FFF0F0" : "white";
-			
+
 			fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"%s\" stroke=\"#343a40\" stroke-width=\"2\" />\n",
 					x, draw_y_start + y, CHIP_SIZE, CHIP_SIZE, fill_color);
 			fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Meiryo, sans-serif\" text-anchor=\"middle\">\n", centerX, draw_y_start + y + 25);
@@ -917,7 +977,7 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 			process_conn(pool.m_list[i]->m_NextG, "#28a745");
 			process_conn(pool.m_list[i]->m_NextR, "#dc3545");
 		}
-		
+
 		current_y_offset += h * CELL_SIZE + SECTION_GAP;
 	}
 	fprintf(fp, "</svg>\n");
@@ -938,69 +998,69 @@ int main(void){
 	g_pField.push_back(std::make_unique<CField>("SUB1", 7, 7));
 	g_pField.push_back(std::make_unique<CField>("SUB2", 7, 7));
 	g_pCurField = g_pField[0].get();
-	
+
 	chip_main();
 	g_pCurField->CheckBlockStack();
 	if(g_uErrorCnt) exit(1);
-	
+
 	std::vector<std::unique_ptr<CarnageSA>>	sa;
 	std::vector<CarnageSA*> sa_ptrs;
-	
+
 	for(int i = 0; i < 3; ++i){
 		//g_pField[i]->m_pool.dump();
 		g_pField[i]->FinalizeCompile();
-		
+
 		sa.emplace_back(std::make_unique<CarnageSA>(g_pField[i]->m_pool, g_pField[i]->m_name));
 		sa_ptrs.push_back(sa[i].get());
-		
+
 		if(g_pField[i]->m_pool.size()){
 			sa[i]->run();
 			//sa[i]->dump();
 		}
 	}
-	
+
 	OutputSvg("okecc.svg", sa_ptrs);
-	
+
 	const std::string mcFile = "memcard.mcd";
 	const char *gameId[] = {"SLPS-01666", "SLPSP02318"};
-	
+
 	MemoryCardManager mcr(mcFile);
-	
+
 	bool bMcrUpdate = false;
-	
+
 	for(int i = 0; i < 2; ++i){
 		// 1. インスタンス生成（ファイル読み込みとID設定）
 		mcr.setGameId(gameId[i]);
-		
+
 		// 2. データの読み出し
 		std::vector<uint8_t> saveBuffer;
 		size_t dataSize = mcr.read(saveBuffer);
-	
+
 		if (dataSize == 0) {
 			std::cerr << "Not found Game ID '" << gameId[i] << std::endl;
 			continue;
 		}
-		
+
 		std::cout << "Game ID: " << gameId[i] << " detected" << std::endl;
-		
+
 		SaveDataZeus *pZeus = (SaveDataZeus *)(((char *)saveBuffer.data()) + i * 8);
-		
+
 		// ソフト書き込み
 		constexpr UINT CARD		= 0;
 		constexpr UINT width	= 23;
 		constexpr UINT height	= 15;
-		
+
 		for(UINT u = 0; u < width * height; ++u) pZeus->Oke[CARD].Software[u] = 0;
-		
+
 		UINT offx = 0, offy = 0;
 		for(UINT fld = 0; fld < 3; ++fld){
 			auto& state = sa[fld]->get_result();
 			auto pFld = g_pField[fld].get();
-			
+
 			auto GetStartX = [&]() -> UINT {
 				return pFld->m_pool.size() == 0 ? 0 : state[pFld->m_pool.m_start].x;
 			};
-			
+
 			if(fld == 0){
 				pZeus->Oke[CARD].StartMainX = GetStartX() + offx + 2;
 				pZeus->Oke[CARD].StartMainY = offy + 2;
@@ -1010,30 +1070,30 @@ int main(void){
 				pZeus->Oke[CARD].StartSub1Y = offy + 2;
 			}else if(fld == 2){
 				offy = 8;
-				
+
 				pZeus->Oke[CARD].StartSub2X = GetStartX() + offx + 2;
 				pZeus->Oke[CARD].StartSub2Y = offy + 2;
 			}
-			
+
 			for(UINT u = 0; u < pFld->m_pool.size(); ++u){
 				CChipBinary bin;
-				
+
 				auto& p = state[u];
 				pFld->m_pool[u]->GetBin(bin);
 				pZeus->Oke[CARD].Software[(p.y + offy) * width + p.x + offx] = bin.m_val;
 			}
-			
+
 			// chksum
 			uint8_t ChkSum = 0;
 			for(int i = 0; i < dataSize - 1; ++i) ChkSum += saveBuffer[i];
 			saveBuffer[dataSize - 1] = ChkSum;
-			
+
 			mcr.write(saveBuffer);
 		}
-		
+
 		bMcrUpdate = true;
 	}
-	
+
 	// 3. データの書き込み
 	if (bMcrUpdate && mcr.saveToFile()) {
 		std::cout << "Successfully wrote to " << mcFile << std::endl;
@@ -1041,6 +1101,6 @@ int main(void){
 		std::cerr << "Failed to write to " << mcFile << std::endl;
 		return 1;
 	}
-	
+
 	return 0;
 }
