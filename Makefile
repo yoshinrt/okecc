@@ -20,7 +20,7 @@ $(OBJDIR)/%: $(OBJDIR)/%.o $(OBJDIR)/okecc_sa.o
 
 %.oke: $(OBJDIR)/%
 	$(OBJDIR)/$*
-	if [ -e chip.svg ]; then mv chip.svg $*.svg; fi
+	if [ -e okecc.svg ]; then mv okecc.svg $*.svg; fi
 
 clean:
 	rm -rf *.svg $(OBJDIR)
