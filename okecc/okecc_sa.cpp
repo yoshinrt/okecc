@@ -493,9 +493,18 @@ void CarnageSA::run_single(UINT uThreadID) {
 	std::array<Pos, MAX_CHIPS> best_state;
 
 	for(UINT LoopCnt = 0; !EndRun; ++LoopCnt){
-		if(LoopCnt == 0) InitState();
+		double T;
 
-		double T = StartT;
+		if(LoopCnt == 0){
+			InitState();
+			T = StartT;
+		}else if(best_E < 100){
+			// スコアが十分良い場合は温度を下げて局所探索に切り替える
+			T = StartT * 0.001;
+		}else{
+			T = StartT * 0.1;
+		}
+
 		rebuild_occ(state, occ);
 
 		auto dump_occ = [&](std::array<ChipID_t, MAX_CHIPS>& occ){
@@ -718,7 +727,7 @@ void CarnageSA::run_single(UINT uThreadID) {
 			T *= cooling;
 
 			#ifndef DEBUG
-				if (iter % 1000000 == 0){
+				if (iter % 500000 == 0){
 					if(uThreadID == 0) printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)BestScore);
 				}
 			#endif
