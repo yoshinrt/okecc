@@ -481,6 +481,11 @@ void CarnageSA::run_single(UINT uThreadID) {
 	std::vector<ChipID_t> move_chip_list;
 	move_chip_list.reserve(MAX_CHIPS);
 
+	// ログ表示タイマ
+	using clock = std::chrono::steady_clock;
+	auto next_log_time = clock::now();  // 最初の起点
+	const auto interval = std::chrono::seconds(1);
+
 #ifdef _WIN32
 	HANDLE hThread = GetCurrentThread();
 	SetThreadPriority(hThread, THREAD_PRIORITY_BELOW_NORMAL);
@@ -494,6 +499,7 @@ void CarnageSA::run_single(UINT uThreadID) {
 
 	for(UINT LoopCnt = 0; !EndRun; ++LoopCnt){
 		double T;
+		next_log_time = clock::now();
 
 		if(LoopCnt == 0){
 			InitState();
@@ -727,8 +733,12 @@ void CarnageSA::run_single(UINT uThreadID) {
 			T *= cooling;
 
 			#ifndef DEBUG
-				if (iter % 500000 == 0){
-					if(uThreadID == 0) printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)BestScore);
+				if (uThreadID == 0 && iter % 100000 == 0){
+					auto now = clock::now();
+					if (now >= next_log_time) {
+						next_log_time = now + interval;
+						printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)BestScore);
+					}
 				}
 			#endif
 		}
