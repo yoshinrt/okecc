@@ -96,9 +96,9 @@ static inline void Error(const std::string& message){
 class CChipBinary {
 public:
 	CChipBinary(uint32_t val = 0) : m_val(val), m_pos(32){}
-	
+
 	uint32_t GetVal(void) const { return m_val; }
-	
+
 	uint32_t	m_val;
 	int			m_pos;
 };
@@ -132,17 +132,17 @@ public:
 		int i = m_value * step + offset;
 		return (i > max) ? (i - max * 2) : i;
 	}
-	
+
 	void GetBin(CChipBinary& bin){
 		bin.m_pos -= width;
 		bin.m_val |= (m_value & bitmask) << bin.m_pos;
 	}
-	
+
 	void SetBin(CChipBinary& bin){
 		bin.m_pos -= width;
 		m_value = (bin.m_val >> bin.m_pos) & bitmask;
 	};
-	
+
 private:
 	UINT	m_value = 0;
 };
@@ -157,7 +157,7 @@ public:
 		OP_EQ,
 		OP_NE,
 	};
-	
+
 	static inline const char *OkeTypeStr[] = {
 		"二脚",
 		"四脚",
@@ -166,77 +166,77 @@ public:
 		"飛行",
 		"全種",
 	};
-	
+
 	static inline const char *m_operator_str[] = {
 		"≧", "≦", "==", "≠"
 	};
-	
+
 	static inline const char *m_StatusTypeStr[] = {
 		"熱量", "燃料", "ダメージ"
 	};
-	
+
 	enum {
 		ENEMY,
 		FRIENDLY
 	};
-	
+
 	static inline const char *m_EnemyFriendlyStr[] = {
 		"敵", "味方"
 	};
-	
+
 	enum {
 		SELF,
 		TARGET
 	};
-	
+
 	static inline const char *m_SelfTgtTypeStr[] = {
 		"自機", "TGT"
 	};
-	
+
 	enum {
 		X, Y, Z
 	};
-	
+
 	static inline const char *m_CoordinateStr[] = {
 		"X", "Y", "Z"
 	};
-	
+
 	static inline const char *m_VarNameStr[] = {
 		"A", "B", "C", "D", "E", "F"
 	};
-	
+
 	CChip(){
 		m_Id		= CHIPID_NULL;
 	}
-	
+
 	virtual ~CChip(){}
-	
+
 	virtual std::string GetLayoutText(void){
 		return "";
 	}
-	
+
 	std::string GetDslText(void){
 		std::string s = GetLayoutText();
 		std::replace(s.begin(), s.end(), '\n', ' ');
 		return s;
 	}
-	
+
 	virtual void set_num(int num){}
 	virtual void set_operator(int opr){}
-	
+
 	bool ValidG(void) const { return m_NextG < IDX_EXIT; }
 	bool ValidR(void) const { return m_NextR < IDX_EXIT; }
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		m_Id.GetBin(bin);
 		m_RawG.GetBin(bin);
 	}
-	
+
 	virtual void SetBin(CChipBinary& bin){
 		m_Id.SetBin(bin);
 		m_RawG.SetBin(bin);
 	}
-	
+
 	ScaledInt<6>	m_Id;
 	ScaledInt<3>	m_RawG;
 	ScaledInt<3>	m_RawR;
@@ -248,12 +248,12 @@ public:
 class CChipCond : public CChip {
 public:
 	virtual ~CChipCond(){}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_RawR.GetBin(bin);
 	}
-	
+
 	virtual void SetBin(CChipBinary& bin){
 		CChip::SetBin(bin);
 		m_RawR.SetBin(bin);
@@ -311,12 +311,12 @@ public:
 
 		return dst;
 	}
-	
+
 	void CleanupGoto(void){
 		// Goto 飛び先解決
 		std::vector<UINT> IdxOld2New;
 		std::vector<UINT> IdxNew2Old;
-		
+
 		for(UINT u = 0; u < m_list.size(); ++u){
 			if(u==0x2c){
 				int a = 0;
@@ -334,7 +334,7 @@ public:
 		for(UINT u = 0; u < m_list.size(); ++u){
 			if(m_list[u]->m_Id.get() == CHIPID_GOTO) m_list[u].reset();
 		}
-		
+
 		// 空きを詰める
 		for(UINT u = 0; u < IdxNew2Old.size(); ++u){
 			m_list[u] = std::move(m_list[IdxNew2Old[u]]);
@@ -344,7 +344,7 @@ public:
 		m_start = IdxOld2New[m_start];
 		m_list.resize(IdxNew2Old.size());
 	}
-	
+
 	void dump(void){
 		printf("Start=%d\n ID   G   R  Description\n", m_start);
 		for(UINT u = 0; u < m_list.size(); ++u){
@@ -373,9 +373,9 @@ public:
 	UINT m_LastG	= IDX_NONE;	// 最後の緑矢印を出している chip
 	UINT m_LastR	= IDX_NONE; // 最後の赤矢印を出している chip
 	CChipPool&	m_pool;
-	
+
 	CChipTree(CChipPool& pool) : m_pool(pool){}
-	
+
 	// g, r を update
 	void AddToG(UINT idx){
 		if(m_start == IDX_NONE) m_start = idx;
@@ -406,50 +406,50 @@ public:
 
 		return *this;
 	}
-	
+
 	CChipTree operator&&(const CChipTree& b) const {
 		CChipTree cc_a = *this;
 		CChipTree cc_b = b;
-	
+
 		// a.r -> cc_b.start を指す
 		cc_a.AddToR(cc_b.m_start);
-	
+
 		// False 側: GOTO を生成し a.g, cc_b.g, tree.g はそれを指す
 		UINT idx = m_pool.add(std::make_unique<CChipGoto>());
 		cc_a.AddToG(idx);
 		cc_b.AddToG(idx);
-	
+
 		// True 側: tree.r は cc_b.r になる
 		cc_a.m_LastR = cc_b.m_LastR;
-	
+
 		return cc_a;
 	}
-	
+
 	CChipTree operator||(const CChipTree& b) const {
 		CChipTree cc_a = *this;
 		CChipTree cc_b = b;
-	
+
 		// a.g -> cc_b.start を指す
 		cc_a.AddToG(cc_b.m_start);
-	
+
 		// True 側: GOTO を生成し a.r, cc_r.g, tree.r はそれを指す
 		UINT idx = m_pool.add(std::make_unique<CChipGoto>());
 		cc_a.AddToR(idx);
 		cc_b.AddToR(idx);
-	
+
 		// False 側: tree.g は cc_b.g になる
 		cc_a.m_LastG = cc_b.m_LastG;
-	
+
 		return cc_a;
 	}
-	
+
 	CChipTree operator!(void) const {
 		CChipTree tree = CChipTree(m_pool);
-		
+
 		tree.m_start = m_start;
 		tree.m_LastG = m_LastR;
 		tree.m_LastR = m_LastG;
-		
+
 		return tree;
 	}
 };
@@ -462,23 +462,23 @@ public:
 	CChipPool	m_pool;
 	CChipTree	m_tree;
 	const char	*m_name;
-	
+
 	CField(const char *name, UINT width, UINT height) : m_name(name), m_pool(width, height), m_tree(m_pool){}
-	
+
 	void FinalizeCompile(){
 		m_tree.AddToG(IDX_EXIT);
 		m_pool.m_start = m_tree.m_start;
 		//m_pool.dump();
-		
+
 		if(m_pool.size() > 0){
 			// Goto 最適化
 			m_pool.CleanupGoto();
 		}
 		printf("%s: Number of chip(s): %d\n", m_name, (UINT)m_pool.m_list.size());
 	}
-	
+
 	// ブロック制御
-	
+
 	enum {
 		BM_NONE,
 		BM_IF_TOP,	// top of if block
@@ -486,59 +486,59 @@ public:
 		BM_ELSE,	// else 中
 		BM_LOOP,	// loop 中
 	};
-	
+
 	class BlockInfo {
 	public:
 		std::source_location m_location;
 		UINT m_TargetIdx;
-		
+
 		BlockInfo(std::source_location location, UINT idx = IDX_NONE) : m_location(location), m_TargetIdx(idx){}
 		virtual ~BlockInfo(){}
-		
+
 		virtual UINT GetMode(){return BM_NONE;}
 	};
-	
+
 	class BiIfTop : public BlockInfo {
 	public:
 		BiIfTop(std::source_location location, UINT idx = IDX_NONE) : BlockInfo(location, idx){}
 		virtual ~BiIfTop(){}
 		virtual UINT GetMode(){return BM_IF_TOP;}
 	};
-	
+
 	class BiIf : public BlockInfo {
 	public:
 		BiIf(std::source_location location, UINT idx) : BlockInfo(location, idx){}
 		virtual ~BiIf(){}
 		virtual UINT GetMode(){return BM_IF;}
 	};
-	
+
 	class BiElse : public BlockInfo {
 	public:
 		BiElse(std::source_location location, UINT idx) : BlockInfo(location, idx){}
 		virtual ~BiElse(){}
 		virtual UINT GetMode(){return BM_ELSE;}
 	};
-	
+
 	class BiLoop : public BlockInfo {
 	public:
 		BiLoop(std::source_location location, UINT idx, UINT brk) : BlockInfo(location, idx), m_SavePrevBreak(brk){}
-		
+
 		virtual ~BiLoop(){}
 		virtual UINT GetMode(){return BM_LOOP;}
-		
+
 		UINT m_SavePrevBreak;
 	};
-	
+
 	static constexpr UINT BLOCK_TOP = 0xFFFFFFFF;
-	
+
 	std::vector<std::unique_ptr<BlockInfo>>	m_BlockStack;
 	UINT m_Break = IDX_NONE;
-	
+
 	UINT GetMode(void){
 		return m_BlockStack.size() < 1 ? BM_NONE :
 			m_BlockStack.back()->GetMode();
 	}
-	
+
 	void CheckBlockStack(){
 		while(m_BlockStack.size() > 0){
 			g_LastLocation = m_BlockStack.back()->m_location;
@@ -546,17 +546,17 @@ public:
 			m_BlockStack.pop_back();
 		}
 	}
-	
+
 	std::string GetBlockErrorMsg(const std::string& message){
 		if(m_BlockStack.size() == 0) return message;
-		
+
 		return std::format("{}\n  Corresponging statement: {}({})",
 			message,
 			m_BlockStack.back()->m_location.file_name(),
 			m_BlockStack.back()->m_location.line()
 		);
 	}
-	
+
 	void BlockError(const std::string& message){
 		Error(GetBlockErrorMsg(message));
 	}
@@ -574,14 +574,14 @@ concept ChipLike = std::convertible_to<T, CChipTree>;
 template <ChipLike T, ChipLike U>
 requires (!std::same_as<std::remove_cvref_t<T>, CChipTree> || !std::same_as<std::remove_cvref_t<U>, CChipTree>)
 CChipTree operator&&(T&& lhs, U&& rhs) {
-	return static_cast<CChipTree>(std::forward<T>(lhs)) && 
+	return static_cast<CChipTree>(std::forward<T>(lhs)) &&
 		   static_cast<CChipTree>(std::forward<U>(rhs));
 }
 
 template <ChipLike T, ChipLike U>
 requires (!std::same_as<std::remove_cvref_t<T>, CChipTree> || !std::same_as<std::remove_cvref_t<U>, CChipTree>)
 CChipTree operator||(T&& lhs, U&& rhs) {
-	return static_cast<CChipTree>(std::forward<T>(lhs)) || 
+	return static_cast<CChipTree>(std::forward<T>(lhs)) ||
 		   static_cast<CChipTree>(std::forward<U>(rhs));
 }
 
@@ -589,33 +589,33 @@ CChipTree operator||(T&& lhs, U&& rhs) {
 
 class CCond {
 public:
-	
+
 	CCond(std::unique_ptr<CChip> pchip) : m_pchip(std::move(pchip)) {}
-	
+
 	std::unique_ptr<CChip> m_pchip;
-	
+
 	CChipTree GetCChipTree(void) {
 		CChipTree tree(g_pCurField->m_pool);
-		
+
 		// チップ単体からツリーに変換 (Condition chip)
 		// R 側に Goto を足して，常に m_NextG を触ればいいようにする
 		tree.m_start = tree.m_pool.add(std::move(m_pchip));
 		tree.m_LastG = tree.m_start;
-		
+
 		tree.m_LastR = tree.m_pool.add(std::make_unique<CChipGoto>());
 		tree.m_pool[tree.m_start]->m_NextR = tree.m_LastR;
-		
+
 		return tree;
 	}
-	
+
 	operator CChipTree() {
 		return GetCChipTree();
 	}
-	
+
 	CChipTree operator!(void) {
 		return !GetCChipTree();
 	}
-	
+
 	CChipTree operator>=(int num) {
 		m_pchip->set_num(num);
 		m_pchip->set_operator(CChip::OP_GE);
@@ -662,23 +662,23 @@ public:
 		TGT_POS_Y,
 		TGT_POS_Z,
 	};
-	
+
 	CChipVal(UINT type, int param = 0) : m_type(type), m_param(param){}
-	
+
 	CChipTree operator!(void) const {
 		return !(*this >= 1);
 	}
-	
+
 	operator CChipTree() const {
 		return *this >= 1;
 	}
-	
+
 	CCond GetCChipCond(void) const;
 	CChipTree operator<=(int num) const;
 	CChipTree operator< (int num) const;
 	CChipTree operator>=(int num) const;
 	CChipTree operator> (int num) const;
-	
+
 	UINT m_type;
 	int m_param;
 };
@@ -690,38 +690,38 @@ class CChipVar {
 public:
 	CChipVar(UINT var) : m_var(var){}
 	UINT m_var;
-	
+
 	CChipVar& operator=(const CChipVal& chip);
-	
+
 	operator CChipTree() const {
 		return *this != 0;
 	}
-	
+
 	CChipTree operator!(void) const {
 		return *this == 0;
 	}
-	
+
 	CChipVar& operator+=(const CChipVar& op2);
 	CChipVar& operator-=(const CChipVar& op2);
 	CChipVar& operator*=(const CChipVar& op2);
 	CChipVar& operator/=(const CChipVar& op2);
 	CChipVar& operator%=(const CChipVar& op2);
 	CChipVar& operator= (const CChipVar& op2);
-	
+
 	CChipVar& operator+=(const int op2);
 	CChipVar& operator-=(const int op2);
 	CChipVar& operator*=(const int op2);
 	CChipVar& operator/=(const int op2);
 	CChipVar& operator%=(const int op2);
 	CChipVar& operator= (const int op2);
-	
+
 	CChipTree operator>=(const CChipVar& op2) const;
 	CChipTree operator<=(const CChipVar& op2) const;
 	CChipTree operator==(const CChipVar& op2) const;
 	CChipTree operator!=(const CChipVar& op2) const;
 	CChipTree operator> (const CChipVar& op2) const;
 	CChipTree operator< (const CChipVar& op2) const;
-	
+
 	CChipTree operator>=(const int imm) const;
 	CChipTree operator<=(const int imm) const;
 	CChipTree operator==(const int imm) const;
@@ -750,24 +750,24 @@ public:
 	}
 
 	virtual ~CChipNop(){}
-	
+
 	virtual std::string GetLayoutText(void){
 		return
 			m_param.get() == 0 ? "NOP" :
 			m_param.get() == NOP_AE ? "Wait AE" :
 			std::format("Wait {:2d}", m_param.get());
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_param.GetBin(bin);
 	}
-	
+
 	virtual void SetBin(CChipBinary& bin){
 		CChip::SetBin(bin);
 		m_param.SetBin(bin);
 	}
-	
+
 	ScaledInt<5,2> m_param;
 };
 
@@ -810,7 +810,7 @@ public:
 			m_param.get() == LEFT	? "左移動" :
 									  "停止";
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_pad.GetBin(bin);
@@ -822,7 +822,7 @@ public:
 		m_pad.SetBin(bin);
 		m_param.SetBin(bin);
 	}
-	
+
 	ScaledInt<1> m_pad;
 	ScaledInt<3> m_param;
 };
@@ -857,7 +857,7 @@ public:
 	virtual std::string GetLayoutText(void){
 		return m_param.get() == LEFT	? "左旋回" : "右旋回";
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_param.GetBin(bin);
@@ -903,7 +903,7 @@ public:
 			m_param.get() == BACK	? "後Jmp" :
 			m_param.get() == LEFT	? "左Jmp" : "右Jmp";
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_param.GetBin(bin);
@@ -955,7 +955,7 @@ public:
 			m_param.get() == ACTION1	? "Action1" :
 			m_param.get() == ACTION2	? "Action2" : "Action3";
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_param.GetBin(bin);
@@ -1001,7 +1001,7 @@ public:
 			m_param.get() == HIGH	? "高高度" :
 			m_param.get() == MID	? "中高度" : "低高度";
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_param.GetBin(bin);
@@ -1057,7 +1057,7 @@ public:
 				m_angleCenter.get(), m_angleRange.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_angleCenter.GetBin(bin);
@@ -1132,7 +1132,7 @@ public:
 				m_direction.get(), -m_elevation.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_direction.GetBin(bin);
@@ -1192,7 +1192,7 @@ public:
 				m_cnt.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_weapon.GetBin(bin);
@@ -1250,7 +1250,7 @@ public:
 				m_VarNameStr[m_direction.get()], m_VarNameStr[m_elevation.get()]
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_direction.GetBin(bin);
@@ -1304,7 +1304,7 @@ public:
 	virtual std::string GetLayoutText(void){
 		return std::format("Option #{}", m_param.get());
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_param.GetBin(bin);
@@ -1328,7 +1328,7 @@ static void option(UINT param, LastLocationArg){
 
 class CChipAmmoNum : public CChipCond {
 public:
-	
+
 	CChipAmmoNum(
 		int weapon,
 		int opr		= OP_GE,
@@ -1339,12 +1339,12 @@ public:
 		m_num		= num;
 		m_Id		= CHIPID_AMMO;
 	}
-	
+
 	virtual ~CChipAmmoNum(){}
 
 	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
-	
+
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
@@ -1353,21 +1353,21 @@ public:
 				m_operator_str[m_operator.get()], m_num.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_weapon.GetBin(bin);
 		m_num.GetBin(bin);
 		m_operator.GetBin(bin);
 	}
-	
+
 	virtual void SetBin(CChipBinary& bin){
 		CChipCond::SetBin(bin);
 		m_weapon.SetBin(bin);
 		m_num.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
-	
+
 	ScaledInt<3>		m_weapon;
 	ScaledInt<7>		m_num;
 	ScaledInt<1>		m_operator;
@@ -1402,12 +1402,12 @@ public:
 		m_num			= 1;
 		m_Id			= CHIPID_DET_OKE;
 	}
-	
+
 	virtual ~CChipOkeNum(){}
 
 	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
-	
+
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
@@ -1417,7 +1417,7 @@ public:
 				m_angleCenter.get(), m_angleRange.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_angleCenter.GetBin(bin);
@@ -1501,12 +1501,12 @@ public:
 		m_num			= num;
 		m_Id			= CHIPID_DET_BARRIER;
 	}
-	
+
 	virtual ~CChipBarrier(){}
 
 	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
-	
+
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
@@ -1516,7 +1516,7 @@ public:
 				m_angleCenter.get(), m_angleRange.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_angleCenter.GetBin(bin);
@@ -1572,7 +1572,7 @@ public:
 	static inline const char *m_ProjectileTypeStr[] = {
 		"弾丸", "ミサイル", "ビーム", "ロケット", "地雷", "機雷", "高速", "発射物"
 	};
-	
+
 	CChipProjectileNum(
 		int angleCenter,
 		int angleRange,
@@ -1587,12 +1587,12 @@ public:
 		m_num			= 1;
 		m_Id			= CHIPID_DET_PROJECTILE;
 	}
-	
+
 	virtual ~CChipProjectileNum(){}
 
 	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
-	
+
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
@@ -1602,7 +1602,7 @@ public:
 				m_angleCenter.get(), m_angleRange.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_angleCenter.GetBin(bin);
@@ -1661,7 +1661,7 @@ public:
 		m_y				= map_y;
 		m_Id			= CHIPID_MAPPOINT;
 	}
-	
+
 	virtual ~CChipMapPoint(){}
 
 	virtual std::string GetLayoutText(void){
@@ -1672,7 +1672,7 @@ public:
 			m_angleCenter.get(), m_angleRange.get()
 		);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_angleCenter.GetBin(bin);
@@ -1720,7 +1720,7 @@ public:
 		FUEL,
 		DAMAGE,
 	};
-	
+
 	CChipSelfStatus(
 		int type
 	){
@@ -1729,12 +1729,12 @@ public:
 		m_num			= 1;
 		m_Id			= CHIPID_SELF_STATUS;
 	}
-	
+
 	virtual ~CChipSelfStatus(){}
 
 	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
-	
+
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
@@ -1743,7 +1743,7 @@ public:
 				m_operator_str[m_operator.get()], m_num.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_type.GetBin(bin);
@@ -1776,11 +1776,11 @@ public:
 	}
 
 	virtual ~CChipSubroutine(){}
-	
+
 	virtual std::string GetLayoutText(void){
 		return std::format("SUB{}", m_no.get());
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_no.GetBin(bin);
@@ -1807,7 +1807,7 @@ static void put_sub_chip(
 
 class CChipIsRand : public CChipCond {
 public:
-	
+
 	CChipIsRand(
 		int num1,
 		int num2
@@ -1816,9 +1816,9 @@ public:
 		m_num1	= num1;
 		m_num2	= num2;
 	}
-	
+
 	virtual ~CChipIsRand(){}
-	
+
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
@@ -1826,7 +1826,7 @@ public:
 				m_num1.get(), m_num2.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_num1.GetBin(bin);
@@ -1857,18 +1857,18 @@ static CChipTree is_rand(
 
 class CChipTime : public CChipCond {
 public:
-	
+
 	CChipTime(void){
 		m_operator		= OP_GE;
 		m_num			= 1;
 		m_Id			= CHIPID_TIME;
 	}
-	
+
 	virtual ~CChipTime(){}
 
 	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
-	
+
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
@@ -1876,7 +1876,7 @@ public:
 				m_operator_str[m_operator.get()], m_num.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_num.GetBin(bin);
@@ -1912,7 +1912,7 @@ public:
 		m_enemy			= enemy;
 		m_Id			= CHIPID_LOCKON;
 	}
-	
+
 	virtual ~CChipLockon(){}
 
 	virtual std::string GetLayoutText(void){
@@ -1923,7 +1923,7 @@ public:
 				m_angleCenter.get(), m_angleRange.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_angleCenter.GetBin(bin);
@@ -1988,18 +1988,18 @@ static void lockon_friendly(
 
 class CChipTgtDistance : public CChipCond {
 public:
-	
+
 	CChipTgtDistance(void){
 		m_operator		= OP_GE;
 		m_num			= 1;
 		m_Id			= CHIPID_TGT_DISTANCE;
 	}
-	
+
 	virtual ~CChipTgtDistance(){}
 
 	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
-	
+
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
@@ -2007,7 +2007,7 @@ public:
 				m_operator_str[m_operator.get()], m_num.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_num.GetBin(bin);
@@ -2036,7 +2036,7 @@ static CCond target_distance(
 
 class CChipTgtDirection : public CChipCond {
 public:
-	
+
 	CChipTgtDirection(
 		int angleCenter,
 		int angleRange
@@ -2045,7 +2045,7 @@ public:
 		m_angleRange	= angleRange;
 		m_Id			= CHIPID_TGT_DIR;
 	}
-	
+
 	virtual ~CChipTgtDirection(){}
 
 	virtual std::string GetLayoutText(void){
@@ -2055,7 +2055,7 @@ public:
 				m_angleCenter.get(), m_angleRange.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_angleCenter.GetBin(bin);
@@ -2086,7 +2086,7 @@ static CChipTree is_target_direction(
 
 class CChipGetTgtDirection : public CChip {
 public:
-	
+
 	CChipGetTgtDirection(
 		int var_dir,
 		int var_elev
@@ -2095,7 +2095,7 @@ public:
 		m_var_elev		= var_elev;
 		m_Id			= CHIPID_GET_TGT_DIR;
 	}
-	
+
 	virtual ~CChipGetTgtDirection(){}
 
 	virtual std::string GetLayoutText(void){
@@ -2106,7 +2106,7 @@ public:
 				m_VarNameStr[m_var_elev.get()]
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_var_dir.GetBin(bin);
@@ -2137,7 +2137,7 @@ static void get_target_direction(
 
 class CChipIsCoordinate : public CChipCond{
 public:
-	
+
 	CChipIsCoordinate(
 		int self_tgt,
 		int param
@@ -2148,12 +2148,12 @@ public:
 		m_num			= 0;
 		m_Id			= CHIPID_IS_COORDINATE;
 	}
-	
+
 	virtual ~CChipIsCoordinate(){}
 
 	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
-	
+
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
@@ -2162,7 +2162,7 @@ public:
 				m_CoordinateStr[m_param.get()], m_operator_str[m_operator.get()], m_num.get()
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_self_tgt.GetBin(bin);
@@ -2178,7 +2178,7 @@ public:
 		m_num.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
-	
+
 	ScaledInt<1>				m_self_tgt;
 	ScaledInt<2>				m_param;
 	ScaledInt<7, 3, -168>		m_num;
@@ -2187,7 +2187,7 @@ public:
 
 class CChipGetCoordinate : public CChip{
 public:
-	
+
 	CChipGetCoordinate(
 		int self_tgt,
 		int param,
@@ -2198,9 +2198,9 @@ public:
 		m_var			= var;
 		m_Id			= CHIPID_GET_COORDINATE;
 	}
-	
+
 	virtual ~CChipGetCoordinate(){}
-	
+
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
@@ -2210,7 +2210,7 @@ public:
 				m_CoordinateStr[m_param.get()]
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_var.GetBin(bin);
@@ -2224,7 +2224,7 @@ public:
 		m_self_tgt.SetBin(bin);
 		m_param.SetBin(bin);
 	}
-	
+
 	ScaledInt<3>			m_var;
 	ScaledInt<1>			m_self_tgt;
 	ScaledInt<2>			m_param;
@@ -2235,7 +2235,7 @@ public:
 
 class CChipTgtAction : public CChipCond {
 public:
-	
+
 	enum {
 		STOP,
 		MOVE,
@@ -2245,11 +2245,11 @@ public:
 		ACTION,
 		STUN,
 	};
-	
+
 	static inline const char *m_StatusTypeStr[] = {
 		"静止", "移動", "旋回", "Jmp", "射撃", "アクション", "被弾"
 	};
-	
+
 	CChipTgtAction(
 		int self_tgt,
 		int param
@@ -2258,7 +2258,7 @@ public:
 		m_param		= param;
 		m_Id		= CHIPID_IS_ACTION;
 	}
-	
+
 	virtual ~CChipTgtAction(){}
 
 	virtual std::string GetLayoutText(void){
@@ -2268,7 +2268,7 @@ public:
 				m_SelfTgtTypeStr[m_self_tgt.get()], m_StatusTypeStr[m_param.get()]
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_self_tgt.GetBin(bin);
@@ -2325,13 +2325,13 @@ public:
 	}
 
 	virtual ~CChipSound(){}
-	
+
 	virtual std::string GetLayoutText(void){
 		return std::format("♪\n#{}x{}",
 			m_snd.get(), m_cnt.get()
 		);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_snd.GetBin(bin);
@@ -2362,22 +2362,22 @@ static void sound(
 
 class CChipGetStatus : public CChip {
 public:
-	
+
 	enum {
 		HEAT,
 		FUEL,
 		DAMAGE,
 		AMMO,
 	};
-	
+
 	CChipGetStatus(int param, int var){
 		m_var	= var;
 		m_param	= param;
 		m_Id	= CHIPID_GET_STATUS;
 	}
-	
+
 	virtual ~CChipGetStatus(){}
-	
+
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
@@ -2387,7 +2387,7 @@ public:
 										  std::format("残弾#{}", m_param.get() - DAMAGE)
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_var.GetBin(bin);
@@ -2415,19 +2415,19 @@ public:
 		ENEMY_NUM,
 		FRIENDLY_NUM,
 	};
-	
+
 	static inline const char *m_TypeStr[] = {
 		"時間", "乱数", "敵機数", "味方機数"
 	};
-	
+
 	CChipGetMiscNum(int param, int var){
 		m_var	= var;
 		m_param	= param;
 		m_Id	= CHIPID_GET_MISC_NUM;
 	}
-	
+
 	virtual ~CChipGetMiscNum(){}
-	
+
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
@@ -2436,7 +2436,7 @@ public:
 				m_TypeStr[m_param.get()]
 			);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_var.GetBin(bin);
@@ -2470,13 +2470,13 @@ public:
 	}
 
 	virtual ~CChipClamp(){}
-	
+
 	virtual std::string GetLayoutText(void){
 		return std::format("クランプ\n{}≦{}≦{}",
 			m_min.get(), m_VarNameStr[m_var.get()], m_max.get()
 		);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_var.GetBin(bin);
@@ -2516,9 +2516,9 @@ public:
 		m_ch	= ch;
 		m_Id	= CHIPID_CH_SEND;
 	}
-	
+
 	virtual ~CChipChSend(){}
-	
+
 	virtual std::string GetLayoutText(void){
 		return std::format(
 			"送信\nCH{}≪{}",
@@ -2526,7 +2526,7 @@ public:
 			m_VarNameStr[m_var.get()]
 		);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_var.GetBin(bin);
@@ -2559,9 +2559,9 @@ public:
 		m_ch	= ch;
 		m_Id	= CHIPID_CH_RECV;
 	}
-	
+
 	virtual ~CChipChReceive(){}
-	
+
 	virtual std::string GetLayoutText(void){
 		return std::format(
 			"受信\n{}≪CH{}",
@@ -2569,7 +2569,7 @@ public:
 			m_ch.get()
 		);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_var.GetBin(bin);
@@ -2612,36 +2612,36 @@ static CChipVal ammo_num(int weapon, LastLocationArg){
 
 #ifndef NO_OKECC_SYNTAX
 CChipVar& CChipVar::operator=(const CChipVal& val){
-	
+
 	std::unique_ptr<CChip> pchip;
-	
+
 	switch(val.m_type){
 		case CChipVal::HEAT:
 		case CChipVal::FUEL:
 		case CChipVal::DAMAGE:
 			pchip = std::make_unique<CChipGetStatus>(val.m_type - CChipVal::HEAT, m_var);
 			break;
-		
+
 		case CChipVal::TIME:
 			pchip = std::make_unique<CChipGetMiscNum>(CChipGetMiscNum::TIME, m_var);
 			break;
-			
+
 		case CChipVal::FRIENDLY:
 			pchip = std::make_unique<CChipGetMiscNum>(CChipGetMiscNum::FRIENDLY_NUM, m_var);
 			break;
-			
+
 		case CChipVal::ENEMY:
 			pchip = std::make_unique<CChipGetMiscNum>(CChipGetMiscNum::ENEMY_NUM, m_var);
 			break;
-			
+
 		case CChipVal::RAND:
 			pchip = std::make_unique<CChipGetMiscNum>(CChipGetMiscNum::RAND, m_var);
 			break;
-		
+
 		case CChipVal::CH_RECV:
 			pchip = std::make_unique<CChipChReceive>(val.m_param, m_var);
 			break;
-		
+
 		case CChipVal::SELF_POS_X:
 		case CChipVal::SELF_POS_Y:
 		case CChipVal::SELF_POS_Z:
@@ -2654,40 +2654,40 @@ CChipVar& CChipVar::operator=(const CChipVal& val){
 				m_var
 			);
 			break;
-		
+
 		default:
 			pchip = std::make_unique<CChipGetStatus>(CChipGetStatus::AMMO + val.m_type, m_var);
 	}
-	
+
 	g_pCurField->m_tree.add(std::move(pchip));
 	return *this;
 }
 
 CCond CChipVal::GetCChipCond(void) const {
-	
+
 	std::unique_ptr<CChip> pchip;
-	
+
 	switch(m_type){
 		case CChipVal::HEAT:
 		case CChipVal::FUEL:
 		case CChipVal::DAMAGE:
 			pchip = std::make_unique<CChipSelfStatus>(m_type - CChipVal::HEAT);
 			break;
-		
+
 		case CChipVal::TIME:
 			pchip = std::make_unique<CChipTime>();
 			break;
-		
+
 		case CChipVal::FRIENDLY:
 		case CChipVal::ENEMY:
 		case CChipVal::RAND:
 			Error("Invalid parameter");
 			break;
-			
+
 		case CChipVal::CH_RECV:
 			Error("Invalid use of ch_receive()");
 			break;
-			
+
 		case CChipVal::SELF_POS_X:
 		case CChipVal::SELF_POS_Y:
 		case CChipVal::SELF_POS_Z:
@@ -2699,11 +2699,11 @@ CCond CChipVal::GetCChipCond(void) const {
 				(m_type - CChipVal::SELF_POS_X) % 3
 			);
 			break;
-		
+
 		default:
 			pchip = std::make_unique<CChipAmmoNum>(m_type);
 	}
-	
+
 	return CCond(std::move(pchip));
 }
 
@@ -2721,11 +2721,11 @@ public:
 	enum {
 		ADD, SUB, MUL, DIV, MOD, MOV
 	};
-	
+
 	static inline const char *m_OprStr[] = {
 		"+", "-", "*", "/", "%", ""
 	};
-	
+
 	CChipCalc(
 		int op1,
 		int opr,
@@ -2738,15 +2738,15 @@ public:
 		m_op2		= op2;
 		m_Id		= CHIPID_CALC;
 	}
-	
+
 	virtual ~CChipCalc(){}
-	
+
 	virtual std::string GetLayoutText(void){
 		return m_immxvar.get() ?
 			std::format("{} {}= {}", m_VarNameStr[m_op1.get()], m_OprStr[m_operator.get()], m_op2.get()) :
 			std::format("{} {}= {}", m_VarNameStr[m_op1.get()], m_OprStr[m_operator.get()], m_VarNameStr[m_op2.get()]);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_op1.GetBin(bin);
@@ -2762,7 +2762,7 @@ public:
 		m_immxvar.SetBin(bin);
 		m_op2.SetBin(bin);
 	}
-	
+
 	ScaledInt<3>	m_op1;
 	ScaledInt<3>	m_operator;
 	ScaledInt<1>	m_immxvar;
@@ -2802,15 +2802,15 @@ public:
 		m_op2		= immxvar ? op2 : op2 - 127;
 		m_Id		= CHIPID_CMP;
 	}
-	
+
 	virtual ~CChipCmp(){}
-	
+
 	virtual std::string GetLayoutText(void){
 		return m_immxvar.get() ?
 			std::format("{}{}{}?", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_op2.get()) :
 			std::format("{}{}{}?", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_VarNameStr[m_op2.get() + 127]);
 	}
-	
+
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_op1.GetBin(bin);
@@ -2826,7 +2826,7 @@ public:
 		m_op2.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
-	
+
 	ScaledInt<3>			m_op1;
 	ScaledInt<1>			m_immxvar;
 	ScaledInt<8, 1, -127>	m_op2;
@@ -2854,15 +2854,15 @@ CChipTree CChipVar::operator< (const int imm) const {return !(*this >= imm);}
 
 static void if_statement(const CChipTree& cc, LastLocationArg, bool BlockStart = true){
 	LastLocation();
-	
+
 	if(BlockStart){
 		g_pCurField->m_BlockStack.push_back(std::make_unique<CField::BiIfTop>(location));
 	}
-	
+
 	// CurTree に if 条件のツリーを接続
 	g_pCurField->m_tree.AddToG(cc.m_start);
 	g_pCurField->m_tree.m_LastG = cc.m_LastR;
-	
+
 	// false 飛び先
 	g_pCurField->m_BlockStack.push_back(std::make_unique<CField::BiIf>(location, cc.m_LastG));
 }
@@ -2880,10 +2880,10 @@ static void else_statement(
 		g_pCurField->BlockError("Unexpected else / elseif");
 		if(!g_pCurField->m_BlockStack.size()) return;
 	}
-	
+
 	auto bi = std::move(g_pCurField->m_BlockStack.back());
 	g_pCurField->m_BlockStack.pop_back();
-	
+
 	UINT idx = g_pCurField->m_tree.m_LastG;	// then 節の最後
 
 	// else 節先頭は，BlockStack に積んでいた false 飛び先
@@ -2907,7 +2907,7 @@ static void endif_statement(
 	LastLocationArg
 ){
 	LastLocation();
-	
+
 	if(
 		g_pCurField->GetMode() != CField::BM_IF &&
 		g_pCurField->GetMode() != CField::BM_ELSE
@@ -2915,22 +2915,22 @@ static void endif_statement(
 		g_pCurField->BlockError("Unexpected endif");
 		if(!g_pCurField->m_BlockStack.size()) return;
 	}
-	
+
 	while(
 		g_pCurField->GetMode() == CField::BM_IF ||
 		g_pCurField->GetMode() == CField::BM_ELSE
 	){
 		auto bi = std::move(g_pCurField->m_BlockStack.back());
 		g_pCurField->m_BlockStack.pop_back();
-		
+
 		// 合流 GOTO 生成
 		UINT merge = g_pCurField->m_pool.add(std::make_unique<CChipGoto>());
 		g_pCurField->m_tree.AddToG(merge);
-		
+
 		// false 条件の飛び先合流
 		g_pCurField->m_pool[bi->m_TargetIdx]->m_NextG = merge;
 	}
-	
+
 	if(g_pCurField->GetMode() != CField::BM_IF_TOP){
 		g_pCurField->BlockError("Internal Error: Block stack broken");
 		if(!g_pCurField->m_BlockStack.size()) return;
@@ -2944,9 +2944,9 @@ static void endif_statement(
 
 static void loop_statement(LastLocationArg){
 	LastLocation();
-	
+
 	UINT LoopTop = 0;
-	
+
 	// goto を 2個生成
 	g_pCurField->m_BlockStack.push_back(
 		std::make_unique<CField::BiLoop>(
@@ -2955,16 +2955,16 @@ static void loop_statement(LastLocationArg){
 			g_pCurField->m_Break								// 直前の break 先を保存
 		)
 	);
-	
+
 	g_pCurField->m_Break = g_pCurField->m_pool.add(std::make_unique<CChipGoto>());	// break 先
-	
+
 	// Top の goto を接続
 	g_pCurField->m_tree.AddToG(LoopTop);
 }
 
 static void loopend_statement(LastLocationArg){
 	LastLocation();
-	
+
 	if(g_pCurField->GetMode() != CField::BM_LOOP){
 		g_pCurField->BlockError("Unexpected endloop");
 		if(!g_pCurField->m_BlockStack.size()) return;
@@ -2977,23 +2977,23 @@ static void loopend_statement(LastLocationArg){
 	// ループ先頭に接続
 	g_pCurField->m_tree.AddToG(bi->m_TargetIdx);
 	g_pCurField->m_tree.m_LastG = g_pCurField->m_Break;
-	
+
 	// break 先を pop
 	g_pCurField->m_Break = bi->m_SavePrevBreak;
 }
 
 static void break_statement(LastLocationArg){
 	LastLocation();
-	
+
 	if(g_pCurField->m_Break == IDX_NONE){
 		g_pCurField->BlockError("break not within a loop");
 	}
-	
+
 	UINT idx = g_pCurField->m_tree.m_LastG;
-	
+
 	// LastG の place holder
 	g_pCurField->m_tree.AddToG(g_pCurField->m_pool.add(std::make_unique<CChipGoto>()));
-	
+
 	// break 先に分岐
 	g_pCurField->m_pool[idx]->m_NextG = g_pCurField->m_Break;
 }
@@ -3003,13 +3003,16 @@ static void break_statement(LastLocationArg){
 
 static void okecc_exit(LastLocationArg){
 	LastLocation();
-	
+
 	// Goto chip * 2 を置き，1個目を Exit に向ける
 	auto chip = std::make_unique<CChipGoto>();
-	chip->m_NextG = IDX_EXIT;
-	
+
 	g_pCurField->m_tree.add(std::move(chip));
+	auto idx = g_pCurField->m_tree.m_LastG;
 	g_pCurField->m_tree.add(std::make_unique<CChipGoto>());
+
+	// 1個目の goto を Exit に向ける
+	g_pCurField->m_pool[idx]->m_NextG = IDX_EXIT;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -3018,16 +3021,16 @@ static void okecc_exit(LastLocationArg){
 class CFieldSwitch {
 public:
 	CField	*m_field;
-	
+
 	CFieldSwitch(int num){
 		m_field	= g_pCurField;
 		g_pCurField	= g_pField[num].get();
 	}
-	
+
 	~CFieldSwitch(){
 		// block stack チェック
 		g_pCurField->CheckBlockStack();
-		
+
 		g_pCurField	= m_field;
 	}
 };
@@ -3036,16 +3039,16 @@ inline bool g_PutSub[2] = {false, false};
 
 static bool start_sub_internal(int num, LastLocationArg){
 	LastLocation();
-	
+
 	if(num < 1 || num > 2){
 		Error("Subroutine num. must be between 1 and 2.");
 		return false;
 	}
-	
+
 	put_sub_chip(num, location);
-	
+
 	if(g_PutSub[num - 1]) return false; // すでに sub 構築済み
-	
+
 	g_PutSub[num - 1] = true;
 	return true;
 }
@@ -3062,11 +3065,11 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define elseif(cc)	elseif_statement(cc);
 	#define else		else_statement();
 	#define endif		endif_statement();
-	
+
 	#define loop		loop_statement();
 	#define endloop		loopend_statement();
 	#define break		break_statement()
-	
+
 	#define exit		okecc_exit
 	#define rand		okecc_rand
 #endif
