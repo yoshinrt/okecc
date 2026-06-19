@@ -81,31 +81,6 @@ public:
 		MakeLinkList();
 	}
 
-	// 座標の正規化：最小値を (0, 0) に合わせる
-	void normalize_coordinates() {
-		int min_x = INT_MAX, min_y = INT_MAX;
-		bool has_data = false;
-
-		for (UINT i = 0; i < (UINT)pool.size(); ++i) {
-			const auto& p = state[i];
-			if (p.x != POS_INVALID) {
-				min_x = (std::min)(min_x, (int)p.x);
-				min_y = (std::min)(min_y, (int)p.y);
-				has_data = true;
-			}
-		}
-
-		if (!has_data) return;
-
-		for (UINT i = 0; i < (UINT)pool.size(); ++i) {
-			auto& p = state[i];
-			if (p.x != POS_INVALID) {
-				p.x -= min_x;
-				p.y -= min_y;
-			}
-		}
-	}
-
 	void InitState(void);
 	void run(UINT num_threads = 0);
 	void run_single(UINT uThreadID);
