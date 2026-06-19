@@ -433,19 +433,16 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 
 	std::mt19937_64 gen;
 	gen.seed(std::random_device{}());
+	
+	auto GetRand = [&gen](uint32_t max) -> uint32_t {
+		return (static_cast<uint64_t>(static_cast<uint32_t>(gen())) * max) >> 32;
+	};
 
-	std::uniform_int_distribution<UINT>		dist_idx(0, (UINT)pool.size() - 1);
-	std::uniform_int_distribution<int>		dist_dir8(0, 7);
-	std::uniform_int_distribution<int>		dist_dir9(0, 8);
 	std::uniform_int_distribution<UINT>		dist_prob(0,
 		p_random_swap +
 		p_nearby_swap +
 		p_move_mid
 	);
-	std::uniform_int_distribution<int> dist_x(0, GridWidth - 1);
-	std::uniform_int_distribution<int> dist_y(0, GridHeight - 1);
-	std::uniform_int_distribution<UINT>	dist_src_strategy(0, 10);	// 移動元はランダム or 優先移動リストから
-	std::uniform_int_distribution<int>	dist_src_pos(0, 24);		// 移動元位置のランダム分布
 
 	// occupancy
 	std::array<ChipID_t, MAX_CHIPS> occ;
@@ -532,11 +529,11 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 		bool proposed = false;
 
 		if (move_strategy < p_random_swap) {
-			UINT SrcIdx = dist_idx(gen);
+			UINT SrcIdx = GetRand(pool.size());
 
 			// ランダムセルへのジャンプ（空きがあれば移動、なければスワップ）
-			int nx = dist_x(gen);
-			int ny = dist_y(gen);
+			int nx = GetRand(GridWidth);
+			int ny = GetRand(GridHeight);
 
 			SwapChipXY(next_state[SrcIdx].x, next_state[SrcIdx].y, nx, ny);
 			proposed = true;
@@ -545,17 +542,17 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 			// 移動元選択
 			UINT SrcIdx;
 
-			if(dist_src_strategy(gen) == 0){
-				SrcIdx = dist_idx(gen);
+			if(GetRand(10) == 0){
+				SrcIdx = GetRand(pool.size());
 			}else{
 				// 優先リストから選ぶ
-				SrcIdx = dist_idx(gen, param_t(0, move_chip_list.size() - 1));
+				SrcIdx = GetRand(move_chip_list.size());
 				int x = next_state[SrcIdx].x;
 				int y = next_state[SrcIdx].y;
 
 				// 優先チップの 5x5 周辺からランダムに選ぶ
 				while(1){
-					int pos_rand = dist_src_pos(gen);
+					int pos_rand = GetRand(25);
 					x += (pos_rand % 5) - 2;
 					if(x < 0) x = 0;
 					else if(x >= (int)GridWidth) x = GridWidth - 1;
@@ -570,7 +567,7 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 
 			if(move_strategy < p_random_swap + p_nearby_swap){
 				// 隣接セルとのスワップ（8方向）
-				int dir = dist_dir8(gen);
+				int dir = GetRand(8);
 				UINT nx = next_state[SrcIdx].x + dx[dir];
 				UINT ny = next_state[SrcIdx].y + dy[dir];
 				if (nx < GridWidth && ny < GridHeight){
@@ -593,7 +590,7 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 				dst_y = (dst_y + n / 2) / n;
 
 				// 隣接セルとのスワップ（8方向）
-				int dir = dist_dir9(gen);
+				int dir = GetRand(9);
 				dst_x += dx[dir];
 				dst_y += dy[dir];
 
