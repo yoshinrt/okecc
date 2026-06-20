@@ -120,15 +120,15 @@ public:
 		S_NOT_FOUND,
 	};
 
-	inline static std::atomic<Energy_t> Score = ~0;
+	inline static std::atomic<Energy_t> OverallScore = std::numeric_limits<Energy_t>::max();
 
 	Energy_t UpdateScore(Energy_t score){
 		Energy_t NewScore = score;
-		Energy_t OtherScore = Score.load(std::memory_order_relaxed);
+		Energy_t OtherScore = OverallScore.load(std::memory_order_relaxed);
 
 		// 現在の共有ベストスコアよりも小さい場合のみ、更新を試みる
 		while (NewScore < OtherScore) {
-			if (Score.compare_exchange_weak(
+			if (OverallScore.compare_exchange_weak(
 				OtherScore, NewScore,
 				std::memory_order_release,
 				std::memory_order_relaxed
@@ -731,6 +731,8 @@ void CarnageSA::run(UINT num_threads){
 	threads.reserve(num_threads);
 	
 	auto start = std::chrono::steady_clock::now();
+	
+	OverallScore = std::numeric_limits<Energy_t>::max();
 	
 	for(UINT uLoopCnt = 0; ; ++uLoopCnt){
 		workers.clear();
