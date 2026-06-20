@@ -36,9 +36,10 @@
 #define NO_OKECC_SYNTAX
 #include "okecc.h"
 #include "mcmgr.h"
+#include <csignal>
 
 typedef uint8_t		ChipID_t;
-typedef uint32_t	Energy_t;
+typedef int			Energy_t;
 
 constexpr int MAX_CHIPS = 225;
 
@@ -86,7 +87,7 @@ public:
 	}
 
 	void InitState(void);
-	void run(UINT num_threads = 0);
+	int run(UINT num_threads = 0);
 	void run_single(UINT uThreadID, double CurrentT);
 	Energy_t calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org, std::vector<ChipID_t>& move_chip_list);
 	void SetArrow(void);
@@ -125,6 +126,11 @@ public:
 	};
 
 	inline static std::atomic<Energy_t> OverallScore = std::numeric_limits<Energy_t>::max();
+
+	// 割り込みハンドラ，割込み時に OverallScore = -1 にする
+	static void InterruptHandler(int signum){
+		OverallScore.store(-1, std::memory_order_relaxed);
+	}
 
 	Energy_t UpdateScore(Energy_t score){
 		Energy_t NewScore = score;
@@ -680,7 +686,7 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT) {
 
 		Energy_t BestScore = UpdateScore(best_E);
 
-		if (BestScore == 0) break;
+		if (BestScore <= 0) break;
 
 		// Tcooling
 		CurrentT *= Tcooling;
@@ -702,7 +708,7 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT) {
 	state = best_state;
 }
 
-void CarnageSA::run(UINT num_threads){
+int CarnageSA::run(UINT num_threads){
 	std::vector<CarnageSA> workers;
 	std::vector<std::thread> threads;
 
@@ -722,6 +728,9 @@ void CarnageSA::run(UINT num_threads){
 	
 	// スレッドごとに T を変える
 	const double Tfactor = num_threads == 1 ? 1.0 : std::pow(0.0001, 1.0 / (num_threads - 1));
+
+	// 割込みハンドラの設定
+	std::signal(SIGINT, InterruptHandler);
 
 	for(UINT uLoopCnt = 0; ; ++uLoopCnt){
 		workers.clear();
@@ -753,7 +762,7 @@ void CarnageSA::run(UINT num_threads){
 		this->state = best_it->state;
 		this->best_E = best_it->best_E;
 	
-		if(best_E == 0 || uLoopCnt >= 1 && best_E < 100){
+		if(best_E == 0 || OverallScore.load(std::memory_order_relaxed) <= 0 || uLoopCnt >= 1 && best_E < 100){
 			NopRouting();
 			SetArrow();
 			break;
@@ -764,6 +773,8 @@ void CarnageSA::run(UINT num_threads){
 	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 	printf("Parallel run finished in %.2fs. Best score: %d\n", elapsed / 1000.0, (UINT)this->best_E);
+
+	return OverallScore.load(std::memory_order_relaxed) < 0;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1033,6 +1044,7 @@ int main(void){
 	std::vector<std::unique_ptr<CarnageSA>>	sa;
 	std::vector<CarnageSA*> sa_ptrs;
 
+	int RunResult = 0;
 	for(int i = 0; i < 3; ++i){
 		//g_pField[i]->m_pool.dump();
 		g_pField[i]->FinalizeCompile();
@@ -1041,12 +1053,16 @@ int main(void){
 		sa_ptrs.push_back(sa[i].get());
 
 		if(g_pField[i]->m_pool.size()){
-			sa[i]->run();
+			RunResult |= sa[i]->run();
 			//sa[i]->dump();
 		}
 	}
 
 	OutputSvg("okecc.svg", sa_ptrs);
+	if(RunResult){
+		std::cerr << "Error: Some chips are not connected properly." << std::endl;
+		return 0;
+	}
 
 	const std::string mcFile = "memcard.mcd";
 	const char *gameId[] = {"SLPS-01666", "SLPSP02318"};
