@@ -844,7 +844,7 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 			}
 		}
 		return max_y + 1; // 0-indexed なので +1
-	};
+		};
 
 	// 全体の描画サイズを計算
 	int max_width = 0;
@@ -863,7 +863,7 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 
 	fprintf(fp, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
 	fprintf(fp, "<svg width=\"%d\" height=\"%d\" viewBox=\"0 0 %d %d\" xmlns=\"http://www.w3.org/2000/svg\">\n",
-			max_width, total_height + 20, max_width, total_height + 20);
+		max_width, total_height + 20, max_width, total_height + 20);
 
 	fprintf(fp, "  <defs>\n");
 	fprintf(fp, "    <marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"3\" orient=\"auto\" markerUnits=\"strokeWidth\">\n");
@@ -881,23 +881,58 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 		const auto& pool = sa->pool;
 		const auto& state_disp = sa->get_result();
 
+		// 💡 エラーチップを判定する関数内関数（ラムダ式）
+		auto is_error_chip = [&](int idx) -> bool {
+			if (pool.m_list[idx] == nullptr || state_disp[idx].x == 255) return false;
+
+			int cx = state_disp[idx].x;
+			int cy = state_disp[idx].y;
+			auto chip = pool.m_list[idx].get();
+
+			// 条件1: Y=0 でない start チップ
+			if ((UINT)idx == pool.m_start && cy != 0) {
+				return true;
+			}
+
+			// 接続先(NextG, NextR)のチェック
+			UINT nexts[2] = { chip->m_NextG, chip->m_NextR };
+			for (UINT next_idx : nexts) {
+				if (next_idx == IDX_NONE) continue;
+
+				// 条件2: IDX_EXIT かつ grid 外周に接していない
+				if (next_idx == IDX_EXIT) {
+					bool on_edge = (cx == 0 || cx == (int)pool.m_width - 1 || cy == 0 || cy == h - 1);
+					if (!on_edge) return true;
+				}
+				// 条件3: 接続先がタテ・ヨコ・ナナメに隣接していない
+				else if (next_idx < sa->pool.size() && state_disp[next_idx].x != 255) {
+					int nx = state_disp[next_idx].x;
+					int ny = state_disp[next_idx].y;
+					if (std::abs(cx - nx) > 1 || std::abs(cy - ny) > 1) {
+						return true;
+					}
+				}
+			}
+			return false;
+			};
+
 		// タイトル表示
 		fprintf(fp, "  <text x=\"0\" y=\"%d\" font-family=\"Meiryo, sans-serif\" font-size=\"18\" font-weight=\"bold\" fill=\"#333\">%s</text>\n",
-				current_y_offset + 25, sa->m_name);
+			current_y_offset + 25, sa->m_name);
 
 		int draw_y_start = current_y_offset + 40;
 
 		auto draw_physical_edge = [&](double x1, double y1, double x2, double y2, const char* color, bool dashed = false) {
 			double dx = x2 - x1;
 			double dy = y2 - y1;
-			double dist = sqrt(dx*dx + dy*dy);
+			double dist = sqrt(dx * dx + dy * dy);
 			if (dist < 0.1) return;
 			double margin = (CHIP_SIZE / 2.0) + 2;
 			const char* dash = dashed ? " stroke-dasharray=\"4\"" : "";
 			fprintf(fp, "  <line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"2.5\"%s marker-end=\"url(#arrow)\" />\n",
-					x1 + dx * (margin/dist), draw_y_start + y1 + dy * (margin/dist),
-					x2 - dx * (margin/dist), draw_y_start + y2 - dy * (margin/dist), color, dash);
-		};
+				x1 + dx * (margin / dist), draw_y_start + y1 + dy * (margin / dist),
+				x2 - dx * (margin / dist), draw_y_start + y2 - dy * (margin / dist), color, dash);
+			};
 
 		// STARTへの入力
 		if (pool.m_start < (UINT)sa->pool.size() && state_disp[pool.m_start].x != 255) {
@@ -914,24 +949,33 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 			int centerX = x + CHIP_SIZE / 2;
 
 			const char* fill_color =
-				pool.m_list[i]->m_Id.get() == CHIPID_NOP && static_cast<CChipNop *>(pool.m_list[i].get())->m_param.get() == 0 ? "#F0F0F0" :
+				pool.m_list[i]->m_Id.get() == CHIPID_NOP && static_cast<CChipNop*>(pool.m_list[i].get())->m_param.get() == 0 ? "#F0F0F0" :
 				pool.m_list[i]->m_NextR != IDX_NONE ? "#FFF0F0" : "white";
 
-			fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"%s\" stroke=\"#343a40\" stroke-width=\"2\" />\n",
-					x, draw_y_start + y, CHIP_SIZE, CHIP_SIZE, fill_color);
+			// 💡 エラーチェックを行い、枠線の色と太さを決定
+			const char* stroke_color = "#343a40";
+			int stroke_width = 2;
+			if (is_error_chip(i)) {
+				stroke_color = "#dc3545"; // エラーは赤色
+				stroke_width = 4;         // エラーは太線
+			}
+
+			fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%d\" />\n",
+				x, draw_y_start + y, CHIP_SIZE, CHIP_SIZE, fill_color, stroke_color, stroke_width);
 			fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Meiryo, sans-serif\" text-anchor=\"middle\">\n", centerX, draw_y_start + y + 25);
 			std::string txt = pool.m_list[i]->GetLayoutText();
 			if (txt.empty()) {
 				fprintf(fp, "    <tspan x=\"%d\" dy=\"1.2em\" font-size=\"10\" fill=\"#6c757d\">ID:%d</tspan>\n", centerX, i);
-			} else {
+			}
+			else {
 				size_t s = 0, e = 0; int line_count = 0;
 				while ((e = txt.find('\n', s)) != std::string::npos) {
 					fprintf(fp, "    <tspan x=\"%d\" dy=\"%s\" font-size=\"11\" fill=\"#333\">%s</tspan>\n",
-							centerX, (line_count == 0 ? "0" : "1.2em"), txt.substr(s, e - s).c_str());
+						centerX, (line_count == 0 ? "0" : "1.2em"), txt.substr(s, e - s).c_str());
 					s = e + 1; line_count++;
 				}
 				fprintf(fp, "    <tspan x=\"%d\" dy=\"%s\" font-size=\"11\" fill=\"#333\">%s</tspan>\n",
-						centerX, (line_count == 0 ? "0" : "1.2em"), txt.substr(s).c_str());
+					centerX, (line_count == 0 ? "0" : "1.2em"), txt.substr(s).c_str());
 				fprintf(fp, "    <tspan x=\"%d\" dy=\"1.5em\" font-size=\"9\" fill=\"#999\">#%d</tspan>\n", centerX, i);
 			}
 			fprintf(fp, "  </text>\n");
