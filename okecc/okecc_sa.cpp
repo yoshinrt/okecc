@@ -429,8 +429,6 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 	constexpr UINT p_nearby_swap	= 5;	// 隣接スワップ
 	constexpr UINT p_move_mid		= 50;	// 接続chip の真ん中に移動
 
-	Score = ~0;
-
 	std::mt19937_64 gen;
 	gen.seed(std::random_device{}());
 	
@@ -529,7 +527,7 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 		bool proposed = false;
 
 		if (move_strategy < p_random_swap) {
-			UINT SrcIdx = GetRand(pool.size());
+			UINT SrcIdx = GetRand((uint32_t)pool.size());
 
 			// ランダムセルへのジャンプ（空きがあれば移動、なければスワップ）
 			int nx = GetRand(GridWidth);
@@ -543,10 +541,10 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 			UINT SrcIdx;
 
 			if(GetRand(10) == 0){
-				SrcIdx = GetRand(pool.size());
+				SrcIdx = GetRand((uint32_t)pool.size());
 			}else{
 				// 優先リストから選ぶ
-				SrcIdx = GetRand(move_chip_list.size());
+				SrcIdx = GetRand((uint32_t)move_chip_list.size());
 				int x = next_state[SrcIdx].x;
 				int y = next_state[SrcIdx].y;
 
