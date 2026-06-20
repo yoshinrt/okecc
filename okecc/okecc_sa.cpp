@@ -76,6 +76,10 @@ public:
 	inline static const int dx[] = { 0,  1,  1,  1,  0, -1, -1, -1, 0};
 	inline static const int dy[] = {-1, -1,  0,  1,  1,  1,  0, -1, 0};
 
+	inline static constexpr int max_iter	= 2000000;
+	inline static constexpr double StartT	= 2000.0;
+	inline static constexpr double EndT		= 0.005;
+
 	CarnageSA(CChipPool& p, const char *name = nullptr)
 		: pool(p), GridWidth(p.m_width), GridHeight(p.m_height), m_name(name){
 		MakeLinkList();
@@ -83,7 +87,7 @@ public:
 
 	void InitState(void);
 	void run(UINT num_threads = 0);
-	void run_single(UINT uThreadID, UINT uLoopCnt);
+	void run_single(UINT uThreadID, double CurrentT);
 	Energy_t calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org, std::vector<ChipID_t>& move_chip_list);
 	void SetArrow(void);
 
@@ -418,29 +422,21 @@ void CarnageSA::rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<
 	}
 };
 
-void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
+void CarnageSA::run_single(UINT uThreadID, double CurrentT) {
 
-	constexpr int max_iter	= 5000000;
-	constexpr double StartT	= 2000.0;
-	constexpr double EndT	= 0.005;
-	const double cooling	= std::pow(EndT / StartT, 1.0 / max_iter);
-
+	const double Tcooling	= std::pow(EndT / CurrentT, 1.0 / max_iter);
+	
 	constexpr UINT p_random_swap	= 1;	// ランダムスワップ
 	constexpr UINT p_nearby_swap	= 5;	// 隣接スワップ
 	constexpr UINT p_move_mid		= 50;	// 接続chip の真ん中に移動
 
 	std::mt19937_64 gen;
 	gen.seed(std::random_device{}());
+	std::uniform_real_distribution<double> dist_prob(0.0, 1.0);
 	
 	auto GetRand = [&gen](uint32_t max) -> uint32_t {
 		return (static_cast<uint64_t>(static_cast<uint32_t>(gen())) * max) >> 32;
 	};
-
-	std::uniform_int_distribution<UINT>		dist_prob(0,
-		p_random_swap +
-		p_nearby_swap +
-		p_move_mid
-	);
 
 	// occupancy
 	std::array<ChipID_t, MAX_CHIPS> occ;
@@ -465,20 +461,6 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 #endif
 
 	std::array<Pos, MAX_CHIPS> best_state;
-
-	double T;
-	next_log_time = clock::now();
-
-	if(uLoopCnt == 0){
-		InitState();
-		T = StartT;
-	}else if(best_E < 100){
-		// スコアが十分良い場合は温度を下げて局所探索に切り替える
-		T = StartT * 0.001;
-	}else{
-		T = StartT * 0.1;
-	}
-
 	rebuild_occ(state, occ);
 
 	auto dump_occ = [&](std::array<ChipID_t, MAX_CHIPS>& occ){
@@ -492,10 +474,8 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 
 	Energy_t current_E	= calculate_energy(state, occ, move_chip_list);
 
-	if(uLoopCnt == 0){
-		best_state	= state;
-		best_E		= current_E;
-	}
+	best_state	= state;
+	best_E		= current_E;
 
 	// move probabilities (base)
 	// neighbor-swap が残りの確率
@@ -523,7 +503,12 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 		next_state	= state;
 		next_occ	= occ;
 
-		UINT move_strategy = dist_prob(gen);
+		UINT move_strategy = GetRand(
+			p_random_swap +
+			p_nearby_swap +
+			p_move_mid
+		);
+		
 		bool proposed = false;
 
 		if (move_strategy < p_random_swap) {
@@ -682,7 +667,7 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 		}
 
 		int diff = (int)next_E - (int)current_E;
-		if (diff < 0 || dist_prob(gen) < std::exp(-diff / T)) {
+		if (diff < 0 || dist_prob(gen) < std::exp(-diff / CurrentT)) {
 			// accept
 			state		= next_state;
 			occ			= next_occ;
@@ -697,15 +682,15 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 
 		if (BestScore == 0) break;
 
-		// cooling
-		T *= cooling;
+		// Tcooling
+		CurrentT *= Tcooling;
 
 		#ifndef DEBUG
 			if (uThreadID == 0 && iter % 100000 == 0){
 				auto now = clock::now();
 				if (now >= next_log_time) {
 					next_log_time = now + interval;
-					printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)BestScore);
+					printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, CurrentT, (UINT)current_E, (UINT)BestScore);
 				}
 			}
 		#endif
@@ -713,7 +698,7 @@ void CarnageSA::run_single(UINT uThreadID, UINT uLoopCnt) {
 
 	Energy_t BestScore = UpdateScore(best_E);
 
-	if(uThreadID == 0) printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, T, (UINT)current_E, (UINT)BestScore);
+	if(uThreadID == 0) printf("Step:%8d | T: %7.2f Score:%6d | Best:%6d\n", iter, CurrentT, (UINT)current_E, (UINT)BestScore);
 	state = best_state;
 }
 
@@ -733,17 +718,25 @@ void CarnageSA::run(UINT num_threads){
 	auto start = std::chrono::steady_clock::now();
 	
 	OverallScore = std::numeric_limits<Energy_t>::max();
+	InitState();
 	
+	// スレッドごとに T を変える
+	const double Tfactor = num_threads == 1 ? 1.0 : std::pow(0.0001, 1.0 / (num_threads - 1));
+
 	for(UINT uLoopCnt = 0; ; ++uLoopCnt){
 		workers.clear();
 		threads.clear();
 		
+		double T = StartT;
+
 		for (UINT u = 0; u < num_threads; ++u) {
 			// 1. スレッドごとに自分(*this)をコピーして独立したインスタンスを作る
 			workers.push_back(*this);
 			
 			// 2. 各インスタンスの run を並列実行
-			threads.emplace_back(&CarnageSA::run_single, &workers[u], u, uLoopCnt);
+			threads.emplace_back(&CarnageSA::run_single, &workers[u], u, T);
+
+			if (uLoopCnt > 0) T *= Tfactor;
 		}
 	
 		// 3. 終了待機
