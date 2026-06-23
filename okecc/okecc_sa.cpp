@@ -779,7 +779,7 @@ int CarnageSA::run(UINT num_threads){
 		}
 
 		// スコアが良化すればステートを継続して探索、悪化すれば再初期化して探索
-		if(best_E >= 0 && best_E < PrevScore){
+		if(best_E >= 0 && (best_E / 100) < (PrevScore / 100)){
 			bRestart = false;
 			PrevScore = best_E;
 		}else{
