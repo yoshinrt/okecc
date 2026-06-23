@@ -6,6 +6,7 @@ SRCDIR		= ./okecc
 OBJDIR		= ./obj
 CXXFLAGS	= -O3 -march=native -mtune=native -ffast-math -flto=auto -pthread -std=c++20 -I$(SRCDIR)
 HEADERS		= $(SRCDIR)/okecc.h $(SRCDIR)/mcmgr.h
+MAKEFLAGS	+= -j4
 
 $(OBJDIR)/%.o: %.cpp $(HEADERS)
 	mkdir -p $(OBJDIR)
@@ -23,4 +24,4 @@ $(OBJDIR)/%: $(OBJDIR)/%.o $(OBJDIR)/okecc_sa.o
 	if [ -e okecc.svg ]; then mv okecc.svg $*.svg; fi
 
 clean:
-	rm -rf *.svg $(OBJDIR)
+	rm -rf *.svg $(OBJDIR) build x64
