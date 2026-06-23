@@ -431,7 +431,7 @@ void CarnageSA::rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<
 void CarnageSA::run_single(UINT uThreadID, double CurrentT) {
 
 	const double Tcooling	= std::pow(EndT / CurrentT, 1.0 / max_iter);
-	
+
 	constexpr UINT p_random_swap	= 1;	// ランダムスワップ
 	constexpr UINT p_nearby_swap	= 5;	// 隣接スワップ
 	constexpr UINT p_move_mid		= 50;	// 接続chip の真ん中に移動
@@ -439,7 +439,7 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT) {
 	std::mt19937_64 gen;
 	gen.seed(std::random_device{}());
 	std::uniform_real_distribution<double> dist_prob(0.0, 1.0);
-	
+
 	auto GetRand = [&gen](uint32_t max) -> uint32_t {
 		return (static_cast<uint64_t>(static_cast<uint32_t>(gen())) * max) >> 32;
 	};
@@ -514,7 +514,7 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT) {
 			p_nearby_swap +
 			p_move_mid
 		);
-		
+
 		bool proposed = false;
 
 		if (move_strategy < p_random_swap) {
@@ -712,63 +712,91 @@ int CarnageSA::run(UINT num_threads){
 	std::vector<CarnageSA> workers;
 	std::vector<std::thread> threads;
 
+	auto BestState = state;
+	Energy_t BestScore = std::numeric_limits<Energy_t>::max();
+	Energy_t PrevScore = std::numeric_limits<Energy_t>::max();
+
 	#ifdef _DEBUG
 		num_threads = 1;
 	#else
 		if(num_threads == 0) num_threads = std::thread::hardware_concurrency();
 	#endif
-	
+
 	workers.reserve(num_threads);
 	threads.reserve(num_threads);
-	
+
 	auto start = std::chrono::steady_clock::now();
-	
-	OverallScore = std::numeric_limits<Energy_t>::max();
-	InitState();
-	
+
 	// スレッドごとに T を変える
 	const double Tfactor = num_threads == 1 ? 1.0 : std::pow(0.0001, 1.0 / (num_threads - 1));
 
 	// 割込みハンドラの設定
 	std::signal(SIGINT, InterruptHandler);
 
+	// 最初から探索やり直し
+	bool bRestart = true;
+
 	for(UINT uLoopCnt = 0; ; ++uLoopCnt){
 		workers.clear();
 		threads.clear();
-		
+
 		double T = StartT;
+
+		if(bRestart){
+			OverallScore = std::numeric_limits<Energy_t>::max();
+			InitState();
+		}
 
 		for (UINT u = 0; u < num_threads; ++u) {
 			// 1. スレッドごとに自分(*this)をコピーして独立したインスタンスを作る
 			workers.push_back(*this);
-			
+
 			// 2. 各インスタンスの run を並列実行
 			threads.emplace_back(&CarnageSA::run_single, &workers[u], u, T);
 
-			if (uLoopCnt > 0) T *= Tfactor;
+			if (!bRestart) T *= Tfactor;
 		}
-	
+
 		// 3. 終了待機
 		for (auto& t : threads) {
 			if (t.joinable()) t.join();
 		}
-	
+
 		// 4. 最良の結果を自分自身(*this)に書き戻す
 		auto best_it = std::min_element(workers.begin(), workers.end(),
 			[](const CarnageSA& a, const CarnageSA& b) {
 				return a.best_E < b.best_E;
-			});
-	
-		this->state = best_it->state;
-		this->best_E = best_it->best_E;
-	
+			}
+		);
+
+		state = best_it->state;
+		best_E = best_it->best_E;
+
+		// 5. 全体の最良スコアを更新
+		if(best_E >= 0 && best_E < BestScore){
+			BestScore = best_E;
+			BestState = state;
+		}
+
+		// スコアが良化すればステートを継続して探索、悪化すれば再初期化して探索
+		if(best_E >= 0 && best_E < PrevScore){
+			bRestart = false;
+			PrevScore = best_E;
+		}else{
+			bRestart = true;
+			PrevScore = std::numeric_limits<Energy_t>::max();
+		}
+
 		if(best_E == 0 || OverallScore.load(std::memory_order_relaxed) <= 0 || uLoopCnt >= 1 && best_E < 100){
+			state = BestState;
+			best_E = BestScore;
+
 			NopRouting();
 			SetArrow();
 			break;
 		}
 	}
-	
+
 	auto end = std::chrono::steady_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
