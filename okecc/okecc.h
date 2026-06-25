@@ -1,4 +1,4 @@
-﻿#include <algorithm>
+#include <algorithm>
 #include <concepts>
 #include <format>
 #include <source_location>
@@ -770,6 +770,8 @@ public:
 
 	ScaledInt<5,2> m_param;
 };
+
+// OKE_CHIP_DEF_BEGIN
 
 static void wait(
 	UINT param,
@@ -2609,6 +2611,8 @@ static CChipVal ch_receive(int ch, LastLocationArg){LastLocation(); return CChip
 static CChipVal ammo_num(int weapon, LastLocationArg){
 	LastLocation(); return CChipVal(weapon - 1);
 }
+
+// OKE_CHIP_DEF_END
 
 #ifndef NO_OKECC_SYNTAX
 CChipVar& CChipVar::operator=(const CChipVal& val){

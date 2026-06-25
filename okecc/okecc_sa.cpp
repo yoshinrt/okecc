@@ -1,4 +1,4 @@
-﻿#include <algorithm>
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cassert>
@@ -1057,6 +1057,8 @@ void OutputSvg(const char* filename, CarnageSA* sa) {
 
 //////////////////////////////////////////////////////////////////////////////
 
+#ifndef OKECC_STAND_ALONE
+
 void chip_main(void);
 
 int main(void){
@@ -1175,3 +1177,4 @@ int main(void){
 
 	return 0;
 }
+#endif

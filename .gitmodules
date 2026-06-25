@@ -1,0 +1,3 @@
+[submodule "okecc/cpp-peglib"]
+	path = okecc/cpp-peglib
+	url = https://github.com/yhirose/cpp-peglib.git
