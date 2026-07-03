@@ -714,6 +714,9 @@ public:
 	CChipVar& operator/=(const int op2);
 	CChipVar& operator%=(const int op2);
 	CChipVar& operator= (const int op2);
+	
+	CChipVar& operator++();
+	CChipVar& operator--();
 
 	CChipTree operator>=(const CChipVar& op2) const;
 	CChipTree operator<=(const CChipVar& op2) const;
@@ -2783,6 +2786,9 @@ CChipVar& CChipVar::operator*=(const int imm){g_pCurField->m_tree.add(std::make_
 CChipVar& CChipVar::operator/=(const int imm){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::DIV, 1, imm)); return *this;}
 CChipVar& CChipVar::operator%=(const int imm){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::MOD, 1, imm)); return *this;}
 CChipVar& CChipVar::operator= (const int imm){g_pCurField->m_tree.add(std::make_unique<CChipCalc>(m_var, CChipCalc::MOV, 1, imm)); return *this;}
+
+CChipVar& CChipVar::operator++(){return *this += 1;}
+CChipVar& CChipVar::operator--(){return *this -= 1;}
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
