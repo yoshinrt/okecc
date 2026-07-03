@@ -102,9 +102,8 @@ void chip_main(){
 		
 		get_target_direction(E, F);
 		if(F <= 32)
-			loop
-				if(!is_self_firing() || prev_cannon_ammo != (F = ammo_num(1))) break; endif
-			endloop
+			while(is_self_firing() && prev_cannon_ammo == (F = ammo_num(1)))
+			endwhile
 			
 			// 被弾したら 3秒間移動
 			if(is_self_stun())

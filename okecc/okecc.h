@@ -2867,6 +2867,28 @@ static void if_statement(const CChipTree& cc, LastLocationArg, bool BlockStart =
 	g_pCurField->m_BlockStack.push_back(std::make_unique<CField::BiIf>(location, cc.m_LastG));
 }
 
+static void if_statement(int cc, LastLocationArg, bool BlockStart = true){
+	LastLocation();
+	
+	if(cc != 0){
+		Error("Constant condition always evaluates to false");
+	}
+	
+	if(BlockStart){
+		g_pCurField->m_BlockStack.push_back(std::make_unique<CField::BiIfTop>(location));
+	}
+
+	// false 用 goto を生成し CurTree に接続
+	UINT false_chip;
+	g_pCurField->m_tree.AddToG(false_chip = g_pCurField->m_pool.add(std::make_unique<CChipGoto>()));
+	
+	// true 用 goto 生成 (ただし実行されない dead code になる)
+	g_pCurField->m_tree.m_LastG = g_pCurField->m_pool.add(std::make_unique<CChipGoto>());
+	
+	// false 飛び先
+	g_pCurField->m_BlockStack.push_back(std::make_unique<CField::BiIf>(location, false_chip));
+}
+
 static void if_statement(CCond&& chip, LastLocationArg){if_statement(std::move(chip).GetCChipTree(), location);}
 static void if_statement(const CChipVal&  chip, LastLocationArg){if_statement(chip >= 1, location);}
 static void if_statement(const CChipVar&  chip, LastLocationArg){if_statement(chip != 0, location);}
@@ -2962,7 +2984,7 @@ static void loop_statement(LastLocationArg){
 	g_pCurField->m_tree.AddToG(LoopTop);
 }
 
-static void loopend_statement(LastLocationArg){
+static void endloop_statement(LastLocationArg){
 	LastLocation();
 
 	if(g_pCurField->GetMode() != CField::BM_LOOP){
@@ -3067,9 +3089,11 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define endif		endif_statement();
 
 	#define loop		loop_statement();
-	#define endloop		loopend_statement();
+	#define endloop		endloop_statement();
 	#define break		break_statement()
-
+	#define while(cc)	loop if(!(cc)) break; endif
+	#define endwhile	endloop
+	
 	#define exit		okecc_exit
 	#define rand		okecc_rand
 #endif

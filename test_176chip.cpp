@@ -78,10 +78,10 @@ void chip_main(){
 		
 		// 飛行型には積極的にはカノンを撃たない
 		if(!(target_z() >= 6 && heat() >= 50))
-			loop
+			while(1)
 				B = ammo_num(1);
 				if(A != B || !is_self_firing()) break; endif
-			endloop
+			endwhile
 			
 			fire(0, 448, 160, OKE_ALL, 3, 1);
 			fire(0, 448, 160, OKE_ALL, 1, 1);

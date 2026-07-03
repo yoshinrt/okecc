@@ -112,18 +112,21 @@ endif
 
 ### ループの記述
 
-繰り返し処理を行うためのループ構文は `loop` `endloop` `break` を使用して記述します．以下に記述例を示します．
+繰り返し処理を行うためのループ構文は `while` `endwhile` `break` を使用して記述します．以下に記述例を示します．
 ```
-loop
-	...
-	if(...)
+// 正面 30m 以内に敵機がいる限り格闘し続ける
+while(enemy_num(0, 128, 30, OKE_ALL) >= 1)
+	
+	// ただしその敵が飛行型の場合は格闘ループを抜ける
+	if(enemy_num(0, 128, 30, OKE_FLIGHT) >= 1)
 		break;
 	endif
-	...
-endloop
+	
+	strike();
+endwhile
 ```
 
-`loop - endloop` は無限ループなので，ループを脱出するために `break` を使用してください．
+ループを脱出するためには `break` を使用してください．
 
 ### カウンタ入力
 
