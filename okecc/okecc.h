@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <vector>
 #include <memory>
+#include <functional>
 
 #ifdef NO_OKECC_SYNTAX
 	#define EXTERN extern
@@ -345,6 +346,27 @@ public:
 		m_list.resize(IdxNew2Old.size());
 	}
 
+	void DeleteUnreferencedChips(void){
+		std::vector<bool> referenced(m_list.size(), false);
+
+		// 参照されているチップをマーク
+		std::function<void(UINT)> mark_referenced = [&](UINT idx){
+			if(idx >= m_list.size() || referenced[idx]) return;
+			referenced[idx] = true;
+			if(m_list[idx]->ValidG()) mark_referenced(m_list[idx]->m_NextG);
+			if(m_list[idx]->ValidR()) mark_referenced(m_list[idx]->m_NextR);
+		};
+
+		mark_referenced(m_start);
+
+		// 参照されていないチップを Goto に置き換える
+		for(UINT u = 0; u < m_list.size(); ++u){
+			if(!referenced[u]){
+				m_list[u]->m_Id = CHIPID_GOTO;
+			}
+		}
+	}
+
 	void dump(void){
 		printf("Start=%d\n ID   G   R  Description\n", m_start);
 		for(UINT u = 0; u < m_list.size(); ++u){
@@ -471,6 +493,9 @@ public:
 		//m_pool.dump();
 
 		if(m_pool.size() > 0){
+			// 参照されないチップを goto に置き換える
+			m_pool.DeleteUnreferencedChips();
+
 			// Goto 最適化
 			m_pool.CleanupGoto();
 		}
@@ -714,7 +739,7 @@ public:
 	CChipVar& operator/=(const int op2);
 	CChipVar& operator%=(const int op2);
 	CChipVar& operator= (const int op2);
-	
+
 	CChipVar& operator++();
 	CChipVar& operator--();
 
@@ -2875,11 +2900,11 @@ static void if_statement(const CChipTree& cc, LastLocationArg, bool BlockStart =
 
 static void if_statement(int cc, LastLocationArg, bool BlockStart = true){
 	LastLocation();
-	
+
 	if(cc != 0){
 		Error("Constant condition always evaluates to false");
 	}
-	
+
 	if(BlockStart){
 		g_pCurField->m_BlockStack.push_back(std::make_unique<CField::BiIfTop>(location));
 	}
@@ -2887,10 +2912,10 @@ static void if_statement(int cc, LastLocationArg, bool BlockStart = true){
 	// false 用 goto を生成し CurTree に接続
 	UINT false_chip;
 	g_pCurField->m_tree.AddToG(false_chip = g_pCurField->m_pool.add(std::make_unique<CChipGoto>()));
-	
+
 	// true 用 goto 生成 (ただし実行されない dead code になる)
 	g_pCurField->m_tree.m_LastG = g_pCurField->m_pool.add(std::make_unique<CChipGoto>());
-	
+
 	// false 飛び先
 	g_pCurField->m_BlockStack.push_back(std::make_unique<CField::BiIf>(location, false_chip));
 }
@@ -3099,7 +3124,7 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define break		break_statement()
 	#define while(cc)	loop if(!(cc)) break; endif
 	#define endwhile	endloop
-	
+
 	#define exit		okecc_exit
 	#define rand		okecc_rand
 #endif
