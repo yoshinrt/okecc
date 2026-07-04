@@ -16,6 +16,9 @@
 #include <stdio.h>
 #include <thread>
 #include <vector>
+#include <fstream>
+#include <cstdint>
+#include <cstring>
 
 #ifdef _WIN32
 	#define WIN32_LEAN_AND_MEAN
@@ -35,7 +38,6 @@
 
 #define NO_OKECC_SYNTAX
 #include "okecc.h"
-#include "mcmgr.h"
 #include <csignal>
 
 typedef uint8_t		ChipID_t;
@@ -900,7 +902,11 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 		total_height += h * CELL_SIZE + SECTION_GAP;
 	}
 
-	fprintf(fp, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+	#ifdef _DEBUG
+		fprintf(fp, "<?xml version=\"1.0\" encoding=\"SJIS\"?>\n");
+	#else
+		fprintf(fp, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+	#endif
 	fprintf(fp, "<svg width=\"%d\" height=\"%d\" viewBox=\"0 0 %d %d\" xmlns=\"http://www.w3.org/2000/svg\">\n",
 		max_width, total_height + 20, max_width, total_height + 20);
 
@@ -988,7 +994,7 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 			int centerX = x + CHIP_SIZE / 2;
 
 			const char* fill_color =
-				pool.m_list[i]->m_Id.get() == CHIPID_NOP && static_cast<CChipNop*>(pool.m_list[i].get())->m_param.get() == 0 ? "#F0F0F0" :
+				pool.m_list[i]->m_Id.get() == CHIPID_NOP ? "#F0F0F0" :
 				pool.m_list[i]->m_NextR != IDX_NONE ? "#FFF0F0" : "white";
 
 			// 💡 エラーチェックを行い、枠線の色と太さを決定
@@ -1057,10 +1063,28 @@ void OutputSvg(const char* filename, CarnageSA* sa) {
 
 //////////////////////////////////////////////////////////////////////////////
 
+class OkeSoft {
+public:
+	constexpr static UINT MAX_CHIP = 15 * 15 + 7 * 7 * 2;
+	constexpr static UINT CHIP_START[3] = { 0, 15 * 15, 15 * 15 + 7 * 7 };
+
+	OkeSoft(uint32_t main_size){
+		size[0] = main_size;
+		size[1] = size[2] = main_size == 15 ? 7 : 0;
+		for (int i = 0; i < MAX_CHIP; ++i) chip[i] = 0x4080;
+	}
+
+	uint64_t	chip[MAX_CHIP];
+	uint32_t	size[3];
+	uint32_t	start[3] = {0, 0, 0};
+};
+
+//////////////////////////////////////////////////////////////////////////////
+
 void chip_main(void);
 
 int main(void){
-	g_pField.push_back(std::make_unique<CField>("MAIN", 15, 15));
+	g_pField.push_back(std::make_unique<CField>("MAIN", 10, 10));
 	g_pField.push_back(std::make_unique<CField>("SUB1", 7, 7));
 	g_pField.push_back(std::make_unique<CField>("SUB2", 7, 7));
 	g_pCurField = g_pField[0].get();
@@ -1092,86 +1116,68 @@ int main(void){
 		return 0;
 	}
 
-	const std::string mcFile = "memcard.mcd";
-	const char *gameId[] = {"SLPS-01666", "SLPSP02318"};
-
-	MemoryCardManager mcr(mcFile);
+	OkeSoft soft(g_pField[0]->m_pool.m_width);
 
 	bool bMcrUpdate = false;
 
-	for(int i = 0; i < 2; ++i){
-		// 1. インスタンス生成（ファイル読み込みとID設定）
-		mcr.setGameId(gameId[i]);
+	// ソフト書き込み
+	for (UINT fld = 0; fld < 3; ++fld) {
+		auto& state = sa[fld]->get_result();
+		auto pFld = g_pField[fld].get();
 
-		// 2. データの読み出し
-		std::vector<uint8_t> saveBuffer;
-		size_t dataSize = mcr.read(saveBuffer);
+		if (pFld->m_pool.size() == 0) continue;
 
-		if (dataSize == 0) {
-			std::cerr << "Not found Game ID '" << gameId[i] << std::endl;
-			continue;
-		}
+		// スタート位置
+		soft.start[fld] = state[pFld->m_pool.m_start].x;
 
-		std::cout << "Game ID: " << gameId[i] << " detected" << std::endl;
+		for (UINT u = 0; u < pFld->m_pool.size(); ++u) {
+			CChipBinary bin;
 
-		SaveDataZeus *pZeus = (SaveDataZeus *)(((char *)saveBuffer.data()) + i * 8);
-
-		// ソフト書き込み
-		constexpr UINT CARD		= 0;
-		constexpr UINT width	= 23;
-		constexpr UINT height	= 15;
-
-		for(UINT u = 0; u < width * height; ++u) pZeus->Oke[CARD].Software[u] = 0;
-
-		UINT offx = 0, offy = 0;
-		for(UINT fld = 0; fld < 3; ++fld){
-			auto& state = sa[fld]->get_result();
-			auto pFld = g_pField[fld].get();
-
-			auto GetStartX = [&]() -> UINT {
-				return pFld->m_pool.size() == 0 ? 0 : state[pFld->m_pool.m_start].x;
-			};
-
-			if(fld == 0){
-				pZeus->Oke[CARD].StartMainX = GetStartX() + offx + 2;
-				pZeus->Oke[CARD].StartMainY = offy + 2;
-			}else if(fld == 1){
-				offx = 16;
-				pZeus->Oke[CARD].StartSub1X = GetStartX() + offx + 2;
-				pZeus->Oke[CARD].StartSub1Y = offy + 2;
-			}else if(fld == 2){
-				offy = 8;
-
-				pZeus->Oke[CARD].StartSub2X = GetStartX() + offx + 2;
-				pZeus->Oke[CARD].StartSub2Y = offy + 2;
-			}
-
-			for(UINT u = 0; u < pFld->m_pool.size(); ++u){
-				CChipBinary bin;
-
-				auto& p = state[u];
-				pFld->m_pool[u]->GetBin(bin);
-				pZeus->Oke[CARD].Software[(p.y + offy) * width + p.x + offx] = bin.m_val;
-			}
-
-			// chksum
-			uint8_t ChkSum = 0;
-			for(int i = 0; i < dataSize - 1; ++i) ChkSum += saveBuffer[i];
-			saveBuffer[dataSize - 1] = ChkSum;
-
-			mcr.write(saveBuffer);
+			auto& p = state[u];
+			pFld->m_pool[u]->GetBin(bin);
+			soft.chip[soft.CHIP_START[fld] + p.y * soft.size[fld] + p.x] = bin.m_val;
 		}
 
 		bMcrUpdate = true;
 	}
 
-	// 3. データの書き込み
-	if (bMcrUpdate && mcr.saveToFile()) {
-		std::cout << "Successfully wrote to " << mcFile << std::endl;
-	} else {
-		std::cerr << "Failed to write to " << mcFile << std::endl;
-		return 1;
+	// 読み込み・書き込み・バイナリモードで開く
+	std::string filepath = "DATA.BIN";
+	std::fstream file(filepath, std::ios::in | std::ios::out | std::ios::binary);
+
+	if (!file) {
+		std::cerr << "Can't open file: " << filepath << "\n";
+		return false;
 	}
 
+	// 1. ファイルサイズを取得
+	file.seekg(0, std::ios::end);
+	std::streamsize size = file.tellg();
+	if (size <= 0) {
+		std::cerr << "File is empty or size cannot be determined.	\n";
+		return false;
+	}
+
+	// 2. バッファに全データを読み込む
+	file.seekg(0, std::ios::beg);
+	std::vector<uint8_t> buffer(static_cast<size_t>(size));
+	if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
+		std::cerr << "Failed to read file data.\n";
+		return false;
+	}
+
+	// 3. データの書き換え
+	memcpy(buffer.data() + 0xFE6, &soft, sizeof(soft));
+
+	// 4. 書き込み位置をファイルの先頭に戻す
+	file.seekp(0, std::ios::beg);
+
+	// 5. 書き換えたバッファを上書き
+	if (!file.write(reinterpret_cast<const char*>(buffer.data()), size)) {
+		std::cerr << "Failed to write updated data to file.\n";
+		return false;
+	}
+
+	std::cout << "Successfully updated " << filepath << ".\n";
 	return 0;
 }
