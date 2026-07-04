@@ -26,43 +26,43 @@
 void move(){
 	start_sub(1);
 	
-	if(is_barrier_over(0, 384, 20, 3))
+	If(is_barrier_over(0, 384, 20, 3))
 		move_backward();
 		
-	elseif(
+	Elseif(
 		enemy_num(256, 64, 240, OKE_ALL) ||
 		is_barrier_over(256, 96, 40, 24)
 	)
 		turn_left();
 		
-	elseif(is_barrier_over(256, 96, 20, 3))
-		if(cur_time >= 3)
+	Elseif(is_barrier_over(256, 96, 20, 3))
+		If(cur_time >= 3)
 			turn_right();
-		else
+		Else
 			turn_left();
-		endif
+		Endif
 		
-	elseif(
+	Elseif(
 		enemy_num(-144, 448, 320, OKE_ALL) ||
 		projectile_num(112, 64, 160, P_ALL) ||
 		enemy_num(0, 512, 80, OKE_ALL)
 	)
 		move_backward();
 		
-	elseif(cur_time < 10)
+	Elseif(cur_time < 10)
 		cannon_timer = 10;
 		move_backward();
-	else
+	Else
 		move_forward();
-	endif
+	Endif
 }
 
 void fire_missile(int oke_type){
-	if(ammo_num(2))
+	If(ammo_num(2))
 		fire(0, 512, 320, oke_type, 2, 1);
-	elseif(ammo_num(3))
+	Elseif(ammo_num(3))
 		fire(0, 512, 320, oke_type, 3, 1);
-	endif
+	Endif
 }
 
 void chip_main(){
@@ -70,62 +70,62 @@ void chip_main(){
 	lockon(0, 512, 320, OKE_ALL);
 	
 	// 格闘
-	if(target_z() <= 6 && target_distance() <= 30 && is_target_direction(0, 160))
+	If(target_z() <= 6 && target_distance() <= 30 && is_target_direction(0, 160))
 		strike();
-		exit();
-	endif
+		Return;
+	Endif
 	
 	cur_time = time();
 	
 	move();
 	
 	// 冷却
-	if(heat() > 70)
-		if(option_num(1) >= 1)
+	If(heat() > 70)
+		If(option_num(1) >= 1)
 			option(1);
-		else
+		Else
 			option(2);
-		endif
+		Endif
 		
 		// 冷却中は移動に徹する
 		(cannon_timer = cur_time) += 4;
 		(missile_timer = cur_time) += 2;
-	endif
+	Endif
 	
 	// ミサイル妨害
-	if(projectile_num(0, 320, 50, P_MISSILE))
+	If(projectile_num(0, 320, 50, P_MISSILE))
 		option(3);
-	endif
+	Endif
 	
 	// カノン
-	if(cur_time >= cannon_timer && ammo_num(1))
+	If(cur_time >= cannon_timer && ammo_num(1))
 		
 		get_target_direction(E, F);
-		if(F <= 32)
-			while(is_self_firing() && prev_cannon_ammo == (F = ammo_num(1)))
-			endwhile
+		If(F <= 32)
+			While(is_self_firing() && prev_cannon_ammo == (F = ammo_num(1)))
+			Endwhile
 			
 			// 被弾したら 3秒間移動
-			if(is_self_stun())
+			If(is_self_stun())
 				(cannon_timer = cur_time) += 3;
 				missile_timer = cannon_timer;
-				exit();
-			endif
+				Return;
+			Endif
 			
 			fire(0, 448, 160, OKE_ALL, 3, 1);
 			fire(0, 448, 160, OKE_ALL, 1, 1);
 			prev_cannon_ammo = ammo_num(1);
-		endif
-	endif
+		Endif
+	Endif
 	
 	// ミサイル
-	if(cur_time >= missile_timer && is_self_moving())
+	If(cur_time >= missile_timer && is_self_moving())
 		(missile_timer = time()) += 4;
 		
-		if(enemy_num(0, 512, 320, OKE_FLIGHT))
+		If(enemy_num(0, 512, 320, OKE_FLIGHT))
 			fire_missile(OKE_FLIGHT);
-		else
+		Else
 			fire_missile(OKE_ALL);
-		endif
-	endif
+		Endif
+	Endif
 }

@@ -79,28 +79,28 @@ void chip_main(){
 
 命令は，OKE ソフトチップに相当する命令を記述します．使用できる命令は[命令一覧](#命令一覧)を参照してください．
 
-### exit() 命令
+### Return 命令
 
-`exit()` 命令は，チップ配置エリアの外枠に向かうチップが配置されます．MAIN では MAIN 先頭に戻り，SUB1/SUB2 では呼び出し元に戻ります．
+`Return` 命令は，チップ配置エリアの外枠に向かうチップが配置されます．MAIN では MAIN 先頭に戻り，SUB1/SUB2 では呼び出し元に戻ります．
 
 ### 条件分岐の記述
 
-条件分岐には，`if` `elseif` `else` `endif` を使用して記述します．以下に記述例を示します．
+条件分岐には，`If` `Elseif` `Else` `Endif` を使用して記述します．以下に記述例を示します．
 
 ```
-if(ammo_num(1) >= 100)
+If(ammo_num(1) >= 100)
 	// 武装 1残弾が 100 発以上の時の処理
 	...
-elseif(is_target_stop())
+Elseif(is_target_stop())
 	// 武装 1残弾が 100 未満 かつ ターゲットが静止中の処理
 	...
-else
+Else
 	// 上記条件のいずれにも当てはまらないときの処理
 	...
-endif
+Endif
 ```
 
-`if(...)` および `elseif(...)` のカッコ内には，OKE ソフトの条件判定チップに相当する条件判定命令を記述します．
+`If(...)` および `Elseif(...)` のカッコ内には，OKE ソフトの条件判定チップに相当する条件判定命令を記述します．
 
 条件判定命令は大きく分けて 2種類あります．
 
@@ -117,33 +117,33 @@ endif
 
 ```
 // 正面 30m 以内の地上敵に格闘攻撃をする
-if(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
+If(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
 	strike();
-endif
+Endif
 
-if(!is_target_stop())
+If(!is_target_stop())
 	// ターゲットが静止中ではないときの処理
 	
-endif
+Endif
 ```
 
 ### ループの記述
 
-繰り返し処理を行うためのループ構文は `while` `endwhile` `break` を使用して記述します．以下に記述例を示します．
+繰り返し処理を行うためのループ構文は `While` `Endwhile` `Break` を使用して記述します．以下に記述例を示します．
 ```
 // 正面 30m 以内に敵機がいる限り格闘し続ける
-while(enemy_num(0, 128, 30, OKE_ALL) >= 1)
+While(enemy_num(0, 128, 30, OKE_ALL) >= 1)
 	
 	// ただしその敵が飛行型の場合は格闘ループを抜ける
-	if(enemy_num(0, 128, 30, OKE_FLIGHT) >= 1)
-		break;
-	endif
+	If(enemy_num(0, 128, 30, OKE_FLIGHT) >= 1)
+		Break;
+	Endif
 	
 	strike();
-endwhile
+Endwhile
 ```
 
-ループを脱出するためには `break` を使用してください．
+ループを脱出するためには `Break` を使用してください．
 
 ### カウンタ入力
 
@@ -459,7 +459,7 @@ void chip_main(){
 
 ## 既知のバグ
 
-- 疑似サブルーチンで `exit()` を呼ぶと，その疑似サブルーチンではなく，その疑似サブルーチンを呼んだ MAIN/SUB1/SUB2 を `exit()` するチップが配置されます．
+- 疑似サブルーチンで `Return` を呼ぶと，その疑似サブルーチンではなく，その疑似サブルーチンを呼んだ MAIN/SUB1/SUB2 を `Return` するチップが配置されます．
 - 数学的にチップ配置できない記述が可能かもしれませんが，チェックは行っていないので，永遠にコンパイルが終わらないかもしれません．
 
 ## 謝辞

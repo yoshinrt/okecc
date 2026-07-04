@@ -3106,25 +3106,21 @@ static bool start_sub_internal(int num, LastLocationArg){
 	return true;
 }
 
-// 黒魔術w
-#define start_sub(num) \
-	for(;!start_sub_internal(num);) return; CFieldSwitch FieldInfo(num)
+#define start_sub(num) if(!start_sub_internal(num)) return; CFieldSwitch FieldInfo(num)
 
 //////////////////////////////////////////////////////////////////////////////
 // C との命名被り回避
 
 #ifndef NO_OKECC_SYNTAX
-	#define if(cc)		if_statement(cc);
-	#define elseif(cc)	elseif_statement(cc);
-	#define else		else_statement();
-	#define endif		endif_statement();
+	#define If(cc)		if_statement(cc);
+	#define Elseif(cc)	elseif_statement(cc);
+	#define Else		else_statement();
+	#define Endif		endif_statement();
 
-	#define loop		loop_statement();
-	#define endloop		endloop_statement();
-	#define break		break_statement()
-	#define while(cc)	loop if(!(cc)) break; endif
-	#define endwhile	endloop
+	#define Break		break_statement()
+	#define While(cc)	loop_statement(); If(!(cc)) Break; Endif
+	#define Endwhile	endloop_statement();
 
-	#define exit		okecc_exit
+	#define Return		okecc_exit()
 	#define rand		okecc_rand
 #endif

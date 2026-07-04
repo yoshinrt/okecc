@@ -41,36 +41,36 @@ void chip_main(){
 	option(1);
 	option(2);
 	option(3);
-	if(ammo_num(1) >= 0) nop(); endif
-	if(ammo_num(1) <= 0) nop(); endif
-	if(ammo_num(5) <= 127) nop(); endif
-	if(option_num(1) <= 127) nop(); endif
-	if(option_num(3) >= 127) nop(); endif
-	if(enemy_num(-240, 32, 20, OKE_BIPED) >= 1) nop(); endif
-	if(enemy_num(0, 512, 320, OKE_QUADRUPED) >= 4) nop(); endif
-	if(enemy_num(256, 32, 20, OKE_VEHICLE) <= 1) nop(); endif
-	if(enemy_num(-240, 32, 20, OKE_HOVER) <= 4) nop(); endif
-	if(enemy_num(-240, 32, 20, OKE_FLIGHT) >= 1) nop(); endif
-	if(friendly_num(-240, 32, 20, OKE_ALL) >= 1) nop(); endif
-	if(is_barrier_over(-240, 32, 10, 3)) nop(); endif
-	if(is_barrier_under(256, 512, 160, 24)) nop(); endif
-	if(projectile_num(-240, 32, 10, P_ALL) >= 0) nop(); endif
-	if(projectile_num(256, 512, 160, P_BULLET) <= 0) nop(); endif
-	if(projectile_num(-240, 32, 10, P_MISSILE) >= 7) nop(); endif
-	if(projectile_num(-240, 32, 10, P_BEAM) <= 7) nop(); endif
-	if(projectile_num(-240, 32, 10, P_ROCKET) >= 0) nop(); endif
-	if(projectile_num(-240, 32, 10, P_MINE) >= 0) nop(); endif
-	if(projectile_num(-240, 32, 10, P_FMINE) >= 0) nop(); endif
-	if(projectile_num(-240, 32, 10, P_HI_V) >= 0) nop(); endif
-	if(is_mappoint(-240, 32, 20, 1, 8)) nop(); endif
-	if(is_mappoint(256, 512, 320, 8, 1)) nop(); endif
-	if(heat() >= 0) nop(); endif
-	if(fuel() <= 100) nop(); endif
-	if(damage() <= 100) nop(); endif
-	if(is_rand(1,2)) nop(); endif
-	if(is_rand(49,50)) nop(); endif
-	if(time() >= 0) nop(); endif
-	if(time() <= 290) nop(); endif
+	If(ammo_num(1) >= 0) nop(); Endif
+	If(ammo_num(1) <= 0) nop(); Endif
+	If(ammo_num(5) <= 127) nop(); Endif
+	If(option_num(1) <= 127) nop(); Endif
+	If(option_num(3) >= 127) nop(); Endif
+	If(enemy_num(-240, 32, 20, OKE_BIPED) >= 1) nop(); Endif
+	If(enemy_num(0, 512, 320, OKE_QUADRUPED) >= 4) nop(); Endif
+	If(enemy_num(256, 32, 20, OKE_VEHICLE) <= 1) nop(); Endif
+	If(enemy_num(-240, 32, 20, OKE_HOVER) <= 4) nop(); Endif
+	If(enemy_num(-240, 32, 20, OKE_FLIGHT) >= 1) nop(); Endif
+	If(friendly_num(-240, 32, 20, OKE_ALL) >= 1) nop(); Endif
+	If(is_barrier_over(-240, 32, 10, 3)) nop(); Endif
+	If(is_barrier_under(256, 512, 160, 24)) nop(); Endif
+	If(projectile_num(-240, 32, 10, P_ALL) >= 0) nop(); Endif
+	If(projectile_num(256, 512, 160, P_BULLET) <= 0) nop(); Endif
+	If(projectile_num(-240, 32, 10, P_MISSILE) >= 7) nop(); Endif
+	If(projectile_num(-240, 32, 10, P_BEAM) <= 7) nop(); Endif
+	If(projectile_num(-240, 32, 10, P_ROCKET) >= 0) nop(); Endif
+	If(projectile_num(-240, 32, 10, P_MINE) >= 0) nop(); Endif
+	If(projectile_num(-240, 32, 10, P_FMINE) >= 0) nop(); Endif
+	If(projectile_num(-240, 32, 10, P_HI_V) >= 0) nop(); Endif
+	If(is_mappoint(-240, 32, 20, 1, 8)) nop(); Endif
+	If(is_mappoint(256, 512, 320, 8, 1)) nop(); Endif
+	If(heat() >= 0) nop(); Endif
+	If(fuel() <= 100) nop(); Endif
+	If(damage() <= 100) nop(); Endif
+	If(is_rand(1,2)) nop(); Endif
+	If(is_rand(49,50)) nop(); Endif
+	If(time() >= 0) nop(); Endif
+	If(time() <= 290) nop(); Endif
 	lockon(-240, 32, 20, OKE_BIPED);
 	lockon(0, 512, 320, OKE_QUADRUPED);
 	lockon(256, 32, 20, OKE_VEHICLE);
@@ -78,23 +78,23 @@ void chip_main(){
 	lockon(-240, 32, 20, OKE_FLIGHT);
 	lockon(-240, 32, 20, OKE_ALL);
 	lockon_friendly(-240, 32, 20, OKE_ALL);
-	if(target_distance() >= 0) nop(); endif
-	if(target_distance() <= 315) nop(); endif
-	if(is_target_direction(-240, 32)) nop(); endif
-	if(is_target_direction(256, 512)) nop(); endif
-	if(target_x() >= -168) nop(); endif
-	if(target_x() <= -168) nop(); endif
-	if(target_y() >= 0) nop(); endif
-	if(target_y() <= 168) nop(); endif
-	if(self_z() >= 168) nop(); endif
-	if(self_z() <= -168) nop(); endif
-	if(is_target_stop   ()) nop(); endif
-	if(is_self_moving ()) nop(); endif
-	if(is_self_turning()) nop(); endif
-	if(is_self_jumping()) nop(); endif
-	if(is_self_firing ()) nop(); endif
-	if(is_self_acting ()) nop(); endif
-	if(is_target_stun   ()) nop(); endif
+	If(target_distance() >= 0) nop(); Endif
+	If(target_distance() <= 315) nop(); Endif
+	If(is_target_direction(-240, 32)) nop(); Endif
+	If(is_target_direction(256, 512)) nop(); Endif
+	If(target_x() >= -168) nop(); Endif
+	If(target_x() <= -168) nop(); Endif
+	If(target_y() >= 0) nop(); Endif
+	If(target_y() <= 168) nop(); Endif
+	If(self_z() >= 168) nop(); Endif
+	If(self_z() <= -168) nop(); Endif
+	If(is_target_stop   ()) nop(); Endif
+	If(is_self_moving ()) nop(); Endif
+	If(is_self_turning()) nop(); Endif
+	If(is_self_jumping()) nop(); Endif
+	If(is_self_firing ()) nop(); Endif
+	If(is_self_acting ()) nop(); Endif
+	If(is_target_stun   ()) nop(); Endif
 	sound(1, 5);
 	sound(5, 1);
 	A = fuel();
@@ -121,10 +121,10 @@ void chip_main(){
 	F = A;
 	A += 0;
 	B = 255;
-	if(A >= F) nop(); endif
-	if(F <= A) nop(); endif
-	if(B == C) nop(); endif
-	if(D != E) nop(); endif
-	if(A >= 127) nop(); endif
-	if(A <=  -127) nop(); endif
+	If(A >= F) nop(); Endif
+	If(F <= A) nop(); Endif
+	If(B == C) nop(); Endif
+	If(D != E) nop(); Endif
+	If(A >= 127) nop(); Endif
+	If(A <=  -127) nop(); Endif
 }

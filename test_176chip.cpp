@@ -4,55 +4,55 @@ void use_option(){
 	//start_sub(1);
 	
 	// 冷却
-	if(heat() >= 65)
-		if(option_num(1))
+	If(heat() >= 65)
+		If(option_num(1))
 			option(1);
-		else
+		Else
 			option(2);
-		endif
+		Endif
 		
-		if(heat() >= 70) option(3); endif
-	endif
+		If(heat() >= 70) option(3); Endif
+	Endif
 }
 
 void chip_main(){
 	for(int i = 0; i < 4; ++i){
 		// 格闘
-		if(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
+		If(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
 			strike();
-			exit();
-		endif
+			Return;
+		Endif
 		
 		lockon(0, 512, 320, OKE_ALL);
 		
 		use_option();
 		
-		if(
+		If(
 			is_target_direction(0, 64) ||
 			is_barrier_over(0, 128, 20, 3) ||
 			projectile_num(0, 32, 160, P_ALL)
 		)
 			turn_left();
-			exit();
-		endif
+			Return;
+		Endif
 		
-		if(
+		If(
 			friendly_num(0, 128, 20, OKE_ALL) ||
 			is_barrier_over(0, 160, 40, 24)
 		)
 			turn_left();
-			exit();
-		endif
+			Return;
+		Endif
 		
 		// ターゲットが後方遠くにいる場合は方向転換
-		if(is_target_direction(256, 256) && target_distance() >= 160)
-			if(is_target_direction(-128, 256))
+		If(is_target_direction(256, 256) && target_distance() >= 160)
+			If(is_target_direction(-128, 256))
 				turn_left();
-			else
+			Else
 				turn_right();
-			endif
-			exit();
-		endif
+			Endif
+			Return;
+		Endif
 		
 		// 前進
 		move_forward();
@@ -61,31 +61,31 @@ void chip_main(){
 		C = ch_receive(1);
 		
 		// ミサイルタイマを過ぎるか，破損が多ければミサイルを撃つ
-		if(B >= C || damage() >= 60)
+		If(B >= C || damage() >= 60)
 			// ミサイル射撃
 			ch_send(B += 4, 1);
 			
-			if(ammo_num(2))
+			If(ammo_num(2))
 				fire(0, 512, 320, OKE_ALL, 2, 1);
 				wait_ae();
-			endif
-			if(ammo_num(3))
+			Endif
+			If(ammo_num(3))
 				fire(0, 512, 320, OKE_ALL, 3, 1);
 				wait_ae();
-			endif
-			exit();
-		endif
+			Endif
+			Return;
+		Endif
 		
 		// 飛行型には積極的にはカノンを撃たない
-		if(!(target_z() >= 6 && heat() >= 50))
-			while(1)
+		If(!(target_z() >= 6 && heat() >= 50))
+			While(1)
 				B = ammo_num(1);
-				if(A != B || !is_self_firing()) break; endif
-			endwhile
+				If(A != B || !is_self_firing()) Break; Endif
+			Endwhile
 			
 			fire(0, 448, 160, OKE_ALL, 3, 1);
 			fire(0, 448, 160, OKE_ALL, 1, 1);
 			A = ammo_num(1);
-		endif
+		Endif
 	}
 }
