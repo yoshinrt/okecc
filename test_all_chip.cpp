@@ -2,7 +2,7 @@
 
 void chip_main(){
 #if 0
-	nop();
+	nop;
 	wait(1);
 	wait(120);
 	wait();
@@ -48,74 +48,78 @@ void chip_main(){
 	A = target_distance();
 	A = target_distance_xy();
 
-	If (ammo_num(1) >= 1) nop(); Endif
-	If (ammo_num(5) >= 990) nop(); Endif
-	If (option_num(1) <= 1) nop(); Endif
-	If (option_num(4) <= 1) nop(); Endif
+	If (ammo_num(1) >= 1) nop; Endif
+	If (ammo_num(5) >= 990) nop; Endif
+	If (option_num(1) <= 1) nop; Endif
+	If (option_num(4) <= 1) nop; Endif
+#endif
 
-	If(is_barrier_over({.h = 0})) nop(); Endif
-	If(is_barrier_over({.w = 0})) nop(); Endif
-	If(is_barrier_over({.x = 800})) nop(); Endif
-	If(is_barrier_over({.y = 800})) nop(); Endif
-	If(is_barrier_over({.height = 30})) nop(); Endif
+	If(is_barrier_over(1).h(0)) nop; Endif
+	If(is_barrier_over(1).w(0)) nop; Endif
+	If(is_barrier_over(1).x(800)) nop; Endif
+	If(is_barrier_over(1).y(800)) nop; Endif
+	If(is_barrier_over(30)) nop; Endif
 	
-	If(is_barrier_under({.span = 0})) nop(); Endif
-	If(is_barrier_under({.dist = 0})) nop(); Endif
-	If(is_barrier_under({.dir = -180})) nop(); Endif
-	If(is_barrier_under({.dir = 180})) nop(); Endif
+	If(is_barrier_under(1).span(0)) nop; Endif
+	If(is_barrier_under(1).dist(0)) nop; Endif
+	If(is_barrier_under(30).dir(-180)) nop; Endif
+	If(is_barrier_under(30).dir(180)) nop; Endif
 
-	If(is_outside_area({.h = 0})) nop(); Endif
-	If(is_outside_area({.dir = 180})) nop(); Endif
+	If(is_outside_area.h(0)) nop; Endif
+	If(is_outside_area.dir(180)) nop; Endif
+#if 0
 	
-	If(enemy_num({.h = 0}) >= 1) nop(); Endif
-	If(enemy_num({.h = 100, .type = OKE_BIPED}) >= 1) nop(); Endif
-	If(enemy_num({.h = 200, .type = OKE_QUADRUPED}) >= 1) nop(); Endif
-	If(enemy_num({.h = 400, .type = OKE_HOVER}) >= 1) nop(); Endif
-	If(enemy_num({.h = 800, .type = OKE_VEHICLE}) >= 3) nop(); Endif
-	If(enemy_num({.dist = 0, .type = OKE_FLIGHT}) <= 3) nop(); Endif
+	If(enemy_num.h(0) >= 1) nop; Endif
+	If(enemy_num.h(100).type(OKE_BIPED) >= 1) nop; Endif
+	If(enemy_num.h(200).type(OKE_QUADRUPED) >= 1) nop; Endif
+	If(enemy_num.h(400).type(OKE_HOVER) >= 1) nop; Endif
+	If(enemy_num.h(800).type(OKE_VEHICLE) >= 3) nop; Endif
+	If(enemy_num.dist(0).type(OKE_FLIGHT) <= 3) nop; Endif
 	
-	If(projectile_num({.h = 0, .type = P_BULLET}) >= 1) nop(); Endif
-	If(projectile_num({.dist = 0, .type = P_BEAM}) >= 1) nop(); Endif
-	If(projectile_num({.type = P_PULSE}) >= 1) nop(); Endif
-	If(projectile_num({.type = P_NAPALM}) >= 1) nop(); Endif
-	If(projectile_num({.type = P_GRENADE}) >= 1) nop(); Endif
-	If(projectile_num({.type = P_BOMB}) >= 1) nop(); Endif
-	If(projectile_num({.type = P_ROCKET}) >= 1) nop(); Endif
-	If(projectile_num({.type = P_MISSILE}) >= 1) nop(); Endif
-	If(projectile_num({.type = P_MINE}) >= 1) nop(); Endif
-	If(projectile_num({.type = P_FMINE}) >= 1) nop(); Endif
-	If(projectile_num({.type = P_HI_V}) >= 3) nop(); Endif
-	If(projectile_num({.type = P_ALL}) <= 3) nop(); Endif
+	If(projectile_num.h(0).type(P_BULLET) >= 1) nop; Endif
+	If(projectile_num.dist(0).type(P_BEAM) > 1) nop; Endif
+	If(projectile_num.type(P_PULSE) <= 1) nop; Endif
+	If(projectile_num.type(P_NAPALM) < 1) nop; Endif
+	If(projectile_num.type(P_GRENADE) >= 1) nop; Endif
+	If(projectile_num.type(P_BOMB) >= 1) nop; Endif
+	If(projectile_num.type(P_ROCKET) >= 1) nop; Endif
+	If(projectile_num.type(P_MISSILE) >= 1) nop; Endif
+	If(projectile_num.type(P_MINE) >= 1) nop; Endif
+	If(projectile_num.type(P_FMINE) >= 1) nop; Endif
+	If(projectile_num.type(P_HI_V) >= 3) nop; Endif
+	If(projectile_num.type(P_ALL) <= 3) nop; Endif
 
-	If(health() >= 0) nop(); Endif
-	If(energy() <= 0) nop(); Endif
-	If(heat() <= 100) nop(); Endif
+	If(health() >= 0) nop; Endif
+	If(energy() <= 0) nop; Endif
+	If(heat() <= 100) nop; Endif
 	
-	If(is_self_waiting ()) nop(); Endif
-	If(is_self_moving  ()) nop(); Endif
-	If(is_self_turning ()) nop(); Endif
-	If(is_self_jumping ()) nop(); Endif
-	If(is_self_firing  ()) nop(); Endif
-	If(is_self_fighting()) nop(); Endif
-	If(is_self_special ()) nop(); Endif
-	If(is_self_stunble ()) nop(); Endif
-	If(is_self_unlock  ()) nop(); Endif
+	If(is_self_waiting ()) nop; Endif
+	If(is_self_moving  ()) nop; Endif
+	If(is_self_turning ()) nop; Endif
+	If(is_self_jumping ()) nop; Endif
+	If(is_self_firing  ()) nop; Endif
+	If(is_self_fighting()) nop; Endif
+	If(is_self_special ()) nop; Endif
+	If(is_self_stunble ()) nop; Endif
+	If(is_self_unlock  ()) nop; Endif
 	
-	If(is_target_stunble ()) nop(); Endif
+	If(is_target_stunble ()) nop; Endif
 	
-	If(is_rand(1)) nop(); Endif
-	If(is_rand(99)) nop(); Endif
+	If(is_rand(1)) nop; Endif
+	If(is_rand(99)) nop; Endif
 	
-	If(target_position({.h = 0})) nop(); Endif
-	If(position_from_target({.dist = 0})) nop(); Endif
+#endif
+	If(is_target_position.h(0)) nop; Endif
+	If(is_position_from_target.dist(0)) nop; Endif
 
-	If(A >= B) nop(); Endif
-	If(C <= D) nop(); Endif
-	If(E == F) nop(); Endif
-	If(G == -99999.9) nop(); Endif
-	If(H == 99999) nop(); Endif
+#if 0
+	If(A >= B) nop; Endif
+	If(C <= D) nop; Endif
+	If(E == F) nop; Endif
+	If(G == -99999.9) nop; Endif
+	If(H == 99999) nop; Endif
 	
-	stop();
+	stop;
 	
 	move_forward;
 	move_backward;
@@ -138,29 +142,29 @@ void chip_main(){
 	turn_left.fast;
 	turn_right.fast.wait;
 	
-#endif
 	fight_low;
 	fight_high;
 	fight_long;
 	fight.wait;
-#if 0
 	
 	guard(5);
-	crouch(60, WAIT);
+	crouch(60).wait;
 	
 	special(1);
-	special(3, WAIT);
+	special(3).wait;
 	
-	fire({.h = 0}, 1, 16);
-	fire({.h = 0, .fire = WIDE}, 5, 1, WAIT);
-	fire({.h = 0, .fire = SNIPE}, 5, 1, WAIT);
+	fire(1, 16).h(0);
+	fire(5, 1).h(0).wide;
+	fire(5, 1).snipe.wait;
+	
+	fire(1, 16).target;
 	
 	option(1);
 	option(5);
 	
-	lockon({});
-	lockon_friendly({});
-	lockon_oke({});
+	lockon;
+	lockon_friendly.type(OKE_BIPED);
+	lockon_all;
 	
 	set_altitude(20);
 	set_altitude(100);
