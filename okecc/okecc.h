@@ -484,7 +484,7 @@ public:
 	bool ValidR    (void) const {return m_LastR < m_pool.m_list.size();}
 
 	// Tree にチップ追加
-	CChipTree& add(std::unique_ptr<CChip> chip){
+	CChip* add(std::unique_ptr<CChip> chip){
 		UINT idx = m_pool.add(std::move(chip));		// チップ追加
 
 		if(ValidStart()){
@@ -494,7 +494,7 @@ public:
 		}
 		m_LastG = idx;
 
-		return *this;
+		return m_pool[idx];
 	}
 
 	CChipTree operator&&(const CChipTree& b) const {
