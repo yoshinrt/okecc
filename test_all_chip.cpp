@@ -117,31 +117,33 @@ void chip_main(){
 	
 	stop();
 	
-	move_forward();
-	move_backward();
-	move_left();
-	move_right();
+	move_forward;
+	move_backward;
+	move_left;
+	move_right;
 	
-	turn_left();
-	turn_right();
+	turn_left;
+	turn_right;
 	
-	jump_forward();
-	jump_backward();
-	jump_left();
-	jump_right(WAIT);
+	jump_forward;
+	jump_backward;
+	jump_left.wait;
+	jump_right.wait;
 	
-	move_forward(FAST);
-	move_backward(FAST);
-	move_left(FAST, WAIT);
-	move_right(FAST, WAIT);
+	move_forward.fast;
+	move_backward.fast;
+	move_left.fast.wait;
+	move_right.fast.wait;
 	
-	turn_left(FAST);
-	turn_right(FAST, WAIT);
+	turn_left.fast;
+	turn_right.fast.wait;
 	
-	fight_low();
-	fight_high();
-	fight_long();
-	fight(WAIT);
+#endif
+	fight_low;
+	fight_high;
+	fight_long;
+	fight.wait;
+#if 0
 	
 	guard(5);
 	crouch(60, WAIT);
@@ -163,7 +165,4 @@ void chip_main(){
 	set_altitude(20);
 	set_altitude(100);
 #endif
-	
-	fire_target({.fire = WIDE}, 1, 16);
-	fire_target({.fire = SNIPE}, 5, 1, WAIT);
 }
