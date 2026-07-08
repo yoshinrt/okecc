@@ -683,18 +683,21 @@ CChipTree operator||(T&& lhs, U&& rhs) {
 class CCond {
 public:
 
-	CCond(std::unique_ptr<CChip> pchip) : m_pchip(std::move(pchip)) {}
+	CCond(std::unique_ptr<CChipCond> upchip){
+		m_pchip = upchip.get();
+		g_pCurField->m_tree.add(std::move(upchip));
+	}
 
-	std::unique_ptr<CChip> m_pchip;
+	CChipCond *m_pchip;
 
 	CChipTree GetCChipTree(void) {
 		CChipTree tree(g_pCurField->m_pool);
 
 		// チップ単体からツリーに変換 (Condition chip)
-		// R 側に Goto を足して，常に m_NextG を触ればいいようにする
-		tree.m_start = tree.m_pool.add(std::move(m_pchip));
+		//tree.m_start = tree.m_pool.add(std::move(m_pchip)); ★後で
 		tree.m_LastG = tree.m_start;
 
+		// R 側に Goto を足して，常に m_NextG を触ればいいようにする
 		tree.m_LastR = tree.m_pool.add(std::make_unique<CChipGoto>());
 		tree.m_pool[tree.m_start]->m_NextR = tree.m_LastR;
 
