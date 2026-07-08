@@ -125,10 +125,10 @@ public:
 
 	// 障害物用
 	int height = 0;
-	
+
 	// OKE / 弾種類
 	int type	= DEFAULT_INT;
-	
+
 	// 射撃モード
 	int fire	= F_NORMAL;
 };
@@ -245,7 +245,7 @@ public:
 	static inline const char *m_SelfStatusTypeStr[] = {
 		"HP", "燃料", "熱量"
 	};
-	
+
 	enum {
 		ENEMY,
 		FRIENDLY,
@@ -323,11 +323,23 @@ public:
 
 	UINT			m_NextG = IDX_NONE;
 	UINT			m_NextR = IDX_NONE;
+	UINT			m_ChipId = 0;
 };
 
+class CChipTree;
 class CChipCond : public CChip {
 public:
 	virtual ~CChipCond(){}
+
+	CChipTree operator>=(int num);
+	CChipTree operator<=(int num);
+	CChipTree operator> (int num);
+	CChipTree operator< (int num);
+	CChipTree operator! ();
+
+	operator CChipTree();
+
+	CChipTree GetChipTree();
 };
 
 //////////////////////////////////////////////////////////////////////////////
@@ -355,8 +367,11 @@ public:
 	CChipPool(UINT width, UINT height) : m_width(width), m_height(height) {}
 
 	UINT add(std::unique_ptr<CChip> chip){
+		auto p = chip.get();
+
 		m_list.push_back(std::move(chip));
-		return (UINT)m_list.size() - 1;
+		p->m_ChipId = (UINT)m_list.size() - 1;
+		return p->m_ChipId;
 	}
 
 	size_t size(void) const { return m_list.size(); }
@@ -463,10 +478,19 @@ public:
 	UINT m_start	= IDX_NONE;	// 開始 chip
 	UINT m_LastG	= IDX_NONE;	// 最後の緑矢印を出している chip
 	UINT m_LastR	= IDX_NONE; // 最後の赤矢印を出している chip
-	
+
 	CChipPool&	m_pool;
 
 	CChipTree(CChipPool& pool) : m_pool(pool){}
+
+	CChipTree(UINT ChipId, CChipPool& pool) : m_pool(pool){
+		m_start = ChipId;
+		m_LastG = m_start;
+
+		// R 側に Goto を足して，常に m_NextG を触ればいいようにする
+		m_LastR = m_pool.add(std::make_unique<CChipGoto>());
+		m_pool[m_start]->m_NextR = m_LastR;
+	}
 
 	CChipTree(std::unique_ptr<CChipCond> upchip, CChipPool& pool) : m_pool(pool){
 		// チップ単体からツリーに変換 (Condition chip)
@@ -496,7 +520,7 @@ public:
 	bool ValidR    (void) const {return m_LastR < m_pool.m_list.size();}
 
 	// Tree にチップ追加
-	CChip* add(std::unique_ptr<CChip> chip){
+	CChip* add_base(std::unique_ptr<CChip> chip){
 		UINT idx = m_pool.add(std::move(chip));		// チップ追加
 
 		if(ValidStart()){
@@ -507,6 +531,11 @@ public:
 		m_LastG = idx;
 
 		return m_pool[idx];
+	}
+
+	template<typename T>
+	T *add(std::unique_ptr<T> chip){
+		return static_cast<T *>(add_base(std::move(chip)));
 	}
 
 	CChipTree operator&&(const CChipTree& b) const {
@@ -564,7 +593,7 @@ public:
 	CChipTree operator<(int num) {
 		return !(*this >= num);
 	}
-	
+
 	CChipTree operator!(void) const {
 		auto cc = *this;
 		cc.m_LastG = m_LastR;
@@ -689,6 +718,23 @@ inline std::vector<std::unique_ptr<CField>>	g_pField;
 inline CField *g_pCurField;
 
 //////////////////////////////////////////////////////////////////////////////
+// CChipCond --> CChipTree operator
+
+#ifndef NO_OKECC_SYNTAX
+CChipTree CChipCond::operator>=(int num){
+	return GetChipTree() >= num;
+}
+
+CChipTree CChipCond::GetChipTree(){
+	return CChipTree(this->m_ChipId, g_pCurField->m_pool);
+}
+
+inline CChipCond::operator CChipTree(){
+    return GetChipTree();
+}
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
 
 // CChipTree に変換可能な型を CChipTree として扱うテンプレート
 template <typename T>
@@ -732,7 +778,7 @@ public:
 		TGT_ACTCODE,
 		TGT_DISTANCE,
 		TGT_DISTANCE_XY,
-		
+
 		MATH,
 		CH_RECV,
 	};
@@ -1063,7 +1109,7 @@ public:
 	CChipJump(int param, int exmode){
 		m_Id = CHIPID_JUMP;
 		m_param = param;
-		m_exmode = exmode;	
+		m_exmode = exmode;
 	}
 
 	virtual ~CChipJump() {}
@@ -1108,12 +1154,12 @@ public:
 		LONG,
 		AUTO,
 	};
-	
+
 	static inline const char* m_type_str[] = {
 		"下段", "上段", "遠距離", "自動"
 	};
-	
-	
+
+
 	CChipFight(int param, int exmode){
 		m_Id	= CHIPID_FIGHT;
 		m_param	= param;
@@ -1160,11 +1206,11 @@ public:
 		GUARD,
 		CROUCH,
 	};
-	
+
 	static inline const char* m_type_str[] = {
 		"ガード", "伏せ"
 	};
-	
+
 	CChipGuard(int param, int num, int exmode){
 		m_Id	= CHIPID_GUARD;
 		m_param	= param;
@@ -1298,7 +1344,7 @@ public:
 	int int2dist(int val){
 		int sign = val < 0 ? -1 : 1;
 		int v = std::abs(val);
-		
+
 		if(v <= 100) return (v / 2) * sign;
 		if(v <= 200) return ((v - 100) / 5 + (100 / 2)) * sign;
 		if(v <= 400) return ((v - 200) / 10 + (100 / 5) + (100 / 2)) * sign;
@@ -1315,7 +1361,7 @@ public:
 		if(v <= 70) return (100 + (v - 50) * 5) * sign;
 		if(v <= 90) return (200 + (v - 70) * 10) * sign;
 		return (400 + (v - 90) * 20) * sign;
-	}	
+	}
 
 	int int2angle(int val){
 		if (val < -180 || 180 < val) Error(std::format("Value {} is out of range [-180 - 180]", val));
@@ -1347,7 +1393,7 @@ public:
 				m_y_dir.get()
 			);
 		}
-		
+
 		return std::format(
 			"{}m\n{},{}",
 			m_x_dist.get(),
@@ -1801,7 +1847,7 @@ public:
 		m_num.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
-	
+
 	ScaledInt<4>		m_enemy;
 	ScaledInt<4>		m_type;
 	ScaledInt<4, 1, 31>	m_num;
@@ -1989,7 +2035,7 @@ public:
 		m_num.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
-	
+
 	ScaledInt<8>		m_type;
 	ScaledInt<4, 1, 31>	m_num;
 	ScaledInt<4>		m_operator;
@@ -2056,11 +2102,11 @@ public:
 	ScaledInt<>		m_operator;
 };
 
-static CChipTree health(
+static CChipSelfStatus& health(
 	LastLocationArg
 ){
 	LastLocation();
-	return CChipTree(std::make_unique<CChipSelfStatus>(CChipSelfStatus::HP), g_pCurField->m_pool);
+	return *g_pCurField->m_tree.add(std::make_unique<CChipSelfStatus>(CChipSelfStatus::HP));
 }
 
 static CChipTree energy(
@@ -2165,7 +2211,7 @@ static CChipTree is_rand(
 
 class CChipTime : public CChipCond {
 public:
-	
+
 	enum{
 		START,
 		END,
@@ -2249,7 +2295,7 @@ public:
 		m_enemy.SetBin(bin);
 		m_type.SetBin(bin);
 	}
-	
+
 	ScaledInt<>		m_enemy;
 	ScaledInt<>		m_type;
 };
@@ -2296,19 +2342,19 @@ public:
 		TGT,
 		FROM_TGT,
 	};
-	
+
 	static inline const char* m_tgt_str[] = {
 		"TGT", "TGTから",
 	};
-	
+
 	CChipTgtPosition(
 		const ChipParam& param,
 		int tgt
 	) : CCoordinate(param){
 		m_Id	= tgt == TGT ? CHIPID_IF_TGT_POS : CHIPID_IF_POS_FROM_TGT;
 	}
-	
-	
+
+
 	virtual ~CChipTgtPosition(){}
 
 	virtual std::string GetLayoutText(void){
@@ -2628,7 +2674,7 @@ public:
 		if(-99999.9 > op2 || op2 > 99999.9){
 			Error(std::format("Value {} is out of range [-99999.9 - 99999.9]", op2));
 		}
-		
+
 		m_op1		= op1;
 		m_operator	= opr;
 		m_immxvar	= 1;
@@ -2737,7 +2783,7 @@ CChipVar& CChipVar::operator=(const CChipVal& val){
 		case CChipVal::CH_RECV:
 			pchip = std::make_unique<CChipChReceive>(val.m_param, m_var);
 			break;
-		
+
 		case CChipVal::MATH: {
 			std::unique_ptr<CChipCalc> pchip_calc = std::make_unique<CChipCalc>(0U, CChipCalc::MOV, 0U);
 			*pchip_calc.get() = *static_cast<CChipCalc*>(val.m_chip.get());
@@ -2830,7 +2876,7 @@ public:
 		if(-99999.9 > op2 || op2 > 99999.9){
 			Error(std::format("Value {} is out of range [-99999.9 - 99999.9]", op2));
 		}
-		
+
 		m_op1		= op1;
 		m_operator	= opr;
 		m_immxvar	= 1;
@@ -2838,7 +2884,7 @@ public:
 		m_op2		= 0;
 		m_Id		= CHIPID_IF_CMP;
 	}
-	
+
 	virtual ~CChipCmp(){}
 
 	virtual std::string GetLayoutText(void){
