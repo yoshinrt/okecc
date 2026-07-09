@@ -91,6 +91,8 @@ enum {
 	CHIPID_FIRE_JMP				= 0xE6,
 	CHIPID_ALTITUDE				= 0xCD,
 	CHIPID_OPTION				= 0xD0,
+	CHIPID_TGT_BODYCODE			= 0xDF,
+	CHIPID_NUM_LOCKED			= 0xE0,
 	CHIPID_LOCKON				= 0xDB,
 	CHIPID_LOCKON_COUNTER		= 0xEC,
 	CHIPID_LOCKON_PARTS			= 0xE8,
@@ -169,7 +171,6 @@ public:
 		bin.m_pos += width;
 	};
 
-private:
 	UINT	m_value = 0;
 };
 
@@ -310,11 +311,15 @@ public:
 	CChipTree operator<=(int num);
 	CChipTree operator> (int num);
 	CChipTree operator< (int num);
+	CChipTree operator==(int num);
+	CChipTree operator!=(int num);
 	CChipTree operator! ();
 
 	operator CChipTree();
 
 	CChipTree GetChipTree();
+	
+	bool m_cond_eq = false;
 };
 
 //////////////////////////////////////////////////////////////////////////////
@@ -569,6 +574,15 @@ public:
 		return !(*this >= num);
 	}
 
+	CChipTree& operator==(int num) {
+		m_pool[m_start]->num_set(num);
+		return *this;
+	}
+	
+	CChipTree operator!=(int num) {
+		return !(*this == num);
+	}
+	
 	CChipTree operator!(void) const {
 		auto cc = *this;
 		cc.m_LastG = m_LastR;
@@ -697,19 +711,33 @@ inline CField *g_pCurField;
 
 #ifndef NO_OKECC_SYNTAX
 CChipTree CChipCond::operator>=(int num){
+	if (m_cond_eq) Error("Use '==' or '!=' for equality comparison");
 	return GetChipTree() >= num;
 }
 
 CChipTree CChipCond::operator<=(int num){
+	if (m_cond_eq) Error("Use '==' or '!=' for equality comparison");
 	return GetChipTree() <= num;
 }
 
 CChipTree CChipCond::operator>(int num){
+	if (m_cond_eq) Error("Use '==' or '!=' for equality comparison");
 	return !(GetChipTree() <= num);
 }
 
 CChipTree CChipCond::operator<(int num){
+	if (m_cond_eq) Error("Use '==' or '!=' for equality comparison");
 	return !(GetChipTree() >= num);
+}
+
+CChipTree CChipCond::operator==(int num){
+	if (!m_cond_eq) Error("Use '>=' or '<=' for inequality comparison");
+	return GetChipTree() == num;
+}
+
+CChipTree CChipCond::operator!=(int num) {
+	if (!m_cond_eq) Error("Use '>=' or '<=' for inequality comparison");
+	return GetChipTree() != num;
 }
 
 CChipTree CChipCond::GetChipTree(){
@@ -1135,27 +1163,27 @@ public:
 	CChipGuard(int param, int num){
 		m_Id	= CHIPID_GUARD;
 		m_param	= param;
-		num_m	= num;
+		m_num	= num;
 		m_exmode= EM_THROUGH;
 	}
 
 	virtual ~CChipGuard(){}
 
 	virtual std::string GetLayoutText(void){
-		return std::format("{}{}\n{}/30s", m_exmode_str[m_exmode.get()], m_type_str[m_param.get()], num_m.get());
+		return std::format("{}{}\n{}/30s", m_exmode_str[m_exmode.get()], m_type_str[m_param.get()], m_num.get());
 	}
 
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_param.GetBin(bin);
-		num_m.GetBin(bin);
+		m_num.GetBin(bin);
 		m_exmode.GetBin(bin);
 	}
 
 	virtual void SetBin(CChipBinary& bin){
 		CChip::SetBin(bin);
 		m_param.SetBin(bin);
-		num_m.SetBin(bin);
+		m_num.SetBin(bin);
 		m_exmode.SetBin(bin);
 	}
 
@@ -1163,7 +1191,7 @@ public:
 	auto& _wait()		{m_exmode	= EM_WAIT;	return *this;}
 
 	ScaledInt<>			m_param;
-	ScaledInt<8, 5, 60>	num_m;
+	ScaledInt<8, 5, 60>	m_num;
 	ScaledInt<>			m_exmode;
 };
 
@@ -1510,13 +1538,13 @@ public:
 	){
 		m_weapon	= weapon;
 		m_operator	= opr;
-		num_m		= num;
+		m_num		= num;
 		m_Id		= CHIPID_IF_AMMO_NUM;
 	}
 
 	virtual ~CChipAmmoNum(){}
 
-	virtual void num_set(int num){num_m = num;}
+	virtual void num_set(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -1524,25 +1552,25 @@ public:
 			std::format(
 				"{}#{}\n残数{}{}?",
 				(m_weapon.get() < 5 ? "武装" : "オプション"), (m_weapon.get() % 5 + 1),
-				m_operator_str[m_operator.get()], num_m.get()
+				m_operator_str[m_operator.get()], m_num.get()
 			);
 	}
 
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
-		num_m.GetBin(bin);
+		m_num.GetBin(bin);
 		m_weapon.GetBin(bin);
 		m_operator.GetBin(bin);
 	}
 
 	virtual void SetBin(CChipBinary& bin){
 		CChipCond::SetBin(bin);
-		num_m.SetBin(bin);
+		m_num.SetBin(bin);
 		m_weapon.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
 
-	ScaledInt<16, 1, 990>	num_m;
+	ScaledInt<16, 1, 990>	m_num;
 	ScaledInt<8>			m_weapon;
 	ScaledInt<8>			m_operator;
 };
@@ -1581,7 +1609,7 @@ public:
 
 	virtual ~CChipOkeNum(){}
 
-	virtual void num_set(int num){num_m = num;}
+	virtual void num_set(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -1589,7 +1617,7 @@ public:
 			std::format(
 				"{}{}{}{}?\n{}",
 				m_EnemyFriendlyStr[m_enemy.get()],
-				m_OkeTypeStr[m_type.get()], m_operator_str[m_operator.get()], num_m.get(),
+				m_OkeTypeStr[m_type.get()], m_operator_str[m_operator.get()], m_num.get(),
 				GetCoordinateText()
 			);
 	}
@@ -1599,7 +1627,7 @@ public:
 		GetCoordinateBin(bin);
 		m_enemy.GetBin(bin);
 		m_type.GetBin(bin);
-		num_m.GetBin(bin);
+		m_num.GetBin(bin);
 		m_operator.GetBin(bin);
 	}
 
@@ -1608,7 +1636,7 @@ public:
 	
 	ScaledInt<4>		m_enemy;
 	ScaledInt<4>		m_type;
-	ScaledInt<4, 1, 31>	num_m;
+	ScaledInt<4, 1, 31>	m_num;
 	ScaledInt<4>		m_operator;
 };
 
@@ -1747,14 +1775,14 @@ public:
 
 	virtual ~CChipProjectileNum(){}
 
-	virtual void num_set(int num){num_m = num;}
+	virtual void num_set(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
 				"{}{}{}?\n{}",
-				m_ProjectileTypeStr[m_type.get()], m_operator_str[m_operator.get()], num_m.get(),
+				m_ProjectileTypeStr[m_type.get()], m_operator_str[m_operator.get()], m_num.get(),
 				GetCoordinateText()
 			);
 	}
@@ -1763,7 +1791,7 @@ public:
 		CChipCond::GetBin(bin);
 		GetCoordinateBin(bin);
 		m_type.GetBin(bin);
-		num_m.GetBin(bin);
+		m_num.GetBin(bin);
 		m_operator.GetBin(bin);
 	}
 
@@ -1771,7 +1799,7 @@ public:
 		CChipCond::SetBin(bin);
 		SetCoordinateBin(bin);
 		m_type.SetBin(bin);
-		num_m.SetBin(bin);
+		m_num.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
 
@@ -1779,7 +1807,7 @@ public:
 	auto& type(int param)	{m_type = param;	return *this;}
 	
 	ScaledInt<8>		m_type;
-	ScaledInt<4, 1, 31>	num_m;
+	ScaledInt<4, 1, 31>	m_num;
 	ScaledInt<4>		m_operator;
 };
 
@@ -1806,13 +1834,13 @@ public:
 	){
 		m_type			= type;
 		m_operator		= OP_GE;
-		num_m			= 1;
+		m_num			= 1;
 		m_Id			= CHIPID_IF_SELF_STATUS;
 	}
 
 	virtual ~CChipSelfStatus(){}
 
-	virtual void num_set(int num){num_m = num;}
+	virtual void num_set(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -1820,26 +1848,26 @@ public:
 			std::format(
 				"{}{}{}?",
 				m_SelfStatusTypeStr[m_type.get()],
-				m_operator_str[m_operator.get()], num_m.get()
+				m_operator_str[m_operator.get()], m_num.get()
 			);
 	}
 
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_type.GetBin(bin);
-		num_m.GetBin(bin);
+		m_num.GetBin(bin);
 		m_operator.GetBin(bin);
 	}
 
 	virtual void SetBin(CChipBinary& bin){
 		CChipCond::SetBin(bin);
 		m_type.SetBin(bin);
-		num_m.SetBin(bin);
+		m_num.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
 
 	ScaledInt<>		m_type;
-	ScaledInt<>		num_m;
+	ScaledInt<>		m_num;
 	ScaledInt<>		m_operator;
 };
 
@@ -1913,7 +1941,7 @@ public:
 		int num
 	){
 		m_Id	= CHIPID_IF_RAND;
-		num_m	= num;
+		m_num	= num;
 	}
 
 	virtual ~CChipIsRand(){}
@@ -1922,21 +1950,21 @@ public:
 		return
 			std::format(
 				"乱数\n{}%?",
-				num_m.get()
+				m_num.get()
 			);
 	}
 
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
-		num_m.GetBin(bin);
+		m_num.GetBin(bin);
 	}
 
 	virtual void SetBin(CChipBinary& bin){
 		CChipCond::SetBin(bin);
-		num_m.SetBin(bin);
+		m_num.SetBin(bin);
 	}
 
-	ScaledInt<8, 1, 99>		num_m;
+	ScaledInt<8, 1, 99>		m_num;
 };
 
 static CChipTree is_rand(
@@ -1961,13 +1989,13 @@ public:
 	CChipIfTime(int start_end){
 		m_operator		= OP_GE;
 		m_start_end		= start_end;
-		num_m			= 1;
+		m_num			= 1;
 		m_Id			= CHIPID_IF_TIME;
 	}
 
 	virtual ~CChipIfTime(){}
 
-	virtual void num_set(int num){num_m = num;}
+	virtual void num_set(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -1975,25 +2003,25 @@ public:
 			std::format(
 				"{}時間\n{}{}?",
 				m_start_end.get() ? "残" : "経過",
-				m_operator_str[m_operator.get()], num_m.get()
+				m_operator_str[m_operator.get()], m_num.get()
 			);
 	}
 
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
-		num_m.GetBin(bin);
+		m_num.GetBin(bin);
 		m_start_end.GetBin(bin);
 		m_operator.GetBin(bin);
 	}
 
 	virtual void SetBin(CChipBinary& bin){
 		CChipCond::SetBin(bin);
-		num_m.SetBin(bin);
+		m_num.SetBin(bin);
 		m_start_end.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
 
-	ScaledInt<16, 1, 300>	num_m;
+	ScaledInt<16, 1, 300>	m_num;
 	ScaledInt<>				m_start_end;
 	ScaledInt<>				m_operator;
 };
@@ -2001,6 +2029,80 @@ public:
 static auto time_remained(LastLocationArg) {
 	LastLocation();
 	return CChipTree(std::make_unique<CChipIfTime>(CChipIfTime::END), g_pCurField->m_pool);
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// ターゲット機体コード
+
+class CChipIfBodyCode : public CChipCond {
+public:
+	CChipIfBodyCode(){
+		m_Id			= CHIPID_TGT_BODYCODE;
+		m_cond_eq		= true;
+	}
+
+	virtual ~CChipIfBodyCode(){}
+
+	virtual void num_set(int num){m_bodycode = num;}
+
+	virtual std::string GetLayoutText(void){
+		return
+			std::format("機体コード={}?", m_bodycode.m_value == 0xFF ? 0 : m_bodycode.get());
+	}
+
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_bodycode.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_bodycode.SetBin(bin);
+	}
+
+	ScaledInt<8, 0, 37, 1, 1>	m_bodycode;
+};
+
+static auto bodycode(LastLocationArg) {
+	LastLocation();
+	return CChipTree(std::make_unique<CChipIfBodyCode>(), g_pCurField->m_pool);
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// 被ロック数
+
+class CChipIfNumLock : public CChipCond {
+public:
+	CChipIfNumLock(){
+		m_Id			= CHIPID_NUM_LOCKED;
+		m_cond_eq		= true;
+	}
+
+	virtual ~CChipIfNumLock(){}
+
+	virtual void num_set(int num){m_num = num;}
+
+	virtual std::string GetLayoutText(void){
+		return
+			std::format("ロック数={}?", m_num.get());
+	}
+
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_num.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_num.SetBin(bin);
+	}
+
+	ScaledInt<8, 1, 3>	m_num;
+};
+
+static auto num_locked(LastLocationArg) {
+	LastLocation();
+	return CChipTree(std::make_unique<CChipIfNumLock>(), g_pCurField->m_pool);
 }
 
 //////////////////////////////////////////////////////////////////////////////

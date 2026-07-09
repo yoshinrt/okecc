@@ -114,12 +114,16 @@ void chip_main(){
 	If(E == F) nop; Endif
 	If(G == -99999.9) nop; Endif
 	If(H == 99999) nop; Endif
-#endif
 	If(time() >= 1) nop; Endif
 	If(time() <= 300) nop; Endif
 	If(time_remained() <= 300) nop; Endif
-	A = time();
 	
+	If(bodycode() == 0) nop; Endif
+	If(bodycode() != 37) nop; Endif
+	
+#endif
+	If(num_locked() != 1) nop; Endif
+	If(num_locked() == 3) nop; Endif
 #if 0
 	stop;
 	
