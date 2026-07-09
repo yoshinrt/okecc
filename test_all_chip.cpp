@@ -17,11 +17,11 @@ void chip_main(){
 	B = 99999.9;
 	C = -99999.9;
 	
-	A = oke_int(99999.9);
-	B = oke_abs(-1);
-	C = oke_max(1);
-	A = oke_min(H);
-	H = oke_sqr(A);
+	A = math_int(99999.9);
+	B = math_abs(-1);
+	C = math_max(1);
+	A = math_min(H);
+	H = math_sqr(A);
 	
 	ch_send(A, 8);
 	ch_send(H, 1);
@@ -31,7 +31,7 @@ void chip_main(){
 	//A = num_enemy();
 	//H = num_friendly();
 	A = time();
-	A = rand();
+	A = math_rand();
 	A = my_x();
 	A = my_y();
 	A = my_z();
@@ -108,14 +108,19 @@ void chip_main(){
 	
 	If(is_target_position.h(0)) nop; Endif
 	If(is_position_from_target.dist(0)) nop; Endif
-#endif
 
 	If(A >= B) nop; Endif
 	If(C <= D) nop; Endif
 	If(E == F) nop; Endif
 	If(G == -99999.9) nop; Endif
 	If(H == 99999) nop; Endif
+#endif
+	If(time() >= 1) nop; Endif
+	If(time() <= 300) nop; Endif
+	If(time_remained() <= 300) nop; Endif
+	A = time();
 	
+#if 0
 	stop;
 	
 	move_forward;
@@ -165,4 +170,5 @@ void chip_main(){
 	
 	set_altitude(20);
 	set_altitude(100);
+#endif
 }

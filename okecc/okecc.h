@@ -781,7 +781,7 @@ public:
 		return *this >= 1;
 	}
 
-	CChipTree GetCChipCond(void) const;
+	auto& GetCChipCond(void) const;
 	CChipTree operator<=(int num) const;
 	CChipTree operator< (int num) const;
 	CChipTree operator>=(int num) const;
@@ -1950,7 +1950,7 @@ static CChipTree is_rand(
 //////////////////////////////////////////////////////////////////////////////
 // 時間
 
-class CChipTime : public CChipCond {
+class CChipIfTime : public CChipCond {
 public:
 
 	enum{
@@ -1958,14 +1958,14 @@ public:
 		END,
 	};
 
-	CChipTime(int start_end){
+	CChipIfTime(int start_end){
 		m_operator		= OP_GE;
 		m_start_end		= start_end;
 		num_m			= 1;
 		m_Id			= CHIPID_IF_TIME;
 	}
 
-	virtual ~CChipTime(){}
+	virtual ~CChipIfTime(){}
 
 	virtual void num_set(int num){num_m = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
@@ -1997,6 +1997,11 @@ public:
 	ScaledInt<>				m_start_end;
 	ScaledInt<>				m_operator;
 };
+
+static auto time_remained(LastLocationArg) {
+	LastLocation();
+	return CChipTree(std::make_unique<CChipIfTime>(CChipIfTime::END), g_pCurField->m_pool);
+}
 
 //////////////////////////////////////////////////////////////////////////////
 // ターゲット指定
@@ -2048,31 +2053,19 @@ public:
 	ScaledInt<>		m_type;
 };
 
-static auto& _lockon(
-	LastLocationArg
-){
+static auto& _lockon(LastLocationArg){
 	LastLocation();
-	return *g_pCurField->m_tree.add(std::make_unique<CChipLockon>(
-		CChip::ENEMY
-	));
+	return *g_pCurField->m_tree.add(std::make_unique<CChipLockon>(CChip::ENEMY));
 }
 
-static auto& _lockon_friendly(
-	LastLocationArg
-) {
+static auto& _lockon_friendly(LastLocationArg) {
 	LastLocation();
-	return *g_pCurField->m_tree.add(std::make_unique<CChipLockon>(
-		CChip::FRIENDLY
-	));
+	return *g_pCurField->m_tree.add(std::make_unique<CChipLockon>(CChip::FRIENDLY));
 }
 
-static auto& _lockon_all(
-	LastLocationArg
-) {
+static auto& _lockon_all(LastLocationArg) {
 	LastLocation();
-	return *g_pCurField->m_tree.add(std::make_unique<CChipLockon>(
-		CChip::ENEMY_FRIENDLY
-	));
+	return *g_pCurField->m_tree.add(std::make_unique<CChipLockon>(CChip::ENEMY_FRIENDLY));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2483,7 +2476,7 @@ CChipVar& CChipVar::operator--(){return *this -= 1.0;}
 //static CChipVal num_enemy			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::ENEMY);}
 //static CChipVal num_friendly		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::FRIENDLY);}
 static CChipVal time				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TIME);}
-static CChipVal okecc_rand			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::RAND);}
+static CChipVal math_rand			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::RAND);}
 
 static CChipVal my_x				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_X);}
 static CChipVal my_y				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_Y);}
@@ -2502,17 +2495,17 @@ static CChipVal target_actcode		(LastLocationArg){LastLocation(); return CChipVa
 static CChipVal target_distance		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DISTANCE);}
 static CChipVal target_distance_xy	(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DISTANCE_XY);}
 
-static CChipVal oke_int	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::INT, val)); }
-static CChipVal oke_abs	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::ABS, val)); }
-static CChipVal oke_max	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MAX, val)); }
-static CChipVal oke_min	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MIN, val)); }
-static CChipVal oke_sqr	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::SQR, val)); }
+static CChipVal math_int	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::INT, val)); }
+static CChipVal math_abs	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::ABS, val)); }
+static CChipVal math_max	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MAX, val)); }
+static CChipVal math_min	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MIN, val)); }
+static CChipVal math_sqr	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::SQR, val)); }
 
-static CChipVal oke_int	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::INT, var.m_var)); }
-static CChipVal oke_abs	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::ABS, var.m_var)); }
-static CChipVal oke_max	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MAX, var.m_var)); }
-static CChipVal oke_min	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MIN, var.m_var)); }
-static CChipVal oke_sqr	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::SQR, var.m_var)); }
+static CChipVal math_int	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::INT, var.m_var)); }
+static CChipVal math_abs	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::ABS, var.m_var)); }
+static CChipVal math_max	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MAX, var.m_var)); }
+static CChipVal math_min	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MIN, var.m_var)); }
+static CChipVal math_sqr	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::SQR, var.m_var)); }
 
 static CChipVal ch_receive(int ch, LastLocationArg){LastLocation(); return CChipVal(CChipVal::CH_RECV, ch);}
 
@@ -2542,54 +2535,22 @@ CChipVar& CChipVar::operator=(const CChipVal& val){
 	return *this;
 }
 
-//##CChipTree CChipVal::GetCChipCond(void) const {
-//##
-//##	std::unique_ptr<CChip> pchip;
-//##
-//##	switch(m_type){
-//##		case CChipVal::HEAT:
-//##		case CChipVal::FUEL:
-//##		case CChipVal::DAMAGE:
-//##			pchip = std::make_unique<CChipSelfStatus>(m_type - CChipVal::HEAT);
-//##			break;
-//##
-//##		case CChipVal::TIME:
-//##			pchip = std::make_unique<CChipTime>();
-//##			break;
-//##
-//##		case CChipVal::FRIENDLY:
-//##		case CChipVal::ENEMY:
-//##		case CChipVal::RAND:
-//##			Error("Invalid parameter");
-//##			break;
-//##
-//##		case CChipVal::CH_RECV:
-//##			Error("Invalid use of ch_receive()");
-//##			break;
-//##
-//##		case CChipVal::MY_POS_X:
-//##		case CChipVal::MY_POS_Y:
-//##		case CChipVal::MY_POS_Z:
-//##		case CChipVal::TGT_POS_X:
-//##		case CChipVal::TGT_POS_Y:
-//##		case CChipVal::TGT_POS_Z:
-//##			pchip = std::make_unique<CChipIsCoordinate>(
-//##				m_type >= CChipVal::TGT_POS_X ? CChip::TARGET : CChip::MY,
-//##				(m_type - CChipVal::MY_POS_X) % 3
-//##			);
-//##			break;
-//##
-//##		default:
-//##			pchip = std::make_unique<CChipAmmoNum>(m_type);
-//##	}
-//##
-//##	return CChipTree(std::move(pchip), g_pCurField->m_pool);
-//##}
-//##
-//##CChipTree CChipVal::operator<=(int num) const {return GetCChipCond() <= num;}
-//##CChipTree CChipVal::operator< (int num) const {return GetCChipCond() <  num;}
-//##CChipTree CChipVal::operator>=(int num) const {return GetCChipCond() >= num;}
-//##CChipTree CChipVal::operator> (int num) const {return GetCChipCond() >  num;}
+auto& CChipVal::GetCChipCond(void) const {
+
+	std::unique_ptr<CChipCond> pchip;
+
+	if(m_type == CChipVal::TIME){
+		pchip = std::make_unique<CChipIfTime>(CChipIfTime::START);
+	}else{
+		Error("Invalid use of compare operator");
+	}
+	return *g_pCurField->m_tree.add(std::move(pchip));
+}
+
+CChipTree CChipVal::operator<=(int num) const {return GetCChipCond() <= num;}
+CChipTree CChipVal::operator< (int num) const {return GetCChipCond() <  num;}
+CChipTree CChipVal::operator>=(int num) const {return GetCChipCond() >= num;}
+CChipTree CChipVal::operator> (int num) const {return GetCChipCond() >  num;}
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2916,7 +2877,6 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define Endwhile	endloop_statement();
 
 	#define Return		okecc_exit()
-	#define rand		okecc_rand
 
 	#define nop				_nop()
 	#define stop			_stop()
