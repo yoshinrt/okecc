@@ -955,11 +955,11 @@ public:
 		return std::format("{}{}{}移動", m_exmode_str[m_exmode.get()], m_fastmode_str[m_fast], m_move_str[m_param.get()]);
 	}
 
-	virtual void SetBin(CChipBinary& bin){
+	virtual void GetBin(CChipBinary& bin){
 		if(m_fast) m_Id = CHIPID_FAST_MOVE;
-		CChip::SetBin(bin);
-		m_param.SetBin(bin);
-		if(m_fast) m_exmode.SetBin(bin);
+		CChip::GetBin(bin);
+		m_param.GetBin(bin);
+		if(m_fast) m_exmode.GetBin(bin);
 	}
 
 	// option
@@ -998,11 +998,11 @@ public:
 		return std::format("{}{}{}旋回", m_exmode_str[m_exmode.get()], m_fastmode_str[m_fast], m_move_str[m_param.get()]);
 	}
 
-	virtual void SetBin(CChipBinary& bin){
+	virtual void GetBin(CChipBinary& bin){
 		if(m_fast) m_Id = CHIPID_FAST_TURN;
-		CChip::SetBin(bin);
-		m_param.SetBin(bin);
-		if(m_fast) m_exmode.SetBin(bin);
+		CChip::GetBin(bin);
+		m_param.GetBin(bin);
+		if(m_fast) m_exmode.GetBin(bin);
 	}
 
 	// option
@@ -1039,10 +1039,10 @@ public:
 		return std::format("{}{}Jmp", m_exmode_str[m_exmode.get()], m_move_str[m_param.get()]);
 	}
 
-	virtual void SetBin(CChipBinary& bin) {
-		CChip::SetBin(bin);
-		m_param.SetBin(bin);
-		m_exmode.SetBin(bin);
+	virtual void GetBin(CChipBinary& bin) {
+		CChip::GetBin(bin);
+		m_param.GetBin(bin);
+		m_exmode.GetBin(bin);
 	}
 
 	// option
@@ -1288,17 +1288,17 @@ public:
 		);
 	}
 
-	virtual void SetBin(CChipBinary& bin){
+	virtual void GetBin(CChipBinary& bin){
 		if(m_target) m_Id = CHIPID_FIRE_TGT;
 		
-		CChip::SetBin(bin);
+		CChip::GetBin(bin);
 		
-		if(!m_target) SetCoordinateBin(bin);
+		if(!m_target) GetCoordinateBin(bin);
 		
-		m_weapon.SetBin(bin);
-		m_cnt.SetBin(bin);
-		m_firemode.SetBin(bin);
-		m_exmode.SetBin(bin);
+		m_weapon.GetBin(bin);	if(m_target) bin.m_pos += 5;
+		m_cnt.GetBin(bin);		if(m_target) bin.m_pos += 3;
+		m_firemode.GetBin(bin); if(m_target) bin.m_pos += 4;
+		m_exmode.GetBin(bin);
 	}
 
 	// option
@@ -1594,13 +1594,13 @@ public:
 			);
 	}
 
-	virtual void SetBin(CChipBinary& bin){
-		CChipCond::SetBin(bin);
-		SetCoordinateBin(bin);
-		m_enemy.SetBin(bin);
-		m_type.SetBin(bin);
-		num_m.SetBin(bin);
-		m_operator.SetBin(bin);
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		GetCoordinateBin(bin);
+		m_enemy.GetBin(bin);
+		m_type.GetBin(bin);
+		num_m.GetBin(bin);
+		m_operator.GetBin(bin);
 	}
 
 	// option

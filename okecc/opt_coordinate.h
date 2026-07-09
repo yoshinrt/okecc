@@ -73,21 +73,23 @@ std::string GetCoordinateText(void){
 	);
 }
 
-void GetCoordinateBin(CChipBinary& bin){}	// 未実装
+void GetCoordinateBin(CChipBinary& bin){
+	if(m_cartesian_pos.get()){
+		m_cartesian_pos.GetBin(bin);
+		m_height.GetBin(bin);
+		m_width.GetBin(bin);
+		m_x.GetBin(bin);
+		m_y.GetBin(bin);
+	}else{
+		m_dummy.GetBin(bin);
+		m_span.GetBin(bin);
+		m_dist.GetBin(bin);
+		m_dir.GetBin(bin);
+	}
+}
 
 void SetCoordinateBin(CChipBinary& bin){
-	if(m_cartesian_pos.get()){
-		m_cartesian_pos.SetBin(bin);
-		m_height.SetBin(bin);
-		m_width.SetBin(bin);
-		m_x.SetBin(bin);
-		m_y.SetBin(bin);
-	}else{
-		m_dummy.SetBin(bin);
-		m_span.SetBin(bin);
-		m_dist.SetBin(bin);
-		m_dir.SetBin(bin);
-	}
+	// 未実装
 }
 
 // option

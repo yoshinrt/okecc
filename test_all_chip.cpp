@@ -3,9 +3,9 @@
 void chip_main(){
 #if 0
 	nop;
-	wait(1);
-	wait(120);
-	wait();
+	//wait(1);
+	//wait(120);
+	//wait();
 	A = H;
 	H = A;
 	A += B;
@@ -28,8 +28,8 @@ void chip_main(){
 	A = ch_receive(8);
 	H = ch_receive(1);
 	
-	A = num_enemy();
-	H = num_friendly();
+	//A = num_enemy();
+	//H = num_friendly();
 	A = time();
 	A = rand();
 	A = my_x();
@@ -52,7 +52,6 @@ void chip_main(){
 	If (num_ammo(5) >= 990) nop; Endif
 	If (num_option(1) <= 1) nop; Endif
 	If (num_option(4) <= 1) nop; Endif
-#endif
 
 	If(is_barrier_over(1).h(0)) nop; Endif
 	If(is_barrier_over(1).w(0)) nop; Endif
@@ -67,7 +66,6 @@ void chip_main(){
 
 	If(is_outside_area.h(0)) nop; Endif
 	If(is_outside_area.dir(180)) nop; Endif
-#if 0
 	
 	If(num_enemy.h(0) >= 1) nop; Endif
 	If(num_enemy.h(100).type(OKE_BIPED) >= 1) nop; Endif
@@ -108,11 +106,10 @@ void chip_main(){
 	If(is_rand(1)) nop; Endif
 	If(is_rand(99)) nop; Endif
 	
-#endif
 	If(is_target_position.h(0)) nop; Endif
 	If(is_position_from_target.dist(0)) nop; Endif
+#endif
 
-#if 0
 	If(A >= B) nop; Endif
 	If(C <= D) nop; Endif
 	If(E == F) nop; Endif
@@ -168,5 +165,4 @@ void chip_main(){
 	
 	set_altitude(20);
 	set_altitude(100);
-#endif
 }
