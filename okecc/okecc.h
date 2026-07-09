@@ -274,7 +274,7 @@ public:
 		return s;
 	}
 
-	virtual void set_num(int num){}
+	virtual void num_set(int num){}
 	virtual void set_operator(int opr){}
 
 	bool ValidG(void) const { return m_NextG < IDX_EXIT; }
@@ -550,13 +550,13 @@ public:
 	}
 
 	CChipTree& operator>=(int num) {
-		m_pool[m_start]->set_num(num);
+		m_pool[m_start]->num_set(num);
 		m_pool[m_start]->set_operator(CChip::OP_GE);
 		return *this;
 	}
 
 	CChipTree& operator<=(int num) {
-		m_pool[m_start]->set_num(num);
+		m_pool[m_start]->num_set(num);
 		m_pool[m_start]->set_operator(CChip::OP_LE);
 		return *this;
 	}
@@ -1135,27 +1135,27 @@ public:
 	CChipGuard(int param, int num){
 		m_Id	= CHIPID_GUARD;
 		m_param	= param;
-		m_num	= num;
+		num_m	= num;
 		m_exmode= EM_THROUGH;
 	}
 
 	virtual ~CChipGuard(){}
 
 	virtual std::string GetLayoutText(void){
-		return std::format("{}{}\n{}/30s", m_exmode_str[m_exmode.get()], m_type_str[m_param.get()], m_num.get());
+		return std::format("{}{}\n{}/30s", m_exmode_str[m_exmode.get()], m_type_str[m_param.get()], num_m.get());
 	}
 
 	virtual void GetBin(CChipBinary& bin){
 		CChip::GetBin(bin);
 		m_param.GetBin(bin);
-		m_num.GetBin(bin);
+		num_m.GetBin(bin);
 		m_exmode.GetBin(bin);
 	}
 
 	virtual void SetBin(CChipBinary& bin){
 		CChip::SetBin(bin);
 		m_param.SetBin(bin);
-		m_num.SetBin(bin);
+		num_m.SetBin(bin);
 		m_exmode.SetBin(bin);
 	}
 
@@ -1163,7 +1163,7 @@ public:
 	auto& _wait()		{m_exmode	= EM_WAIT;	return *this;}
 
 	ScaledInt<>			m_param;
-	ScaledInt<8, 5, 60>	m_num;
+	ScaledInt<8, 5, 60>	num_m;
 	ScaledInt<>			m_exmode;
 };
 
@@ -1510,13 +1510,13 @@ public:
 	){
 		m_weapon	= weapon;
 		m_operator	= opr;
-		m_num		= num;
+		num_m		= num;
 		m_Id		= CHIPID_IF_AMMO_NUM;
 	}
 
 	virtual ~CChipAmmoNum(){}
 
-	virtual void set_num(int num){m_num = num;}
+	virtual void num_set(int num){num_m = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -1524,30 +1524,30 @@ public:
 			std::format(
 				"{}#{}\n残数{}{}?",
 				(m_weapon.get() < 5 ? "武装" : "オプション"), (m_weapon.get() % 5 + 1),
-				m_operator_str[m_operator.get()], m_num.get()
+				m_operator_str[m_operator.get()], num_m.get()
 			);
 	}
 
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
-		m_num.GetBin(bin);
+		num_m.GetBin(bin);
 		m_weapon.GetBin(bin);
 		m_operator.GetBin(bin);
 	}
 
 	virtual void SetBin(CChipBinary& bin){
 		CChipCond::SetBin(bin);
-		m_num.SetBin(bin);
+		num_m.SetBin(bin);
 		m_weapon.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
 
-	ScaledInt<16, 1, 990>	m_num;
+	ScaledInt<16, 1, 990>	num_m;
 	ScaledInt<8>			m_weapon;
 	ScaledInt<8>			m_operator;
 };
 
-static CChipTree ammo_num(
+static CChipTree num_ammo(
 	int weapon,
 	LastLocationArg
 ){
@@ -1555,7 +1555,7 @@ static CChipTree ammo_num(
 	return CChipTree(std::make_unique<CChipAmmoNum>(weapon - 1), g_pCurField->m_pool);
 }
 
-static CChipTree option_num(
+static CChipTree num_option(
 	int weapon,
 	LastLocationArg
 ){
@@ -1581,7 +1581,7 @@ public:
 
 	virtual ~CChipOkeNum(){}
 
-	virtual void set_num(int num){m_num = num;}
+	virtual void num_set(int num){num_m = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -1589,7 +1589,7 @@ public:
 			std::format(
 				"{}{}{}{}?\n{}",
 				m_EnemyFriendlyStr[m_enemy.get()],
-				m_OkeTypeStr[m_type.get()], m_operator_str[m_operator.get()], m_num.get(),
+				m_OkeTypeStr[m_type.get()], m_operator_str[m_operator.get()], num_m.get(),
 				GetCoordinateText()
 			);
 	}
@@ -1599,7 +1599,7 @@ public:
 		SetCoordinateBin(bin);
 		m_enemy.SetBin(bin);
 		m_type.SetBin(bin);
-		m_num.SetBin(bin);
+		num_m.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
 
@@ -1608,19 +1608,19 @@ public:
 	
 	ScaledInt<4>		m_enemy;
 	ScaledInt<4>		m_type;
-	ScaledInt<4, 1, 31>	m_num;
+	ScaledInt<4, 1, 31>	num_m;
 	ScaledInt<4>		m_operator;
 };
 
-static auto& oke_num(
+static auto& num_oke(
 	int enemy
 ){
 	return *g_pCurField->m_tree.add(std::make_unique<CChipOkeNum>(enemy));
 }
 
-static auto& _enemy_num		(LastLocationArg){LastLocation(); return oke_num(CChip::ENEMY); }
-static auto& _friendly_num	(LastLocationArg){LastLocation(); return oke_num(CChip::FRIENDLY); }
-static auto& _oke_num		(LastLocationArg){LastLocation(); return oke_num(CChip::ENEMY_FRIENDLY); }
+static auto& _num_enemy		(LastLocationArg){LastLocation(); return num_oke(CChip::ENEMY); }
+static auto& _num_friendly	(LastLocationArg){LastLocation(); return num_oke(CChip::FRIENDLY); }
+static auto& _num_oke		(LastLocationArg){LastLocation(); return num_oke(CChip::ENEMY_FRIENDLY); }
 
 //////////////////////////////////////////////////////////////////////////////
 // エリア外判定
@@ -1681,7 +1681,7 @@ public:
 
 	virtual ~CChipBarrier(){}
 
-	virtual void set_num(int num){m_barrier_height = num;}
+	virtual void num_set(int num){m_barrier_height = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -1747,14 +1747,14 @@ public:
 
 	virtual ~CChipProjectileNum(){}
 
-	virtual void set_num(int num){m_num = num;}
+	virtual void num_set(int num){num_m = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
 				"{}{}{}?\n{}",
-				m_ProjectileTypeStr[m_type.get()], m_operator_str[m_operator.get()], m_num.get(),
+				m_ProjectileTypeStr[m_type.get()], m_operator_str[m_operator.get()], num_m.get(),
 				GetCoordinateText()
 			);
 	}
@@ -1763,7 +1763,7 @@ public:
 		CChipCond::GetBin(bin);
 		GetCoordinateBin(bin);
 		m_type.GetBin(bin);
-		m_num.GetBin(bin);
+		num_m.GetBin(bin);
 		m_operator.GetBin(bin);
 	}
 
@@ -1771,7 +1771,7 @@ public:
 		CChipCond::SetBin(bin);
 		SetCoordinateBin(bin);
 		m_type.SetBin(bin);
-		m_num.SetBin(bin);
+		num_m.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
 
@@ -1779,11 +1779,11 @@ public:
 	auto& type(int param)	{m_type = param;	return *this;}
 	
 	ScaledInt<8>		m_type;
-	ScaledInt<4, 1, 31>	m_num;
+	ScaledInt<4, 1, 31>	num_m;
 	ScaledInt<4>		m_operator;
 };
 
-static auto& _projectile_num(
+static auto& _num_projectile(
 	LastLocationArg
 ){
 	LastLocation();
@@ -1806,13 +1806,13 @@ public:
 	){
 		m_type			= type;
 		m_operator		= OP_GE;
-		m_num			= 1;
+		num_m			= 1;
 		m_Id			= CHIPID_IF_SELF_STATUS;
 	}
 
 	virtual ~CChipSelfStatus(){}
 
-	virtual void set_num(int num){m_num = num;}
+	virtual void num_set(int num){num_m = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -1820,26 +1820,26 @@ public:
 			std::format(
 				"{}{}{}?",
 				m_SelfStatusTypeStr[m_type.get()],
-				m_operator_str[m_operator.get()], m_num.get()
+				m_operator_str[m_operator.get()], num_m.get()
 			);
 	}
 
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
 		m_type.GetBin(bin);
-		m_num.GetBin(bin);
+		num_m.GetBin(bin);
 		m_operator.GetBin(bin);
 	}
 
 	virtual void SetBin(CChipBinary& bin){
 		CChipCond::SetBin(bin);
 		m_type.SetBin(bin);
-		m_num.SetBin(bin);
+		num_m.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
 
 	ScaledInt<>		m_type;
-	ScaledInt<>		m_num;
+	ScaledInt<>		num_m;
 	ScaledInt<>		m_operator;
 };
 
@@ -1913,7 +1913,7 @@ public:
 		int num
 	){
 		m_Id	= CHIPID_IF_RAND;
-		m_num	= num;
+		num_m	= num;
 	}
 
 	virtual ~CChipIsRand(){}
@@ -1922,21 +1922,21 @@ public:
 		return
 			std::format(
 				"乱数\n{}%?",
-				m_num.get()
+				num_m.get()
 			);
 	}
 
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
-		m_num.GetBin(bin);
+		num_m.GetBin(bin);
 	}
 
 	virtual void SetBin(CChipBinary& bin){
 		CChipCond::SetBin(bin);
-		m_num.SetBin(bin);
+		num_m.SetBin(bin);
 	}
 
-	ScaledInt<8, 1, 99>		m_num;
+	ScaledInt<8, 1, 99>		num_m;
 };
 
 static CChipTree is_rand(
@@ -1961,13 +1961,13 @@ public:
 	CChipTime(int start_end){
 		m_operator		= OP_GE;
 		m_start_end		= start_end;
-		m_num			= 1;
+		num_m			= 1;
 		m_Id			= CHIPID_IF_TIME;
 	}
 
 	virtual ~CChipTime(){}
 
-	virtual void set_num(int num){m_num = num;}
+	virtual void num_set(int num){num_m = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -1975,25 +1975,25 @@ public:
 			std::format(
 				"{}時間\n{}{}?",
 				m_start_end.get() ? "残" : "経過",
-				m_operator_str[m_operator.get()], m_num.get()
+				m_operator_str[m_operator.get()], num_m.get()
 			);
 	}
 
 	virtual void GetBin(CChipBinary& bin){
 		CChipCond::GetBin(bin);
-		m_num.GetBin(bin);
+		num_m.GetBin(bin);
 		m_start_end.GetBin(bin);
 		m_operator.GetBin(bin);
 	}
 
 	virtual void SetBin(CChipBinary& bin){
 		CChipCond::SetBin(bin);
-		m_num.SetBin(bin);
+		num_m.SetBin(bin);
 		m_start_end.SetBin(bin);
 		m_operator.SetBin(bin);
 	}
 
-	ScaledInt<16, 1, 300>	m_num;
+	ScaledInt<16, 1, 300>	num_m;
 	ScaledInt<>				m_start_end;
 	ScaledInt<>				m_operator;
 };
@@ -2088,7 +2088,7 @@ public:
 	};
 
 	static inline const char* m_tgt_str[] = {
-		"TGT", "TGTから",
+		"", "からの",
 	};
 
 	CChipTgtPosition(
@@ -2104,7 +2104,7 @@ public:
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
-				"{}\n{}",
+				"TGT{}位置?\n{}",
 				m_tgt_str[m_Id.get() == CHIPID_IF_TGT_POS ? 0 : 1], GetCoordinateText()
 			);
 	}
@@ -2480,8 +2480,8 @@ CChipVar& CChipVar::operator--(){return *this -= 1.0;}
 //////////////////////////////////////////////////////////////////////////////
 // val 系
 
-//static CChipVal enemy_num			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::ENEMY);}
-//static CChipVal friendly_num		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::FRIENDLY);}
+//static CChipVal num_enemy			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::ENEMY);}
+//static CChipVal num_friendly		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::FRIENDLY);}
 static CChipVal time				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TIME);}
 static CChipVal okecc_rand			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::RAND);}
 
@@ -2921,10 +2921,10 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define nop				_nop()
 	#define stop			_stop()
 	
-	#define projectile_num	_projectile_num()
-	#define enemy_num		_enemy_num()
-	#define friendly_num	_friendly_num()
-	#define oke_num			_oke_num()
+	#define num_projectile	_num_projectile()
+	#define num_enemy		_num_enemy()
+	#define num_friendly	_num_friendly()
+	#define num_oke			_num_oke()
 	
 	#define is_outside_area			_is_outside_area()
 	#define is_target_position		_target_position()

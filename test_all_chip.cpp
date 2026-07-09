@@ -28,8 +28,8 @@ void chip_main(){
 	A = ch_receive(8);
 	H = ch_receive(1);
 	
-	A = enemy_num();
-	H = friendly_num();
+	A = num_enemy();
+	H = num_friendly();
 	A = time();
 	A = rand();
 	A = my_x();
@@ -48,10 +48,10 @@ void chip_main(){
 	A = target_distance();
 	A = target_distance_xy();
 
-	If (ammo_num(1) >= 1) nop; Endif
-	If (ammo_num(5) >= 990) nop; Endif
-	If (option_num(1) <= 1) nop; Endif
-	If (option_num(4) <= 1) nop; Endif
+	If (num_ammo(1) >= 1) nop; Endif
+	If (num_ammo(5) >= 990) nop; Endif
+	If (num_option(1) <= 1) nop; Endif
+	If (num_option(4) <= 1) nop; Endif
 #endif
 
 	If(is_barrier_over(1).h(0)) nop; Endif
@@ -69,25 +69,25 @@ void chip_main(){
 	If(is_outside_area.dir(180)) nop; Endif
 #if 0
 	
-	If(enemy_num.h(0) >= 1) nop; Endif
-	If(enemy_num.h(100).type(OKE_BIPED) >= 1) nop; Endif
-	If(enemy_num.h(200).type(OKE_QUADRUPED) >= 1) nop; Endif
-	If(enemy_num.h(400).type(OKE_HOVER) >= 1) nop; Endif
-	If(enemy_num.h(800).type(OKE_VEHICLE) >= 3) nop; Endif
-	If(enemy_num.dist(0).type(OKE_FLIGHT) <= 3) nop; Endif
+	If(num_enemy.h(0) >= 1) nop; Endif
+	If(num_enemy.h(100).type(OKE_BIPED) >= 1) nop; Endif
+	If(num_enemy.h(200).type(OKE_QUADRUPED) >= 1) nop; Endif
+	If(num_enemy.h(400).type(OKE_HOVER) >= 1) nop; Endif
+	If(num_enemy.h(800).type(OKE_VEHICLE) >= 3) nop; Endif
+	If(num_enemy.dist(0).type(OKE_FLIGHT) <= 3) nop; Endif
 	
-	If(projectile_num.h(0).type(P_BULLET) >= 1) nop; Endif
-	If(projectile_num.dist(0).type(P_BEAM) > 1) nop; Endif
-	If(projectile_num.type(P_PULSE) <= 1) nop; Endif
-	If(projectile_num.type(P_NAPALM) < 1) nop; Endif
-	If(projectile_num.type(P_GRENADE) >= 1) nop; Endif
-	If(projectile_num.type(P_BOMB) >= 1) nop; Endif
-	If(projectile_num.type(P_ROCKET) >= 1) nop; Endif
-	If(projectile_num.type(P_MISSILE) >= 1) nop; Endif
-	If(projectile_num.type(P_MINE) >= 1) nop; Endif
-	If(projectile_num.type(P_FMINE) >= 1) nop; Endif
-	If(projectile_num.type(P_HI_V) >= 3) nop; Endif
-	If(projectile_num.type(P_ALL) <= 3) nop; Endif
+	If(num_projectile.h(0).type(P_BULLET) >= 1) nop; Endif
+	If(num_projectile.dist(0).type(P_BEAM) > 1) nop; Endif
+	If(num_projectile.type(P_PULSE) <= 1) nop; Endif
+	If(num_projectile.type(P_NAPALM) < 1) nop; Endif
+	If(num_projectile.type(P_GRENADE) >= 1) nop; Endif
+	If(num_projectile.type(P_BOMB) >= 1) nop; Endif
+	If(num_projectile.type(P_ROCKET) >= 1) nop; Endif
+	If(num_projectile.type(P_MISSILE) >= 1) nop; Endif
+	If(num_projectile.type(P_MINE) >= 1) nop; Endif
+	If(num_projectile.type(P_FMINE) >= 1) nop; Endif
+	If(num_projectile.type(P_HI_V) >= 3) nop; Endif
+	If(num_projectile.type(P_ALL) <= 3) nop; Endif
 
 	If(health() >= 0) nop; Endif
 	If(energy() <= 0) nop; Endif
