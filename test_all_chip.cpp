@@ -121,9 +121,26 @@ void chip_main(){
 	If(bodycode() == 0) nop; Endif
 	If(bodycode() != 37) nop; Endif
 	
-#endif
 	If(numLocked() != 1) nop; Endif
 	If(numLocked() == 3) nop; Endif
+#endif
+	
+	If(targetWeaponId(1) == W_NONE) nop; Endif
+	If(targetWeaponId(2) == W_ASSULT) nop; Endif
+	If(targetWeaponId(3) == W_BEAM) nop; Endif
+	If(targetWeaponId(4) == W_PULSE) nop; Endif
+	If(targetWeaponId(5) == W_NAPALM) nop; Endif
+	If(targetWeaponId(1) == W_FLANK) nop; Endif
+	If(targetWeaponId(1) == W_SHOOTGUN) nop; Endif
+	If(targetWeaponId(1) == W_CANNON) nop; Endif
+	If(targetWeaponId(1) == W_RAILGUN) nop; Endif
+	If(targetWeaponId(1) == W_GRANADE) nop; Endif
+	If(targetWeaponId(1) == W_BOMB) nop; Endif
+	If(targetWeaponId(1) == W_ROCKET) nop; Endif
+	If(targetWeaponId(1) == W_MISSILE) nop; Endif
+	If(targetWeaponId(1) == W_MINE) nop; Endif
+	If(targetWeaponId(1) == W_FMINE) nop; Endif
+	
 #if 0
 	stop;
 	

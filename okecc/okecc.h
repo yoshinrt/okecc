@@ -39,6 +39,24 @@ enum {
 };
 
 enum {
+	W_NONE,
+	W_ASSULT,
+	W_BEAM,
+	W_PULSE,
+	W_NAPALM,
+	W_FLANK,
+	W_SHOOTGUN,
+	W_CANNON,
+	W_RAILGUN,
+	W_GRANADE,
+	W_BOMB,
+	W_ROCKET,
+	W_MISSILE,
+	W_MINE,
+	W_FMINE,
+};
+
+enum {
 	EM_WAIT,
 	EM_THROUGH,
 };
@@ -2108,6 +2126,65 @@ static auto numLocked(LastLocationArg) {
 }
 
 //////////////////////////////////////////////////////////////////////////////
+// 武装 ID
+
+class CChipIfTargetWeaponId : public CChipCond {
+public:
+	CChipIfTargetWeaponId(int weapon){
+		m_Id			= CHIPID_WEAPON_ID;
+		m_weapon		= weapon;
+		m_cond_eq		= true;
+	}
+
+	static inline const char *m_TypeStr[] = {
+		"武装なし",
+		"アサルト",
+		"ビーム",
+		"パルス",
+		"ナパーム",
+		"炸裂砲",
+		"ショットガン",
+		"カノン",
+		"レールガン",
+		"グレネード",
+		"爆弾",
+		"ロケット",
+		"ミサイル",
+		"地雷",
+		"機雷",
+	};
+
+	virtual ~CChipIfTargetWeaponId(){}
+
+	virtual void num_set(int num){m_num = num;}
+
+	virtual std::string GetLayoutText(void){
+		return
+			std::format("敵武装{}=\n{}?", m_weapon.get(), m_TypeStr[m_num.get()]);
+	}
+
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+		m_weapon.GetBin(bin);
+		m_num.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+		m_weapon.SetBin(bin);
+		m_num.SetBin(bin);
+	}
+
+	ScaledInt<8, 1, 5, 1, 1>	m_weapon;
+	ScaledInt<>					m_num;
+};
+
+static auto targetWeaponId(int weapon, LastLocationArg) {
+	LastLocation();
+	return CChipTree(std::make_unique<CChipIfTargetWeaponId>(weapon), g_pCurField->m_pool);
+}
+
+//////////////////////////////////////////////////////////////////////////////
 // ターゲット指定
 
 class CChipLockon : public CChip {
@@ -2313,53 +2390,6 @@ static CChipTree isTargetSpecial	(LastLocationArg){LastLocation(); return is_sel
 static CChipTree isTargetStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::STUN);}
 #endif
 
-//##//////////////////////////////////////////////////////////////////////////////
-//##// サウンド
-//##
-//##class CChipSound : public CChip {
-//##public:
-//##	CChipSound(
-//##		int snd,
-//##		int cnt
-//##	){
-//##		m_Id	= CHIPID_SOUND;
-//##		m_snd	= snd;
-//##		m_cnt	= cnt;
-//##	}
-//##
-//##	virtual ~CChipSound(){}
-//##
-//##	virtual std::string GetLayoutText(void){
-//##		return std::format("♪\n#{}x{}",
-//##			m_snd.get(), m_cnt.get()
-//##		);
-//##	}
-//##
-//##	virtual void GetBin(CChipBinary& bin){
-//##		CChip::GetBin(bin);
-//##		m_snd.GetBin(bin);
-//##		m_cnt.GetBin(bin);
-//##	}
-//##
-//##	virtual void SetBin(CChipBinary& bin){
-//##		CChip::SetBin(bin);
-//##		m_snd.SetBin(bin);
-//##		m_cnt.SetBin(bin);
-//##	}
-//##
-//##	ScaledInt<3,1,1> m_snd;
-//##	ScaledInt<3,1,1> m_cnt;
-//##};
-//##
-//##static void sound(
-//##	int snd,
-//##	int cnt,
-//##	LastLocationArg
-//##){
-//##	LastLocation();
-//##	g_pCurField->m_tree.add(std::make_unique<CChipSound>(snd, cnt));
-//##}
-//##
 //////////////////////////////////////////////////////////////////////////////
 // カウンタに状態入力
 
