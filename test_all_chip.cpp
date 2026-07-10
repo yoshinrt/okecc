@@ -27,25 +27,25 @@ void chip_main(){
 	A = chReceive(8);
 	H = chReceive(1);
 	
-	//A = numEnemy();
-	//H = numFriendly();
-	A = time();
-	A = mathRand();
-	A = myX();
-	A = myY();
-	A = myZ();
-	A = myDirection();
-	A = targetId();
-	A = targetAzimuth();
-	A = targetElevation();
-	A = targetX();
-	A = targetY();
-	A = targetZ();
-	A = targetDirection();
-	A = targetBodycode();
-	A = targetActcode();
-	A = targetDistance();
-	A = targetDistanceXy();
+	//A = numEnemy;
+	//H = numFriendly;
+	A = time;
+	A = mathRand;
+	A = myX;
+	A = myY;
+	A = myZ;
+	A = myDirection;
+	A = targetId;
+	A = targetAzimuth;
+	A = targetElevation;
+	A = targetX;
+	A = targetY;
+	A = targetZ;
+	A = targetDirection;
+	A = targetBodycode;
+	A = targetActcode;
+	A = targetDistance;
+	A = targetDistanceXy;
 
 	If (numAmmo(1) >= 1) nop; Endif
 	If (numAmmo(5) >= 990) nop; Endif
@@ -86,21 +86,21 @@ void chip_main(){
 	If(numProjectile.type(P_HI_V) >= 3) nop; Endif
 	If(numProjectile.type(P_ALL) <= 3) nop; Endif
 
-	If(health() >= 0) nop; Endif
-	If(energy() <= 0) nop; Endif
-	If(heat() <= 100) nop; Endif
+	If(health >= 0) nop; Endif
+	If(energy <= 0) nop; Endif
+	If(heat <= 100) nop; Endif
 	
-	If(isSelfWaiting ()) nop; Endif
-	If(isSelfMoving  ()) nop; Endif
-	If(isSelfTurning ()) nop; Endif
-	If(isSelfJumping ()) nop; Endif
-	If(isSelfFiring  ()) nop; Endif
-	If(isSelfFighting()) nop; Endif
-	If(isSelfSpecial ()) nop; Endif
-	If(isSelfStumbling ()) nop; Endif
-	If(isUnlock  ()) nop; Endif
+	If(isSelfWaiting ) nop; Endif
+	If(isSelfMoving  ) nop; Endif
+	If(isSelfTurning ) nop; Endif
+	If(isSelfJumping ) nop; Endif
+	If(isSelfFiring  ) nop; Endif
+	If(isSelfFighting) nop; Endif
+	If(isSelfSpecial ) nop; Endif
+	If(isSelfStumbling ) nop; Endif
+	If(isUnlock  ) nop; Endif
 	
-	If(isTargetStumbling ()) nop; Endif
+	If(isTargetStumbling ) nop; Endif
 	
 	If(isRand(1)) nop; Endif
 	If(isRand(99)) nop; Endif
@@ -113,15 +113,15 @@ void chip_main(){
 	If(E == F) nop; Endif
 	If(G == -99999.9) nop; Endif
 	If(H == 99999) nop; Endif
-	If(time() >= 1) nop; Endif
-	If(time() <= 300) nop; Endif
-	If(timeRemained() <= 300) nop; Endif
+	If(time >= 1) nop; Endif
+	If(time <= 300) nop; Endif
+	If(timeRemained <= 300) nop; Endif
 	
-	If(bodycode() == 0) nop; Endif
-	If(bodycode() != 37) nop; Endif
+	If(bodycode == 0) nop; Endif
+	If(bodycode != 37) nop; Endif
 	
-	If(numLocked() != 1) nop; Endif
-	If(numLocked() == 3) nop; Endif
+	If(numLocked != 1) nop; Endif
+	If(numLocked == 3) nop; Endif
 	
 	If(targetWeaponId(1) == W_NONE) nop; Endif
 	If(targetWeaponId(2) == W_ASSULT) nop; Endif
@@ -139,7 +139,7 @@ void chip_main(){
 	If(targetWeaponId(1) == W_MINE) nop; Endif
 	If(targetWeaponId(1) == W_FMINE) nop; Endif
 	
-	If(isLineClear()) nop; Endif
+	If(isLineClear) nop; Endif
 	
 	stop;
 	
@@ -211,9 +211,9 @@ void chip_main(){
 	lockonFriendly.type(OKE_BIPED);
 	lockonAll;
 	
-	_autoTurn().h(0);
-	_autoTurn().span(0);
-	_autoTurn()._off();
+	autoTurn.h(0);
+	autoTurn.span(0);
+	autoTurn.off;
 	
 	lockonPart(BODY);
 	lockonPart(1);

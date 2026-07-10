@@ -1956,21 +1956,21 @@ public:
 	ScaledInt<>		m_operator;
 };
 
-static CChipSelfStatus& health(
+static CChipSelfStatus& _health(
 	LastLocationArg
 ){
 	LastLocation();
 	return *g_pCurField->m_tree.add(std::make_unique<CChipSelfStatus>(CChipSelfStatus::HP));
 }
 
-static CChipTree energy(
+static CChipTree _energy(
 	LastLocationArg
 ){
 	LastLocation();
 	return CChipTree(std::make_unique<CChipSelfStatus>(CChipSelfStatus::ENERGY), g_pCurField->m_pool);
 }
 
-static CChipTree heat(
+static CChipTree _heat(
 	LastLocationArg
 ){
 	LastLocation();
@@ -2111,7 +2111,7 @@ public:
 	ScaledInt<>				m_operator;
 };
 
-static auto timeRemained(LastLocationArg) {
+static auto _timeRemained(LastLocationArg) {
 	LastLocation();
 	return CChipTree(std::make_unique<CChipIfTime>(CChipIfTime::END), g_pCurField->m_pool);
 }
@@ -2148,7 +2148,7 @@ public:
 	ScaledInt<8, 0, 37, 1, 1>	m_bodycode;
 };
 
-static auto bodycode(LastLocationArg) {
+static auto _bodycode(LastLocationArg) {
 	LastLocation();
 	return CChipTree(std::make_unique<CChipIfBodyCode>(), g_pCurField->m_pool);
 }
@@ -2185,7 +2185,7 @@ public:
 	ScaledInt<8, 1, 3>	m_num;
 };
 
-static auto numLocked(LastLocationArg) {
+static auto _numLocked(LastLocationArg) {
 	LastLocation();
 	return CChipTree(std::make_unique<CChipIfNumLock>(), g_pCurField->m_pool);
 }
@@ -2273,7 +2273,7 @@ public:
 	}
 };
 
-static auto isLineClear(LastLocationArg) {
+static auto _isLineClear(LastLocationArg) {
 	LastLocation();
 	return CChipTree(std::make_unique<CChipIfLineClear>(), g_pCurField->m_pool);
 }
@@ -2427,14 +2427,14 @@ public:
 	}
 };
 
-static auto& _target_position(
+static auto& _isTargetPosition(
 	LastLocationArg
 ){
 	LastLocation();
 	return *g_pCurField->m_tree.add(std::make_unique<CChipTgtPosition>(CChipTgtPosition::TGT));
 }
 
-static auto& _position_from_target(
+static auto& _isPositionFromTarget(
 	LastLocationArg
 ){
 	LastLocation();
@@ -2503,24 +2503,24 @@ static CChipTree is_self_target_status(
 }
 
 #ifndef NO_OKECC_SYNTAX
-static CChipTree isSelfWaiting		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::WAIT);}
-static CChipTree isSelfMoving		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::MOVE);}
-static CChipTree isSelfTurning		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::TURN);}
-static CChipTree isSelfJumping		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::JUMP);}
-static CChipTree isSelfFiring		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIRE);}
-static CChipTree isSelfFighting		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIGHT);}
-static CChipTree isSelfSpecial		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::SPECIAL);}
-static CChipTree isSelfStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::STUN);}
-static CChipTree isUnlock			(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::UNLOCK);}
+static CChipTree _isSelfWaiting		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::WAIT);}
+static CChipTree _isSelfMoving		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::MOVE);}
+static CChipTree _isSelfTurning		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::TURN);}
+static CChipTree _isSelfJumping		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::JUMP);}
+static CChipTree _isSelfFiring		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIRE);}
+static CChipTree _isSelfFighting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIGHT);}
+static CChipTree _isSelfSpecial		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::SPECIAL);}
+static CChipTree _isSelfStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::STUN);}
+static CChipTree _isUnlock			(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::UNLOCK);}
 
-static CChipTree isTargetWaiting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::WAIT);}
-static CChipTree isTargetMoving		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::MOVE);}
-static CChipTree isTargetTurning	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::TURN);}
-static CChipTree isTargetJumping	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::JUMP);}
-static CChipTree isTargetFiring		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIRE);}
-static CChipTree isTargetFighting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIGHT);}
-static CChipTree isTargetSpecial	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::SPECIAL);}
-static CChipTree isTargetStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::STUN);}
+static CChipTree _isTargetWaiting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::WAIT);}
+static CChipTree _isTargetMoving	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::MOVE);}
+static CChipTree _isTargetTurning	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::TURN);}
+static CChipTree _isTargetJumping	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::JUMP);}
+static CChipTree _isTargetFiring	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIRE);}
+static CChipTree _isTargetFighting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIGHT);}
+static CChipTree _isTargetSpecial	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::SPECIAL);}
+static CChipTree _isTargetStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::STUN);}
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2826,25 +2826,25 @@ CChipVar& CChipVar::operator--(){return *this -= 1.0;}
 
 //static CChipVal numEnemy			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::ENEMY);}
 //static CChipVal numFriendly		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::FRIENDLY);}
-static CChipVal time				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TIME);}
-static CChipVal mathRand			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::RAND);}
+static CChipVal _time				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TIME);}
+static CChipVal _mathRand			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::RAND);}
 
-static CChipVal myX					(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_X);}
-static CChipVal myY					(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_Y);}
-static CChipVal myZ					(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_Z);}
-static CChipVal myDirection			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_DIRECTION);}
+static CChipVal _myX				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_X);}
+static CChipVal _myY				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_Y);}
+static CChipVal _myZ				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_Z);}
+static CChipVal _myDirection		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_DIRECTION);}
 
-static CChipVal targetId			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_NO);}
-static CChipVal targetAzimuth		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_AZIMUTH);}
-static CChipVal targetElevation		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_ELEVATION);}
-static CChipVal targetX				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_X);}
-static CChipVal targetY				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_Y);}
-static CChipVal targetZ				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_Z);}
-static CChipVal targetDirection		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DIRECTION);}
-static CChipVal targetBodycode		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_BODYCODE);}
-static CChipVal targetActcode		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_ACTCODE);}
-static CChipVal targetDistance		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DISTANCE);}
-static CChipVal targetDistanceXy	(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DISTANCE_XY);}
+static CChipVal _targetId			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_NO);}
+static CChipVal _targetAzimuth		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_AZIMUTH);}
+static CChipVal _targetElevation	(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_ELEVATION);}
+static CChipVal _targetX			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_X);}
+static CChipVal _targetY			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_Y);}
+static CChipVal _targetZ			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_Z);}
+static CChipVal _targetDirection	(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DIRECTION);}
+static CChipVal _targetBodycode		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_BODYCODE);}
+static CChipVal _targetActcode		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_ACTCODE);}
+static CChipVal _targetDistance		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DISTANCE);}
+static CChipVal _targetDistanceXy	(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DISTANCE_XY);}
 
 static CChipVal mathInt	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::INT, val)); }
 static CChipVal mathAbs	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::ABS, val)); }
@@ -3229,40 +3229,79 @@ static bool start_sub_internal(int num, LastLocationArg){
 
 	#define Return		okecc_exit()
 
-	#define nop				_nop()
-	#define stop			_stop()
-	
-	#define numProjectile	_numProjectile()
-	#define numEnemy		_numEnemy()
-	#define numFriendly		_numFriendly()
-	#define numOke			_numOke()
-	
+	#define autoTurn				_autoTurn()
+	#define bodycode				_bodycode()
+	#define energy					_energy()
+	#define fight					_fight()
+	#define fightHigh				_fightHigh()
+	#define fightLong				_fightLong()
+	#define fightLow				_fightLow()
+	#define health					_health()
+	#define heat					_heat()
+	#define isLineClear				_isLineClear()
 	#define isOutsideArea			_isOutsideArea()
-	#define isTargetPosition		_target_position()
-	#define isPositionFromTarget	_position_from_target()
+	#define isSelfFighting			_isSelfFighting()
+	#define isSelfFiring			_isSelfFiring()
+	#define isSelfJumping			_isSelfJumping()
+	#define isSelfMoving			_isSelfMoving()
+	#define isSelfSpecial			_isSelfSpecial()
+	#define isSelfStumbling			_isSelfStumbling()
+	#define isSelfTurning			_isSelfTurning()
+	#define isSelfWaiting			_isSelfWaiting()
+	#define isTargetFighting		_isTargetFighting()
+	#define isTargetFiring			_isTargetFiring()
+	#define isTargetJumping			_isTargetJumping()
+	#define isTargetMoving			_isTargetMoving()
+	#define isTargetSpecial			_isTargetSpecial()
+	#define isTargetStumbling		_isTargetStumbling()
+	#define isTargetTurning			_isTargetTurning()
+	#define isTargetWaiting			_isTargetWaiting()
+	#define isTargetPosition		_isTargetPosition()
+	#define isPositionFromTarget	_isPositionFromTarget()
+	#define isUnlock				_isUnlock()
+	#define jumpBackward			_jumpBackward()
+	#define jumpForward				_jumpForward()
+	#define jumpLeft				_jumpLeft()
+	#define jumpRight				_jumpRight()
+	#define lockon					_lockon()
+	#define lockonAll				_lockonAll()
+	#define lockonFriendly			_lockonFriendly()
+	#define mathRand				_mathRand()
+	#define moveBackward			_moveBackward()
+	#define moveForward				_moveForward()
+	#define moveLeft				_moveLeft()
+	#define moveRight				_moveRight()
+	#define myDirection				_myDirection()
+	#define myX						_myX()
+	#define myY						_myY()
+	#define myZ						_myZ()
+	#define nop						_nop()
+	#define numEnemy				_numEnemy()
+	#define numFriendly				_numFriendly()
+	#define numLocked				_numLocked()
+	#define numOke					_numOke()
+	#define numProjectile			_numProjectile()
+	#define stop					_stop()
+	#define targetActcode			_targetActcode()
+	#define targetAzimuth			_targetAzimuth()
+	#define targetBodycode			_targetBodycode()
+	#define targetDirection			_targetDirection()
+	#define targetDistance			_targetDistance()
+	#define targetDistanceXy		_targetDistanceXy()
+	#define targetElevation			_targetElevation()
+	#define targetId				_targetId()
+	#define targetX					_targetX()
+	#define targetY					_targetY()
+	#define targetZ					_targetZ()
+	#define time					_time()
+	#define timeRemained			_timeRemained()
+	#define turnLeft				_turnLeft()
+	#define turnRight				_turnRight()
+	#define wait					_wait()
 	
-	#define moveLeft		_moveLeft()
-	#define moveRight		_moveRight()
-	#define moveForward		_moveForward()
-	#define moveBackward	_moveBackward()
-	#define turnLeft		_turnLeft()
-	#define turnRight		_turnRight()
-	#define jumpLeft		_jumpLeft()
-	#define jumpRight		_jumpRight()
-	#define jumpForward		_jumpForward()
-	#define jumpBackward	_jumpBackward()
-	#define fightLow		_fightLow()
-	#define fightHigh		_fightHigh()
-	#define fightLong		_fightLong()
-	#define fight			_fight()
-	
-	#define lockon			_lockon()
-	#define lockonFriendly	_lockonFriendly()
-	#define lockonAll		_lockonAll()
-	
-	#define	wait			_wait()
-	#define	fast			_fast()
-	#define wide			_wide()
-	#define snipe			_snipe()
-	#define target			_target()
+	#define	fast					_fast()
+	#define wide					_wide()
+	#define snipe					_snipe()
+	#define target					_target()
+	#define off						_off()
 #endif
