@@ -93,6 +93,8 @@ enum {
 	CHIPID_OPTION				= 0xD0,
 	CHIPID_TGT_BODYCODE			= 0xDF,
 	CHIPID_NUM_LOCKED			= 0xE0,
+	CHIPID_WEAPON_ID			= 0xE1,
+	CHIPID_IS_LINE_CLEAR		= 0xE9,
 	CHIPID_LOCKON				= 0xDB,
 	CHIPID_LOCKON_COUNTER		= 0xEC,
 	CHIPID_LOCKON_PARTS			= 0xE8,
@@ -1004,10 +1006,10 @@ static auto& put_move_chip(int param, LastLocationArg) {
 	return *g_pCurField->m_tree.add(std::make_unique<CChipMove>(param));
 }
 
-static auto& _move_left	(LastLocationArg){LastLocation(); return put_move_chip(CChip::LEFT);}
-static auto& _move_right	(LastLocationArg){LastLocation(); return put_move_chip(CChip::RIGHT);}
-static auto& _move_forward	(LastLocationArg){LastLocation(); return put_move_chip(CChip::FWD);}
-static auto& _move_backward(LastLocationArg){LastLocation(); return put_move_chip(CChip::BACK);}
+static auto& _moveLeft		(LastLocationArg){LastLocation(); return put_move_chip(CChip::LEFT);}
+static auto& _moveRight		(LastLocationArg){LastLocation(); return put_move_chip(CChip::RIGHT);}
+static auto& _moveForward	(LastLocationArg){LastLocation(); return put_move_chip(CChip::FWD);}
+static auto& _moveBackward	(LastLocationArg){LastLocation(); return put_move_chip(CChip::BACK);}
 
 //////////////////////////////////////////////////////////////////////////////
 // turn
@@ -1047,8 +1049,8 @@ static auto& put_turn_chip(int param, LastLocationArg){
 	return *g_pCurField->m_tree.add(std::make_unique<CChipTurn>(param));
 }
 
-static auto& _turn_left	(LastLocationArg){LastLocation(); return put_turn_chip(CChip::LEFT);}
-static auto& _turn_right(LastLocationArg){LastLocation(); return put_turn_chip(CChip::RIGHT);}
+static auto& _turnLeft	(LastLocationArg){LastLocation(); return put_turn_chip(CChip::LEFT);}
+static auto& _turnRight	(LastLocationArg){LastLocation(); return put_turn_chip(CChip::RIGHT);}
 
 //////////////////////////////////////////////////////////////////////////////
 // Jump
@@ -1084,10 +1086,10 @@ static auto& put_jump_chip(int param) {
 	return *g_pCurField->m_tree.add(std::make_unique<CChipJump>(param));
 }
 
-static auto& _jump_forward	(LastLocationArg) { LastLocation(); return put_jump_chip(CChip::FWD);}
-static auto& _jump_backward	(LastLocationArg) { LastLocation(); return put_jump_chip(CChip::BACK);}
-static auto& _jump_left		(LastLocationArg) { LastLocation(); return put_jump_chip(CChip::LEFT);}
-static auto& _jump_right	(LastLocationArg) { LastLocation(); return put_jump_chip(CChip::RIGHT);}
+static auto& _jumpForward	(LastLocationArg) { LastLocation(); return put_jump_chip(CChip::FWD);}
+static auto& _jumpBackward	(LastLocationArg) { LastLocation(); return put_jump_chip(CChip::BACK);}
+static auto& _jumpLeft		(LastLocationArg) { LastLocation(); return put_jump_chip(CChip::LEFT);}
+static auto& _jumpRight		(LastLocationArg) { LastLocation(); return put_jump_chip(CChip::RIGHT);}
 
 //////////////////////////////////////////////////////////////////////////////
 // 格闘
@@ -1141,9 +1143,9 @@ static auto& put_fight_chip(int param){
 	return *g_pCurField->m_tree.add(std::make_unique<CChipFight>(param));
 }
 
-static auto& _fight_low(LastLocationArg)	{ LastLocation(); return put_fight_chip(CChipFight::LOW); }
-static auto& _fight_high(LastLocationArg)	{ LastLocation(); return put_fight_chip(CChipFight::HIGH); }
-static auto& _fight_long(LastLocationArg)	{ LastLocation(); return put_fight_chip(CChipFight::LONG); }
+static auto& _fightLow(LastLocationArg)		{ LastLocation(); return put_fight_chip(CChipFight::LOW); }
+static auto& _fightHigh(LastLocationArg)	{ LastLocation(); return put_fight_chip(CChipFight::HIGH); }
+static auto& _fightLong(LastLocationArg)	{ LastLocation(); return put_fight_chip(CChipFight::LONG); }
 static auto& _fight(LastLocationArg)		{ LastLocation(); return put_fight_chip(CChipFight::AUTO); }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1273,7 +1275,7 @@ static void put_alt_chip(UINT param){
 	g_pCurField->m_tree.add(std::make_unique<CChipAlt>(param));
 }
 
-static void set_altitude(int alt, LastLocationArg){LastLocation(); put_alt_chip(alt);}
+static void setAltitude(int alt, LastLocationArg){LastLocation(); put_alt_chip(alt);}
 
 //////////////////////////////////////////////////////////////////////////////
 // fire
@@ -1575,7 +1577,7 @@ public:
 	ScaledInt<8>			m_operator;
 };
 
-static CChipTree num_ammo(
+static CChipTree numAmmo(
 	int weapon,
 	LastLocationArg
 ){
@@ -1583,7 +1585,7 @@ static CChipTree num_ammo(
 	return CChipTree(std::make_unique<CChipAmmoNum>(weapon - 1), g_pCurField->m_pool);
 }
 
-static CChipTree num_option(
+static CChipTree numOption(
 	int weapon,
 	LastLocationArg
 ){
@@ -1640,15 +1642,15 @@ public:
 	ScaledInt<4>		m_operator;
 };
 
-static auto& num_oke(
+static auto& numOke(
 	int enemy
 ){
 	return *g_pCurField->m_tree.add(std::make_unique<CChipOkeNum>(enemy));
 }
 
-static auto& _num_enemy		(LastLocationArg){LastLocation(); return num_oke(CChip::ENEMY); }
-static auto& _num_friendly	(LastLocationArg){LastLocation(); return num_oke(CChip::FRIENDLY); }
-static auto& _num_oke		(LastLocationArg){LastLocation(); return num_oke(CChip::ENEMY_FRIENDLY); }
+static auto& _numEnemy		(LastLocationArg){LastLocation(); return numOke(CChip::ENEMY); }
+static auto& _numFriendly	(LastLocationArg){LastLocation(); return numOke(CChip::FRIENDLY); }
+static auto& _numOke		(LastLocationArg){LastLocation(); return numOke(CChip::ENEMY_FRIENDLY); }
 
 //////////////////////////////////////////////////////////////////////////////
 // エリア外判定
@@ -1683,7 +1685,7 @@ public:
 	}
 };
 
-static auto& _is_outside_area(
+static auto& _isOutsideArea(
 	LastLocationArg
 ){
 	LastLocation();
@@ -1739,7 +1741,7 @@ public:
 	ScaledInt<8>		m_operator;
 };
 
-static auto& is_barrier_over(
+static auto& isBarrierOver(
 	int num,
 	LastLocationArg
 ){
@@ -1747,7 +1749,7 @@ static auto& is_barrier_over(
 	return *g_pCurField->m_tree.add(std::make_unique<CChipBarrier>(num, CChip::OP_GE));
 }
 
-static auto& is_barrier_under(
+static auto& isBarrierUnder(
 	int num,
 	LastLocationArg
 ){
@@ -1811,7 +1813,7 @@ public:
 	ScaledInt<4>		m_operator;
 };
 
-static auto& _num_projectile(
+static auto& _numProjectile(
 	LastLocationArg
 ){
 	LastLocation();
@@ -1967,7 +1969,7 @@ public:
 	ScaledInt<8, 1, 99>		m_num;
 };
 
-static CChipTree is_rand(
+static CChipTree isRand(
 	int num,
 	LastLocationArg
 ){
@@ -2026,7 +2028,7 @@ public:
 	ScaledInt<>				m_operator;
 };
 
-static auto time_remained(LastLocationArg) {
+static auto timeRemained(LastLocationArg) {
 	LastLocation();
 	return CChipTree(std::make_unique<CChipIfTime>(CChipIfTime::END), g_pCurField->m_pool);
 }
@@ -2100,7 +2102,7 @@ public:
 	ScaledInt<8, 1, 3>	m_num;
 };
 
-static auto num_locked(LastLocationArg) {
+static auto numLocked(LastLocationArg) {
 	LastLocation();
 	return CChipTree(std::make_unique<CChipIfNumLock>(), g_pCurField->m_pool);
 }
@@ -2160,12 +2162,12 @@ static auto& _lockon(LastLocationArg){
 	return *g_pCurField->m_tree.add(std::make_unique<CChipLockon>(CChip::ENEMY));
 }
 
-static auto& _lockon_friendly(LastLocationArg) {
+static auto& _lockonFriendly(LastLocationArg) {
 	LastLocation();
 	return *g_pCurField->m_tree.add(std::make_unique<CChipLockon>(CChip::FRIENDLY));
 }
 
-static auto& _lockon_all(LastLocationArg) {
+static auto& _lockonAll(LastLocationArg) {
 	LastLocation();
 	return *g_pCurField->m_tree.add(std::make_unique<CChipLockon>(CChip::ENEMY_FRIENDLY));
 }
@@ -2291,24 +2293,24 @@ static CChipTree is_self_target_status(
 }
 
 #ifndef NO_OKECC_SYNTAX
-static CChipTree is_self_waiting (LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::WAIT);}
-static CChipTree is_self_moving  (LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::MOVE);}
-static CChipTree is_self_turning (LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::TURN);}
-static CChipTree is_self_jumping (LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::JUMP);}
-static CChipTree is_self_firing  (LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIRE);}
-static CChipTree is_self_fighting(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIGHT);}
-static CChipTree is_self_special (LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::SPECIAL);}
-static CChipTree is_self_stunble (LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::STUN);}
-static CChipTree is_self_unlock  (LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::UNLOCK);}
+static CChipTree isSelfWaiting		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::WAIT);}
+static CChipTree isSelfMoving		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::MOVE);}
+static CChipTree isSelfTurning		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::TURN);}
+static CChipTree isSelfJumping		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::JUMP);}
+static CChipTree isSelfFiring		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIRE);}
+static CChipTree isSelfFighting		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIGHT);}
+static CChipTree isSelfSpecial		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::SPECIAL);}
+static CChipTree isSelfStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::STUN);}
+static CChipTree isUnlock			(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::UNLOCK);}
 
-static CChipTree is_target_waiting (LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::WAIT);}
-static CChipTree is_target_moving  (LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::MOVE);}
-static CChipTree is_target_turning (LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::TURN);}
-static CChipTree is_target_jumping (LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::JUMP);}
-static CChipTree is_target_firing  (LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIRE);}
-static CChipTree is_target_fighting(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIGHT);}
-static CChipTree is_target_special (LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::SPECIAL);}
-static CChipTree is_target_stunble (LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::STUN);}
+static CChipTree isTargetWaiting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::WAIT);}
+static CChipTree isTargetMoving		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::MOVE);}
+static CChipTree isTargetTurning	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::TURN);}
+static CChipTree isTargetJumping	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::JUMP);}
+static CChipTree isTargetFiring		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIRE);}
+static CChipTree isTargetFighting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIGHT);}
+static CChipTree isTargetSpecial	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::SPECIAL);}
+static CChipTree isTargetStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::STUN);}
 #endif
 
 //##//////////////////////////////////////////////////////////////////////////////
@@ -2434,7 +2436,7 @@ public:
 	ScaledInt<8, 1, 8, 1, 1>	m_ch;
 };
 
-static void ch_send(
+static void chSend(
 	CChipVar& var,
 	int ch,
 	LastLocationArg
@@ -2575,41 +2577,41 @@ CChipVar& CChipVar::operator--(){return *this -= 1.0;}
 //////////////////////////////////////////////////////////////////////////////
 // val 系
 
-//static CChipVal num_enemy			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::ENEMY);}
-//static CChipVal num_friendly		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::FRIENDLY);}
+//static CChipVal numEnemy			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::ENEMY);}
+//static CChipVal numFriendly		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::FRIENDLY);}
 static CChipVal time				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TIME);}
-static CChipVal math_rand			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::RAND);}
+static CChipVal mathRand			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::RAND);}
 
-static CChipVal my_x				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_X);}
-static CChipVal my_y				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_Y);}
-static CChipVal my_z				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_Z);}
-static CChipVal my_direction		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_DIRECTION);}
+static CChipVal myX					(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_X);}
+static CChipVal myY					(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_Y);}
+static CChipVal myZ					(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_POS_Z);}
+static CChipVal myDirection			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::MY_DIRECTION);}
 
-static CChipVal target_no			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_NO);}
-static CChipVal target_azimuth		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_AZIMUTH);}
-static CChipVal target_elevation	(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_ELEVATION);}
-static CChipVal target_x			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_X);}
-static CChipVal target_y			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_Y);}
-static CChipVal target_z			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_Z);}
-static CChipVal target_direction	(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DIRECTION);}
-static CChipVal target_bodycode		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_BODYCODE);}
-static CChipVal target_actcode		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_ACTCODE);}
-static CChipVal target_distance		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DISTANCE);}
-static CChipVal target_distance_xy	(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DISTANCE_XY);}
+static CChipVal targetId			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_NO);}
+static CChipVal targetAzimuth		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_AZIMUTH);}
+static CChipVal targetElevation		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_ELEVATION);}
+static CChipVal targetX				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_X);}
+static CChipVal targetY				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_Y);}
+static CChipVal targetZ				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_Z);}
+static CChipVal targetDirection		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DIRECTION);}
+static CChipVal targetBodycode		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_BODYCODE);}
+static CChipVal targetActcode		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_ACTCODE);}
+static CChipVal targetDistance		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DISTANCE);}
+static CChipVal targetDistanceXy	(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DISTANCE_XY);}
 
-static CChipVal math_int	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::INT, val)); }
-static CChipVal math_abs	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::ABS, val)); }
-static CChipVal math_max	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MAX, val)); }
-static CChipVal math_min	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MIN, val)); }
-static CChipVal math_sqr	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::SQR, val)); }
+static CChipVal mathInt	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::INT, val)); }
+static CChipVal mathAbs	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::ABS, val)); }
+static CChipVal mathMax	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MAX, val)); }
+static CChipVal mathMin	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MIN, val)); }
+static CChipVal mathSqr	(double val, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::SQR, val)); }
 
-static CChipVal math_int	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::INT, var.m_var)); }
-static CChipVal math_abs	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::ABS, var.m_var)); }
-static CChipVal math_max	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MAX, var.m_var)); }
-static CChipVal math_min	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MIN, var.m_var)); }
-static CChipVal math_sqr	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::SQR, var.m_var)); }
+static CChipVal mathInt	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::INT, var.m_var)); }
+static CChipVal mathAbs	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::ABS, var.m_var)); }
+static CChipVal mathMax	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MAX, var.m_var)); }
+static CChipVal mathMin	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::MIN, var.m_var)); }
+static CChipVal mathSqr	(CChipVar& var, LastLocationArg) { LastLocation(); return CChipVal(CChipVal::MATH, std::make_unique<CChipCalc>(0, CChipCalc::SQR, var.m_var)); }
 
-static CChipVal ch_receive(int ch, LastLocationArg){LastLocation(); return CChipVal(CChipVal::CH_RECV, ch);}
+static CChipVal chReceive(int ch, LastLocationArg){LastLocation(); return CChipVal(CChipVal::CH_RECV, ch);}
 
 #ifndef NO_OKECC_SYNTAX
 CChipVar& CChipVar::operator=(const CChipVal& val){
@@ -2983,33 +2985,33 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define nop				_nop()
 	#define stop			_stop()
 	
-	#define num_projectile	_num_projectile()
-	#define num_enemy		_num_enemy()
-	#define num_friendly	_num_friendly()
-	#define num_oke			_num_oke()
+	#define numProjectile	_numProjectile()
+	#define numEnemy		_numEnemy()
+	#define numFriendly		_numFriendly()
+	#define numOke			_numOke()
 	
-	#define is_outside_area			_is_outside_area()
-	#define is_target_position		_target_position()
-	#define is_position_from_target	_position_from_target()
+	#define isOutsideArea			_isOutsideArea()
+	#define isTargetPosition		_target_position()
+	#define isPositionFromTarget	_position_from_target()
 	
-	#define move_left		_move_left()
-	#define move_right		_move_right()
-	#define move_forward	_move_forward()
-	#define move_backward	_move_backward()
-	#define turn_left		_turn_left()
-	#define turn_right		_turn_right()
-	#define jump_left		_jump_left()
-	#define jump_right		_jump_right()
-	#define jump_forward	_jump_forward()
-	#define jump_backward	_jump_backward()
-	#define fight_low		_fight_low()
-	#define fight_high		_fight_high()
-	#define fight_long		_fight_long()
+	#define moveLeft		_moveLeft()
+	#define moveRight		_moveRight()
+	#define moveForward		_moveForward()
+	#define moveBackward	_moveBackward()
+	#define turnLeft		_turnLeft()
+	#define turnRight		_turnRight()
+	#define jumpLeft		_jumpLeft()
+	#define jumpRight		_jumpRight()
+	#define jumpForward		_jumpForward()
+	#define jumpBackward	_jumpBackward()
+	#define fightLow		_fightLow()
+	#define fightHigh		_fightHigh()
+	#define fightLong		_fightLong()
 	#define fight			_fight()
 	
 	#define lockon			_lockon()
-	#define lockon_friendly	_lockon_friendly()
-	#define lockon_all		_lockon_all()
+	#define lockonFriendly	_lockonFriendly()
+	#define lockonAll		_lockonAll()
 	
 	#define	wait			_wait()
 	#define	fast			_fast()
