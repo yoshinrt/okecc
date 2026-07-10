@@ -8,12 +8,6 @@
 #include <functional>
 #include <cmath>
 
-#ifdef NO_OKECC_SYNTAX
-	#define EXTERN extern
-#else
-	#define EXTERN
-#endif
-
 enum {
 	OKE_BIPED,
 	OKE_QUADRUPED,
@@ -57,67 +51,7 @@ enum {
 };
 
 enum {
-	EM_WAIT,
-	EM_THROUGH,
-};
-
-enum {
-	FM_NORMAL,
-	FM_WIDE,
-	FM_SNIPE,
-};
-
-enum {
-	CHIPID_NULL					= 0x00,
-	CHIPID_NOP					= 0xC1,
-	CHIPID_WAIT					= 0xC2,
-	CHIPID_WAIT_AE				= 0xC3,
-	CHIPID_SUB					= 0xDA,
-	CHIPID_GET_STATUS			= 0xEA,
-	CHIPID_CALC					= 0xEB,
-	CHIPID_CH_SEND				= 0xEF,
-	CHIPID_CH_RECV				= 0xF0,
-	CHIPID_IF_AMMO_NUM			= 0xD1,
-	CHIPID_IF_OUTSIDE_AREA		= 0xD2,
-	CHIPID_IF_BARRIER			= 0xD4,
-	CHIPID_IF_OKE_NUM			= 0xD3,
-	CHIPID_IF_DET_PROJECTILE	= 0xD5,
-	CHIPID_IF_SELF_STATUS		= 0xD6,
-	CHIPID_IF_MY_ACTION			= 0xD7,
-	CHIPID_IF_TGT_ACTION		= 0xDE,
-	CHIPID_IF_RAND				= 0xD8,
-	CHIPID_IF_TGT_POS			= 0xDC,
-	CHIPID_IF_POS_FROM_TGT		= 0xDD,
-	CHIPID_IF_TIME				= 0xD9,
-	CHIPID_IF_CMP				= 0xEE,
-	CHIPID_STOP					= 0xC4,
-	CHIPID_MOVE					= 0xC5,
-	CHIPID_TURN					= 0xC6,
-	CHIPID_JUMP					= 0xC7,
-	CHIPID_FAST_MOVE			= 0xC8,
-	CHIPID_FAST_TURN			= 0xC9,
-	CHIPID_FIGHT				= 0xCA,
-	CHIPID_GUARD				= 0xCB,
-	CHIPID_SPECIAL				= 0xCC,
-	CHIPID_FIRE_NEAREST			= 0xCE,
-	CHIPID_FIRE_TGT				= 0xE2,
-	CHIPID_FIRE_FIXED_DIR		= 0xCF,
-	CHIPID_FIRE_COUNTER			= 0xED,
-	CHIPID_JUMP_TURN			= 0xE3,
-	CHIPID_MOVE_TURN			= 0xE3,
-	CHIPID_FIRE_MOVE			= 0xE5,
-	CHIPID_FIRE_JMP				= 0xE6,
-	CHIPID_ALTITUDE				= 0xCD,
-	CHIPID_OPTION				= 0xD0,
-	CHIPID_TGT_BODYCODE			= 0xDF,
-	CHIPID_NUM_LOCKED			= 0xE0,
-	CHIPID_WEAPON_ID			= 0xE1,
-	CHIPID_IS_LINE_CLEAR		= 0xE9,
-	CHIPID_LOCKON				= 0xDB,
-	CHIPID_LOCKON_COUNTER		= 0xEC,
-	CHIPID_LOCKON_PARTS			= 0xE8,
-	CHIPID_AUTO_TURN			= 0xE7,
-	CHIPID_GOTO					= 0xFF,
+	BODY
 };
 
 typedef unsigned int UINT;
@@ -198,6 +132,59 @@ public:
 // Chip class
 class CChip {
 public:
+	enum {
+		CHIPID_NULL					= 0x00,
+		CHIPID_NOP					= 0xC1,
+		CHIPID_WAIT					= 0xC2,
+		CHIPID_WAIT_AE				= 0xC3,
+		CHIPID_SUB					= 0xDA,
+		CHIPID_GET_STATUS			= 0xEA,
+		CHIPID_CALC					= 0xEB,
+		CHIPID_CH_SEND				= 0xEF,
+		CHIPID_CH_RECV				= 0xF0,
+		CHIPID_IF_AMMO_NUM			= 0xD1,
+		CHIPID_IF_OUTSIDE_AREA		= 0xD2,
+		CHIPID_IF_BARRIER			= 0xD4,
+		CHIPID_IF_OKE_NUM			= 0xD3,
+		CHIPID_IF_DET_PROJECTILE	= 0xD5,
+		CHIPID_IF_SELF_STATUS		= 0xD6,
+		CHIPID_IF_MY_ACTION			= 0xD7,
+		CHIPID_IF_TGT_ACTION		= 0xDE,
+		CHIPID_IF_RAND				= 0xD8,
+		CHIPID_IF_TGT_POS			= 0xDC,
+		CHIPID_IF_POS_FROM_TGT		= 0xDD,
+		CHIPID_IF_TIME				= 0xD9,
+		CHIPID_IF_CMP				= 0xEE,
+		CHIPID_STOP					= 0xC4,
+		CHIPID_MOVE					= 0xC5,
+		CHIPID_TURN					= 0xC6,
+		CHIPID_JUMP					= 0xC7,
+		CHIPID_FAST_MOVE			= 0xC8,
+		CHIPID_FAST_TURN			= 0xC9,
+		CHIPID_FIGHT				= 0xCA,
+		CHIPID_GUARD				= 0xCB,
+		CHIPID_SPECIAL				= 0xCC,
+		CHIPID_FIRE_NEAREST			= 0xCE,
+		CHIPID_FIRE_TGT				= 0xE2,
+		CHIPID_FIRE_FIXED_DIR		= 0xCF,
+		CHIPID_FIRE_COUNTER			= 0xED,
+		CHIPID_JUMP_TURN			= 0xE3,
+		CHIPID_MOVE_TURN			= 0xE4,
+		CHIPID_FIRE_MOVE			= 0xE5,
+		CHIPID_FIRE_JMP				= 0xE6,
+		CHIPID_ALTITUDE				= 0xCD,
+		CHIPID_OPTION				= 0xD0,
+		CHIPID_TGT_BODYCODE			= 0xDF,
+		CHIPID_NUM_LOCKED			= 0xE0,
+		CHIPID_WEAPON_ID			= 0xE1,
+		CHIPID_IS_LINE_CLEAR		= 0xE9,
+		CHIPID_LOCKON				= 0xDB,
+		CHIPID_LOCKON_COUNTER		= 0xEC,
+		CHIPID_LOCKON_PARTS			= 0xE8,
+		CHIPID_AUTO_TURN			= 0xE7,
+		CHIPID_GOTO					= 0xFF,
+	};
+	
 	static inline const char *m_OkeTypeStr[] = {
 		"二脚",
 		"四脚",
@@ -277,6 +264,17 @@ public:
 		"", "急"
 	};
 
+	enum {
+		EM_WAIT,
+		EM_THROUGH,
+	};
+	
+	enum {
+		FM_NORMAL,
+		FM_WIDE,
+		FM_SNIPE,
+	};
+	
 	CChip(){
 		m_Id		= CHIPID_NULL;
 		m_RawG		= 0;
@@ -385,7 +383,7 @@ public:
 		UINT dst = idx;
 
 		// 最終地点を取得
-		while(dst < m_list.size() && m_list[dst]->m_Id.get() == CHIPID_GOTO) dst = m_list[dst]->m_NextG;
+		while(dst < m_list.size() && m_list[dst]->m_Id.get() == CChip::CHIPID_GOTO) dst = m_list[dst]->m_NextG;
 
 		// 最終地点までの Goto はすべて最終地点を指す
 		while(idx != dst){
@@ -406,7 +404,7 @@ public:
 			if(u==0x2c){
 				int a = 0;
 			}
-			if(m_list[u]->m_Id.get() != CHIPID_GOTO){
+			if(m_list[u]->m_Id.get() != CChip::CHIPID_GOTO){
 				m_list[u]->m_NextR = GetFinalDst(m_list[u]->m_NextR);
 				m_list[u]->m_NextG = GetFinalDst(m_list[u]->m_NextG);
 				IdxNew2Old.push_back(u);
@@ -417,7 +415,7 @@ public:
 
 		//Goto 削除
 		for(UINT u = 0; u < m_list.size(); ++u){
-			if(m_list[u]->m_Id.get() == CHIPID_GOTO) m_list[u].reset();
+			if(m_list[u]->m_Id.get() == CChip::CHIPID_GOTO) m_list[u].reset();
 		}
 
 		// 空きを詰める
@@ -446,7 +444,7 @@ public:
 		// 参照されていないチップを Goto に置き換える
 		for(UINT u = 0; u < m_list.size(); ++u){
 			if(!referenced[u]){
-				m_list[u]->m_Id = CHIPID_GOTO;
+				m_list[u]->m_Id = CChip::CHIPID_GOTO;
 			}
 		}
 	}
@@ -945,7 +943,7 @@ static void simple_chip(
 	g_pCurField->m_tree.add(std::make_unique<CChipSimple>(id, text));
 }
 
-static void wait(LastLocationArg){simple_chip(CHIPID_WAIT_AE, "Wait", location);}
+static void _wait(LastLocationArg){simple_chip(CChip::CHIPID_WAIT_AE, "Wait", location);}
 
 class CChipWait : public CChip {
 public:
@@ -973,7 +971,7 @@ public:
 	ScaledInt<8, 1, 120> m_param;
 };
 
-static void wait(
+static void sleep(
 	UINT param,
 	LastLocationArg
 ){
@@ -984,13 +982,19 @@ static void wait(
 //////////////////////////////////////////////////////////////////////////////
 // Stop
 
-static void _stop(LastLocationArg){simple_chip(CHIPID_STOP, "Stop", location);}
+static void _stop(LastLocationArg){simple_chip(CChip::CHIPID_STOP, "Stop", location);}
 
 //////////////////////////////////////////////////////////////////////////////
 // move
 
 class CChipMove : public CChip {
 public:
+	enum {
+		NORMAL,
+		FAST,
+		TURN,
+	};
+	
 	CChipMove(int param){
 		m_Id		= CHIPID_MOVE;
 		m_param		= param;
@@ -1000,24 +1004,36 @@ public:
 	virtual ~CChipMove(){}
 
 	virtual std::string GetLayoutText(void){
-		return std::format("{}{}{}移動", m_exmode_str[m_exmode.get()], m_fastmode_str[m_fast], m_move_str[m_param.get()]);
+		std::string s = std::format("{}{}{}移動", m_exmode_str[m_exmode.get()], m_fastmode_str[m_mode], m_move_str[m_param.get()]);
+		
+		if(m_mode == TURN){
+			s += std::format("\n+{}旋回", m_move_str[m_turn.get()]);
+		}
+		
+		return s;
 	}
 
 	virtual void GetBin(CChipBinary& bin){
-		if(m_fast) m_Id = CHIPID_FAST_MOVE;
+		if(     m_mode == FAST) m_Id = CHIPID_FAST_MOVE;
+		else if(m_mode == TURN) m_Id = CHIPID_MOVE_TURN;
+		
 		CChip::GetBin(bin);
 		m_param.GetBin(bin);
-		if(m_fast) m_exmode.GetBin(bin);
+		if(m_mode == TURN) m_turn.GetBin(bin);
+		if(m_mode == FAST) m_exmode.GetBin(bin);
 	}
 
 	// option
-	auto& _fast()		{m_fast		= 1;			return *this;}
+	auto& _fast()		{m_mode		= FAST;		return *this;}
 	auto& _wait()		{m_exmode	= EM_WAIT;	return *this;}
+	auto& _turnLeft()	{m_turn	= LEFT;  m_mode = TURN; return *this;}
+	auto& _turnRight()	{m_turn	= RIGHT; m_mode = TURN; return *this;}
 
 	ScaledInt<>	m_param;
+	ScaledInt<>	m_turn;
 	ScaledInt<>	m_exmode;
 
-	int	m_fast = 0;
+	int	m_mode = NORMAL;
 };
 
 static auto& put_move_chip(int param, LastLocationArg) {
@@ -1054,7 +1070,7 @@ public:
 	}
 
 	// option
-	auto& _fast()		{m_fast		= 1;			return *this;}
+	auto& _fast()		{m_fast		= 1;		return *this;}
 	auto& _wait()		{m_exmode	= EM_WAIT;	return *this;}
 
 	ScaledInt<>	m_param;
@@ -1084,20 +1100,32 @@ public:
 	virtual ~CChipJump() {}
 
 	virtual std::string GetLayoutText(void) {
-		return std::format("{}{}Jmp", m_exmode_str[m_exmode.get()], m_move_str[m_param.get()]);
+		std::string s = std::format("{}{}Jmp", m_exmode_str[m_exmode.get()], m_move_str[m_param.get()]);
+		
+		if(m_with_turn){
+			s += std::format("\n+{}旋回", m_move_str[m_turn.get()]);
+		}
+		return s;
 	}
 
 	virtual void GetBin(CChipBinary& bin) {
+		if(m_with_turn) m_Id = CHIPID_JUMP_TURN;
 		CChip::GetBin(bin);
 		m_param.GetBin(bin);
+		if(m_with_turn) m_turn.GetBin(bin);
 		m_exmode.GetBin(bin);
 	}
 
 	// option
 	auto& _wait()		{m_exmode	= EM_WAIT;	return *this;}
+	auto& _turnLeft()	{m_turn	= LEFT;  m_with_turn = true; return *this;}
+	auto& _turnRight()	{m_turn	= RIGHT; m_with_turn = true; return *this;}
 
 	ScaledInt<> m_param;
+	ScaledInt<>	m_turn;
 	ScaledInt<> m_exmode;
+	
+	bool m_with_turn = false;
 };
 
 static auto& put_jump_chip(int param) {
@@ -1289,11 +1317,9 @@ public:
 	ScaledInt<8, 20, 100> m_param;
 };
 
-static void put_alt_chip(UINT param){
+static void setAltitude(int param, LastLocationArg){LastLocation();
 	g_pCurField->m_tree.add(std::make_unique<CChipAlt>(param));
 }
-
-static void setAltitude(int alt, LastLocationArg){LastLocation(); put_alt_chip(alt);}
 
 //////////////////////////////////////////////////////////////////////////////
 // fire
@@ -1301,6 +1327,13 @@ static void setAltitude(int alt, LastLocationArg){LastLocation(); put_alt_chip(a
 class CChipFire : public CChip {
 public:
 	#include "opt_coordinate.h"
+	
+	enum {
+		NORMAL,
+		TGT,
+		MOVE,
+		JUMP
+	};
 	
 	CChipFire(
 		int weapon,
@@ -1318,13 +1351,21 @@ public:
 	virtual ~CChipFire(){}
 
 	virtual std::string GetLayoutText(void){
-		if(m_target){
-			return std::format(
+		if(m_mode != NORMAL){
+			std::string s = std::format(
 				"{}TGT射撃\n#{}x{}",
 				m_exmode_str[m_exmode.get()],
 				m_weapon.get(),
 				m_cnt.get()
 			);
+			
+			if(m_mode == MOVE){
+				s += std::format("\n+{}移動", m_move_str[m_movedir.get()]);
+			}else if(m_mode == JUMP){
+				s += std::format("\n+{}Jmp", m_move_str[m_movedir.get()]);
+			}
+			
+			return s;
 		}
 		
 		return std::format(
@@ -1337,15 +1378,25 @@ public:
 	}
 
 	virtual void GetBin(CChipBinary& bin){
-		if(m_target) m_Id = CHIPID_FIRE_TGT;
+		if(     m_mode == TGT ) m_Id = CHIPID_FIRE_TGT;
+		else if(m_mode == MOVE) m_Id = CHIPID_FIRE_MOVE;
+		else if(m_mode == JUMP) m_Id = CHIPID_FIRE_JMP;
 		
 		CChip::GetBin(bin);
 		
-		if(!m_target) GetCoordinateBin(bin);
+		if(m_mode == NORMAL) GetCoordinateBin(bin);
 		
-		m_weapon.GetBin(bin);	if(m_target) bin.m_pos += 5;
-		m_cnt.GetBin(bin);		if(m_target) bin.m_pos += 3;
-		m_firemode.GetBin(bin); if(m_target) bin.m_pos += 4;
+		if(m_mode >= MOVE){
+			m_movedir.GetBin(bin);
+		}
+		
+		m_weapon.GetBin(bin);	if(m_mode != NORMAL) bin.m_pos += 5;
+		m_cnt.GetBin(bin);		if(m_mode != NORMAL) bin.m_pos += 3;
+		
+		if(m_mode <= TGT){
+			m_firemode.GetBin(bin);
+			if(m_mode == TGT) bin.m_pos += 4;
+		}
 		m_exmode.GetBin(bin);
 	}
 
@@ -1353,18 +1404,27 @@ public:
 	auto& _wait()	{m_exmode	= EM_WAIT;	return *this;}
 	auto& _wide()	{m_firemode	= FM_WIDE;	return *this;}
 	auto& _snipe()	{m_firemode	= FM_SNIPE;	return *this;}
-	auto& _target()	{m_target	= 1;		return *this;}
+	auto& _target()	{m_mode	= TGT;		return *this;}
+	auto& _moveLeft()		{m_movedir	= LEFT;		m_mode = MOVE; return *this;}
+	auto& _moveRight()		{m_movedir	= RIGHT;	m_mode = MOVE; return *this;}
+	auto& _moveForward()	{m_movedir	= FWD;		m_mode = MOVE; return *this;}
+	auto& _moveBackward()	{m_movedir	= BACK; 	m_mode = MOVE; return *this;}
+	auto& _jumpLeft()		{m_movedir	= LEFT; 	m_mode = JUMP; return *this;}
+	auto& _jumpRight()		{m_movedir	= RIGHT;	m_mode = JUMP; return *this;}
+	auto& _jumpForward()	{m_movedir	= FWD;		m_mode = JUMP; return *this;}
+	auto& _jumpBackward()	{m_movedir	= BACK; 	m_mode = JUMP; return *this;}
 	
 	ScaledInt<3, 1, 5, 1, 1>	m_weapon;
 	ScaledInt<5, 1, 16>			m_cnt;
 	ScaledInt<4>				m_firemode;
 	ScaledInt<4>				m_exmode;
+	ScaledInt<>					m_movedir;
 	
-	int m_target = 0;
+	int m_mode = NORMAL;
 };
 
 static auto& fire(
-	int weapon = 1,
+	int weapon,
 	int cnt = 1,
 	LastLocationArg
 ){
@@ -1376,141 +1436,146 @@ static auto& fire(
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// fire fixed dir
+// 方位射撃
 
-//##class CChipFireFixedDir : public CChip {
-//##public:
-//##	CChipFireFixedDir(
-//##		int direction,
-//##		int elevation,
-//##		int weapon,
-//##		int cnt
-//##	){
-//##		m_Id		= CHIPID_FIRE_FIXED_DIR;
-//##		m_direction	= direction;
-//##		m_elevation	= -elevation;
-//##		m_weapon	= weapon;
-//##		m_cnt		= cnt;
-//##	}
-//##
-//##	virtual ~CChipFireFixedDir(){}
-//##
-//##	virtual std::string GetLayoutText(void){
-//##		return
-//##			std::format(
-//##				"射撃 #{}x{}\n方位 {}\n角度 {}",
-//##				m_weapon.get(),
-//##				m_cnt.get(),
-//##				m_direction.get(), -m_elevation.get()
-//##			);
-//##	}
-//##
-//##	virtual void GetBin(CChipBinary& bin){
-//##		CChip::GetBin(bin);
-//##		m_direction.GetBin(bin);
-//##		m_elevation.GetBin(bin);
-//##		m_weapon.GetBin(bin);
-//##		m_cnt.GetBin(bin);
-//##	}
-//##
-//##	virtual void SetBin(CChipBinary& bin){
-//##		CChip::SetBin(bin);
-//##		m_direction.SetBin(bin);
-//##		m_elevation.SetBin(bin);
-//##		m_weapon.SetBin(bin);
-//##		m_cnt.SetBin(bin);
-//##	}
-//##
-//##	ScaledInt<5, 16, 0, true>	m_direction;
-//##	ScaledInt<4, 16, -112>		m_elevation;
-//##	ScaledInt<3, 1, 1>			m_weapon;
-//##	ScaledInt<3, 1, 1>			m_cnt;
-//##};
-//##
-//##static void fire_direction(
-//##	int direction,
-//##	int elevation,
-//##	int weapon,
-//##	int cnt,
-//##	LastLocationArg
-//##){
-//##	LastLocation();
-//##	g_pCurField->m_tree.add(std::make_unique<CChipFireFixedDir>(
-//##		direction,
-//##		elevation,
-//##		weapon,
-//##		cnt
-//##	));
-//##}
+class CChipFireFixedDir : public CChip {
+public:
+	CChipFireFixedDir(
+		int dir,
+		int elev,
+		int weapon,
+		int cnt
+	){
+		m_Id			= CHIPID_FIRE_FIXED_DIR;
+		m_dir			= (uint8_t)CChipFire::int2angle(dir);
+		m_elev			= (uint8_t)int2elev(elev);
+		m_weapon		= weapon;
+		m_cnt			= cnt;
+		m_exmode		= EM_THROUGH;
+	}
 
-//##//////////////////////////////////////////////////////////////////////////////
-//##// カウンタ方位射撃
-//##
-//##class CChipFireCounter : public CChip {
-//##public:
-//##	CChipFireCounter(
-//##		int direction,
-//##		int elevation,
-//##		int weapon,
-//##		int cnt
-//##	){
-//##		m_Id		= CHIPID_FIRE_COUNTER;
-//##		m_direction	= direction;
-//##		m_elevation	= elevation;
-//##		m_weapon	= weapon;
-//##		m_cnt		= cnt;
-//##	}
-//##
-//##	virtual ~CChipFireCounter(){}
-//##
-//##	virtual std::string GetLayoutText(void){
-//##		return
-//##			std::format(
-//##				"射撃 #{}x{}\n方位 {}\n角度 {}",
-//##				m_weapon.get(),
-//##				m_cnt.get(),
-//##				m_VarNameStr[m_direction.get()], m_VarNameStr[m_elevation.get()]
-//##			);
-//##	}
-//##
-//##	virtual void GetBin(CChipBinary& bin){
-//##		CChip::GetBin(bin);
-//##		m_direction.GetBin(bin);
-//##		m_elevation.GetBin(bin);
-//##		m_weapon.GetBin(bin);
-//##		m_cnt.GetBin(bin);
-//##	}
-//##
-//##	virtual void SetBin(CChipBinary& bin){
-//##		CChip::SetBin(bin);
-//##		m_direction.SetBin(bin);
-//##		m_elevation.SetBin(bin);
-//##		m_weapon.SetBin(bin);
-//##		m_cnt.SetBin(bin);
-//##	}
-//##
-//##	ScaledInt<3>		m_direction;
-//##	ScaledInt<3>		m_elevation;
-//##	ScaledInt<3, 1, 1>	m_weapon;
-//##	ScaledInt<3, 1, 1>	m_cnt;
-//##};
-//##
-//##static void fire_direction(
-//##	CChipVar& direction,
-//##	CChipVar& elevation,
-//##	int weapon,
-//##	int cnt,
-//##	LastLocationArg
-//##){
-//##	LastLocation();
-//##	g_pCurField->m_tree.add(std::make_unique<CChipFireCounter>(
-//##		direction.m_var,
-//##		elevation.m_var,
-//##		weapon,
-//##		cnt
-//##	));
-//##}
-//##
+	static int int2elev(int val){
+		if (val < -90 || 90 < val) Error(std::format("Value {} is out of range [-90 - 90]", val));
+		return val / 2;
+	}
+
+	static int elev2int(int val){
+		return (int32_t)(int8_t)val * 2;
+	}
+
+	virtual ~CChipFireFixedDir(){}
+
+	virtual std::string GetLayoutText(void){
+		return std::format(
+			"{}射撃 #{}x{}\n方位={}\n仰角={}",
+			m_exmode_str[m_exmode.get()],
+			m_weapon.get(),
+			m_cnt.get(),
+			CChipFire::angle2int(m_dir.get()),
+			elev2int(m_elev.get())
+		);
+	}
+
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_dir.GetBin(bin);
+		m_elev.GetBin(bin);
+		m_weapon.GetBin(bin);
+		m_cnt.GetBin(bin);
+		m_exmode.GetBin(bin);
+	}
+
+	// option
+	auto& _wait()	{m_exmode	= EM_WAIT;	return *this;}
+	
+	ScaledInt<>					m_elev;
+	ScaledInt<>					m_dir;
+	ScaledInt<8, 1, 5, 1, 1>	m_weapon;
+	ScaledInt<8, 1, 16>			m_cnt;
+	ScaledInt<>					m_exmode;
+	
+	int m_target = 0;
+};
+
+static auto& fire(
+	int dir,
+	int elev,
+	int weapon,
+	int cnt = 1,
+	LastLocationArg
+){
+	LastLocation();
+	return *g_pCurField->m_tree.add(std::make_unique<CChipFireFixedDir>(
+		dir, elev, weapon, cnt
+	));
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// カウンタ方位射撃
+
+class CChipFireCounterDir : public CChip {
+public:
+	CChipFireCounterDir(
+		int dir,
+		int elev,
+		int weapon,
+		int cnt
+	){
+		m_Id			= CHIPID_FIRE_COUNTER;
+		m_dir			= dir;
+		m_elev			= elev;
+		m_weapon		= weapon;
+		m_cnt			= cnt;
+		m_exmode		= EM_THROUGH;
+	}
+
+	virtual ~CChipFireCounterDir(){}
+
+	virtual std::string GetLayoutText(void){
+		return std::format(
+			"{}射撃 #{}x{}\n方位={}\n仰角={}",
+			m_exmode_str[m_exmode.get()],
+			m_weapon.get(),
+			m_cnt.get(),
+			m_VarNameStr[m_dir.get()],
+			m_VarNameStr[m_elev.get()]
+		);
+	}
+
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_dir.GetBin(bin);
+		m_elev.GetBin(bin);
+		m_weapon.GetBin(bin);
+		m_cnt.GetBin(bin);
+		m_exmode.GetBin(bin);
+	}
+
+	// option
+	auto& _wait()	{m_exmode	= EM_WAIT;	return *this;}
+	
+	ScaledInt<>					m_elev;
+	ScaledInt<>					m_dir;
+	ScaledInt<8, 1, 5, 1, 1>	m_weapon;
+	ScaledInt<8, 1, 16>			m_cnt;
+	ScaledInt<>					m_exmode;
+	
+	int m_target = 0;
+};
+
+static auto& fire(
+	CChipVar& dir,
+	CChipVar& elev,
+	int weapon,
+	int cnt = 1,
+	LastLocationArg
+){
+	LastLocation();
+	return *g_pCurField->m_tree.add(std::make_unique<CChipFireCounterDir>(
+		dir.m_var, elev.m_var, weapon, cnt
+	));
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // option
 
@@ -2185,6 +2250,35 @@ static auto targetWeaponId(int weapon, LastLocationArg) {
 }
 
 //////////////////////////////////////////////////////////////////////////////
+// 射線クリア?
+
+class CChipIfLineClear : public CChipCond {
+public:
+	CChipIfLineClear(){
+		m_Id			= CHIPID_IS_LINE_CLEAR;
+	}
+
+	virtual ~CChipIfLineClear(){}
+
+	virtual std::string GetLayoutText(void){
+		return "射線クリア?";
+	}
+
+	virtual void GetBin(CChipBinary& bin){
+		CChipCond::GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChipCond::SetBin(bin);
+	}
+};
+
+static auto isLineClear(LastLocationArg) {
+	LastLocation();
+	return CChipTree(std::make_unique<CChipIfLineClear>(), g_pCurField->m_pool);
+}
+
+//////////////////////////////////////////////////////////////////////////////
 // ターゲット指定
 
 class CChipLockon : public CChip {
@@ -2247,6 +2341,45 @@ static auto& _lockonFriendly(LastLocationArg) {
 static auto& _lockonAll(LastLocationArg) {
 	LastLocation();
 	return *g_pCurField->m_tree.add(std::make_unique<CChipLockon>(CChip::ENEMY_FRIENDLY));
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// ターゲット指定
+
+class CChipLockonID : public CChip {
+public:
+	CChipLockonID(
+		int var
+	){
+		m_var		= var;
+		m_Id		= CHIPID_LOCKON_COUNTER;
+	}
+
+	virtual ~CChipLockonID(){}
+
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"Lock\nId={}", m_VarNameStr[m_var.get()]
+			);
+	}
+
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_var.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_var.SetBin(bin);
+	}
+	
+	ScaledInt<>		m_var;
+};
+
+static auto& lockonId(CChipVar& id, LastLocationArg){
+	LastLocation();
+	return *g_pCurField->m_tree.add(std::make_unique<CChipLockonID>(id.m_var));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2389,6 +2522,90 @@ static CChipTree isTargetFighting	(LastLocationArg){LastLocation(); return is_se
 static CChipTree isTargetSpecial	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::SPECIAL);}
 static CChipTree isTargetStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::STUN);}
 #endif
+
+//////////////////////////////////////////////////////////////////////////////
+// ターゲットに向けて自動旋回
+
+class CChipAutoTurn : public CChip {
+public:
+	#include "opt_coordinate.h"
+	
+	CChipAutoTurn(){
+		m_Id	= CHIPID_AUTO_TURN;
+		m_on	= 1;
+		InitCoordinate();
+	}
+
+	virtual ~CChipAutoTurn(){}
+
+	virtual std::string GetLayoutText(void){
+		return
+			std::format(
+				"自動旋回{}\n{}",
+				m_on.get() ? "ON" : "OFF",
+				GetCoordinateText()
+			);
+	}
+
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		GetCoordinateBin(bin);
+		m_on.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		SetCoordinateBin(bin);
+		m_on.SetBin(bin);
+	}
+
+	// option
+	auto& _off() { m_on = 0;		return *this; }
+
+	ScaledInt<>		m_on;
+};
+
+static auto& _autoTurn(
+	LastLocationArg
+){
+	LastLocation();
+	return *g_pCurField->m_tree.add(std::make_unique<CChipAutoTurn>());
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// 照準箇所
+
+class CChipLockonPart : public CChip {
+public:
+	CChipLockonPart(UINT param){
+		m_Id	= CHIPID_LOCKON_PARTS;
+		m_param	= param;
+	}
+
+	virtual ~CChipLockonPart(){}
+
+	virtual std::string GetLayoutText(void){
+		return m_param.get() == 0?
+			"照準箇所\nボティ" :
+			std::format("照準箇所\n武装{}", m_param.get());
+	}
+
+	virtual void GetBin(CChipBinary& bin){
+		CChip::GetBin(bin);
+		m_param.GetBin(bin);
+	}
+
+	virtual void SetBin(CChipBinary& bin){
+		CChip::SetBin(bin);
+		m_param.SetBin(bin);
+	}
+
+	ScaledInt<> m_param;
+};
+
+static void lockonPart(int param, LastLocationArg){LastLocation();
+	g_pCurField->m_tree.add(std::make_unique<CChipLockonPart>(param));
+}
 
 //////////////////////////////////////////////////////////////////////////////
 // カウンタに状態入力

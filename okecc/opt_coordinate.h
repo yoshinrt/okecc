@@ -12,7 +12,7 @@ void InitCoordinate(){
 	m_dir				= 0;
 }
 
-int int2dist(int val){
+static int int2dist(int val){
 	int sign = val < 0 ? -1 : 1;
 	int v = std::abs(val);
 
@@ -25,7 +25,7 @@ int int2dist(int val){
 	return 0;
 }
 
-int dist2int(int val){
+static int dist2int(int val){
 	int sign = val < 0 ? -1 : 1;
 	int v = std::abs(val);
 	if(v <= 50) return v * 2 * sign;
@@ -34,23 +34,23 @@ int dist2int(int val){
 	return (400 + (v - 90) * 20) * sign;
 }
 
-int int2angle(int val){
+static int int2angle(int val){
 	if (val < -180 || 180 < val) Error(std::format("Value {} is out of range [-180 - 180]", val));
 	if (val < 0) val += 360;
 	return val / 2;
 }
 
-int angle2int(int val){
+static int angle2int(int val){
 	val *= 2;
 	return val > 180 ? val - 360 : val;
 }
 
-int int2span(int val){
+static int int2span(int val){
 	if (val < 0 || 360 < val) Error(std::format("Value {} is out of range [0 - 360]", val));
 	return val / 2;
 }
 
-int span2int(int val){
+static int span2int(int val){
 	return val * 2;
 }
 

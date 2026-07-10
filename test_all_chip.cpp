@@ -1,11 +1,10 @@
 #include "okecc.h"
 
 void chip_main(){
-#if 0
 	nop;
-	//wait(1);
-	//wait(120);
-	//wait();
+	sleep(1);
+	sleep(120);
+	wait;
 	A = H;
 	H = A;
 	A += B;
@@ -123,7 +122,6 @@ void chip_main(){
 	
 	If(numLocked() != 1) nop; Endif
 	If(numLocked() == 3) nop; Endif
-#endif
 	
 	If(targetWeaponId(1) == W_NONE) nop; Endif
 	If(targetWeaponId(2) == W_ASSULT) nop; Endif
@@ -141,13 +139,24 @@ void chip_main(){
 	If(targetWeaponId(1) == W_MINE) nop; Endif
 	If(targetWeaponId(1) == W_FMINE) nop; Endif
 	
-#if 0
+	If(isLineClear()) nop; Endif
+	
 	stop;
 	
 	moveForward;
 	moveBackward;
 	moveLeft;
 	moveRight;
+	
+	moveForward.fast;
+	moveBackward.fast;
+	moveLeft.fast.wait;
+	moveRight.fast.wait;
+	
+	moveForward.turnRight;
+	moveBackward.turnLeft;
+	moveLeft.turnRight;
+	moveRight.turnLeft;
 	
 	turnLeft;
 	turnRight;
@@ -157,10 +166,10 @@ void chip_main(){
 	jumpLeft.wait;
 	jumpRight.wait;
 	
-	moveForward.fast;
-	moveBackward.fast;
-	moveLeft.fast.wait;
-	moveRight.fast.wait;
+	jumpForward.turnLeft;
+	jumpBackward.turnRight;
+	jumpLeft.turnLeft.wait;
+	jumpRight.turnRight.wait;
 	
 	turnLeft.fast;
 	turnRight.fast.wait;
@@ -181,6 +190,19 @@ void chip_main(){
 	fire(5, 1).snipe.wait;
 	
 	fire(1, 16).target;
+	fire(5, 1).target.snipe.wait;
+	
+	fire(1, 16).moveLeft;
+	fire(1, 16).moveRight;
+	fire(1, 16).moveForward;
+	fire(5, 1).moveBackward.wait;
+	fire(1, 16).jumpLeft;
+	fire(5, 1).jumpBackward.wait;
+	
+	fire(0, 90, 1, 16);
+	fire(180, -90, 5, 1).wait;
+	fire(A, H, 1, 16);
+	fire(H, A, 5, 1).wait;
 	
 	option(1);
 	option(5);
@@ -189,7 +211,17 @@ void chip_main(){
 	lockonFriendly.type(OKE_BIPED);
 	lockonAll;
 	
+	_autoTurn().h(0);
+	_autoTurn().span(0);
+	_autoTurn()._off();
+	
+	lockonPart(BODY);
+	lockonPart(1);
+	lockonPart(5);
+	
+	lockonId(A);
+	lockonId(H);
+	
 	setAltitude(20);
 	setAltitude(100);
-#endif
 }
