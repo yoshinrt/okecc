@@ -34,15 +34,15 @@ enum {
 
 enum {
 	W_NONE,
-	W_ASSULT,
+	W_ASSAULT,
 	W_BEAM,
 	W_PULSE,
 	W_NAPALM,
-	W_FLANK,
-	W_SHOOTGUN,
+	W_FLAK,
+	W_SHOTGUN,
 	W_CANNON,
 	W_RAILGUN,
-	W_GRANADE,
+	W_GRENADE,
 	W_BOMB,
 	W_ROCKET,
 	W_MISSILE,
@@ -2870,8 +2870,8 @@ static CChipVal _targetX			(LastLocationArg){LastLocation(); return CChipVal(CCh
 static CChipVal _targetY			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_Y);}
 static CChipVal _targetZ			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_POS_Z);}
 static CChipVal _targetDirection	(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DIRECTION);}
-static CChipVal _targetBodycode		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_BODYCODE);}
-static CChipVal _targetActcode		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_ACTCODE);}
+static CChipVal _targetBodyCode		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_BODYCODE);}
+static CChipVal _targetActCode		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_ACTCODE);}
 static CChipVal _targetDistance		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DISTANCE);}
 static CChipVal _targetDistanceXy	(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TGT_DISTANCE_XY);}
 
@@ -3313,9 +3313,9 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define numOke					_numOke()
 	#define numProjectile			_numProjectile()
 	#define stop					_stop()
-	#define targetActcode			_targetActcode()
+	#define targetActCode			_targetActCode()
 	#define targetAzimuth			_targetAzimuth()
-	#define targetBodycode			_targetBodycode()
+	#define targetBodyCode			_targetBodyCode()
 	#define targetDirection			_targetDirection()
 	#define targetDistance			_targetDistance()
 	#define targetDistanceXy		_targetDistanceXy()

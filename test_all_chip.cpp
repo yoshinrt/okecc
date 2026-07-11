@@ -42,8 +42,8 @@ void chip_main(){
 	A = targetY;
 	A = targetZ;
 	A = targetDirection;
-	A = targetBodycode;
-	A = targetActcode;
+	A = targetBodyCode;
+	A = targetActCode;
 	A = targetDistance;
 	A = targetDistanceXy;
 
@@ -124,15 +124,15 @@ void chip_main(){
 	If(numLocked == 3) nop; Endif
 	
 	If(targetWeaponId(1) == W_NONE) nop; Endif
-	If(targetWeaponId(2) == W_ASSULT) nop; Endif
+	If(targetWeaponId(2) == W_ASSAULT) nop; Endif
 	If(targetWeaponId(3) == W_BEAM) nop; Endif
 	If(targetWeaponId(4) == W_PULSE) nop; Endif
 	If(targetWeaponId(5) == W_NAPALM) nop; Endif
-	If(targetWeaponId(1) == W_FLANK) nop; Endif
-	If(targetWeaponId(1) == W_SHOOTGUN) nop; Endif
+	If(targetWeaponId(1) == W_FLAK) nop; Endif
+	If(targetWeaponId(1) == W_SHOTGUN) nop; Endif
 	If(targetWeaponId(1) == W_CANNON) nop; Endif
 	If(targetWeaponId(1) == W_RAILGUN) nop; Endif
-	If(targetWeaponId(1) == W_GRANADE) nop; Endif
+	If(targetWeaponId(1) == W_GRENADE) nop; Endif
 	If(targetWeaponId(1) == W_BOMB) nop; Endif
 	If(targetWeaponId(1) == W_ROCKET) nop; Endif
 	If(targetWeaponId(1) == W_MISSILE) nop; Endif
