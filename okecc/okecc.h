@@ -198,11 +198,10 @@ public:
 		OP_GE,
 		OP_LE,
 		OP_EQ,
-		OP_NE,
 	};
 
 	static inline const char *m_operator_str[] = {
-		"≧", "≦", "==", "≠"
+		"≧", "≦", "=="
 	};
 
 	enum {
@@ -771,7 +770,7 @@ CChipTree CChipCond::operator!=(int num) {
 
 CChipTree CChipCond::operator!() {
 	if (m_cond_eq) Error("Use '==' or '!=' for equality comparison");
-	return GetChipTree() >= 1;
+	return GetChipTree() < 1;
 }
 
 CChipTree CChipCond::GetChipTree(){
@@ -1417,10 +1416,10 @@ public:
 	}
 
 	// option
-	auto& _wait()	{m_exmode	= EM_WAIT;	return *this;}
-	auto& _wide()	{m_firemode	= FM_WIDE;	return *this;}
-	auto& _snipe()	{m_firemode	= FM_SNIPE;	return *this;}
-	auto& _target()	{m_mode	= TGT;		return *this;}
+	auto& _wait()			{m_exmode	= EM_WAIT;	return *this;}
+	auto& _wide()			{m_firemode	= FM_WIDE;	return *this;}
+	auto& _snipe()			{m_firemode	= FM_SNIPE;	return *this;}
+	auto& _target()			{						m_mode	= TGT;	return *this;}
 	auto& _moveLeft()		{m_movedir	= LEFT;		m_mode = MOVE; return *this;}
 	auto& _moveRight()		{m_movedir	= RIGHT;	m_mode = MOVE; return *this;}
 	auto& _moveForward()	{m_movedir	= FWD;		m_mode = MOVE; return *this;}
@@ -1705,6 +1704,7 @@ public:
 		m_type		= OKE_ALL;
 		m_enemy		= enemy;
 		m_Id		= CHIPID_IF_OKE_NUM;
+		m_num		= 1;
 		InitCoordinate();
 	}
 
@@ -1871,6 +1871,7 @@ public:
 	){
 		m_type		= P_ALL;
 		m_Id		= CHIPID_IF_DET_PROJECTILE;
+		m_num		= 1;
 		InitCoordinate();
 	}
 
@@ -2840,8 +2841,8 @@ CChipVar& CChipVar::operator--(){return *this -= 1.0;}
 //////////////////////////////////////////////////////////////////////////////
 // val 系
 
-//static CChipVal numEnemy			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::ENEMY);}
-//static CChipVal numFriendly		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::FRIENDLY);}
+static CChipVal _numAllEnemy		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::ENEMY);}
+static CChipVal _numAllFriendly		(LastLocationArg){LastLocation(); return CChipVal(CChipVal::FRIENDLY);}
 static CChipVal _time				(LastLocationArg){LastLocation(); return CChipVal(CChipVal::TIME);}
 static CChipVal _mathRand			(LastLocationArg){LastLocation(); return CChipVal(CChipVal::RAND);}
 
@@ -2992,14 +2993,14 @@ public:
 CChipTree CChipVar::operator>=(const CChipVar& op2) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_GE, op2.m_var), g_pCurField->m_pool);}
 CChipTree CChipVar::operator<=(const CChipVar& op2) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_LE, op2.m_var), g_pCurField->m_pool);}
 CChipTree CChipVar::operator==(const CChipVar& op2) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_EQ, op2.m_var), g_pCurField->m_pool);}
-CChipTree CChipVar::operator!=(const CChipVar& op2) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_NE, op2.m_var), g_pCurField->m_pool);}
+CChipTree CChipVar::operator!=(const CChipVar& op2) const {return !(*this == op2);}
 CChipTree CChipVar::operator> (const CChipVar& op2) const {return !(*this <= op2);}
 CChipTree CChipVar::operator< (const CChipVar& op2) const {return !(*this >= op2);}
 
 CChipTree CChipVar::operator>=(const double imm) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_GE, imm), g_pCurField->m_pool);}
 CChipTree CChipVar::operator<=(const double imm) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_LE, imm), g_pCurField->m_pool);}
 CChipTree CChipVar::operator==(const double imm) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_EQ, imm), g_pCurField->m_pool);}
-CChipTree CChipVar::operator!=(const double imm) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_NE, imm), g_pCurField->m_pool);}
+CChipTree CChipVar::operator!=(const double imm) const {return !(*this == imm);}
 CChipTree CChipVar::operator> (const double imm) const {return !(*this <= imm);}
 CChipTree CChipVar::operator< (const double imm) const {return !(*this >= imm);}
 #endif
@@ -3044,8 +3045,8 @@ static void if_statement(int cc, LastLocationArg, bool BlockStart = true){
 	g_pCurField->m_BlockStack.push_back(std::make_unique<CField::BiIf>(location, false_chip));
 }
 
-static void if_statement(const CChipVal&  chip, LastLocationArg){if_statement(chip >= 1, location);}
-static void if_statement(const CChipVar&  chip, LastLocationArg){if_statement(chip != 0, location);}
+static void if_statement(const CChipVal& chip, LastLocationArg){if_statement(chip >= 1, location);}
+static void if_statement(const CChipVar& chip, LastLocationArg){if_statement(chip != 0, location);}
 
 static void else_statement(
 	LastLocationArg
@@ -3256,6 +3257,7 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define heat					_heat()
 	#define isLineClear				_isLineClear()
 	#define isOutsideArea			_isOutsideArea()
+	#define isPositionFromTarget	_isPositionFromTarget()
 	#define isSelfFighting			_isSelfFighting()
 	#define isSelfFiring			_isSelfFiring()
 	#define isSelfJumping			_isSelfJumping()
@@ -3268,12 +3270,11 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define isTargetFiring			_isTargetFiring()
 	#define isTargetJumping			_isTargetJumping()
 	#define isTargetMoving			_isTargetMoving()
+	#define isTargetPosition		_isTargetPosition()
 	#define isTargetSpecial			_isTargetSpecial()
 	#define isTargetStumbling		_isTargetStumbling()
 	#define isTargetTurning			_isTargetTurning()
 	#define isTargetWaiting			_isTargetWaiting()
-	#define isTargetPosition		_isTargetPosition()
-	#define isPositionFromTarget	_isPositionFromTarget()
 	#define isUnlock				_isUnlock()
 	#define jumpBackward			_jumpBackward()
 	#define jumpForward				_jumpForward()
@@ -3292,6 +3293,8 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define myY						_myY()
 	#define myZ						_myZ()
 	#define nop						_nop()
+	#define numAllEnemy				_numAllEnemy()
+	#define numAllFriendly			_numAllFriendly()
 	#define numEnemy				_numEnemy()
 	#define numFriendly				_numFriendly()
 	#define numLocked				_numLocked()

@@ -27,8 +27,8 @@ void chip_main(){
 	A = chReceive(8);
 	H = chReceive(1);
 	
-	//A = numEnemy;
-	//H = numFriendly;
+	A = numAllEnemy;
+	H = numAllFriendly;
 	A = time;
 	A = mathRand;
 	A = myX;
