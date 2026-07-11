@@ -758,6 +758,11 @@ CChipTree CChipCond::operator!=(int num) {
 	return GetChipTree() != num;
 }
 
+CChipTree CChipCond::operator!() {
+	if (m_cond_eq) Error("Use '==' or '!=' for equality comparison");
+	return GetChipTree() >= 1;
+}
+
 CChipTree CChipCond::GetChipTree(){
 	return CChipTree(this->m_ChipId, g_pCurField->m_pool);
 }
@@ -3053,7 +3058,7 @@ static void else_statement(
 	g_pCurField->m_BlockStack.push_back(std::make_unique<CField::BiElse>(location, idx));
 }
 
-static void elseif_statement(CChipTree &&cc, LastLocationArg){
+static void elseif_statement(const CChipTree& cc, LastLocationArg){
 	LastLocation();
 	else_statement(location);
 	if_statement(cc, location, false);
