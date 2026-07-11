@@ -51,6 +51,15 @@ enum {
 };
 
 enum {
+	BC_UNLOCK,
+	BC_BIPED	= 33,
+	BC_QUADRUPED,
+	BC_HOVER,
+	BC_VEHICLE,
+	BC_FLIGHT,
+};
+
+enum {
 	BODY
 };
 
