@@ -1099,7 +1099,7 @@ int main(void){
 	int RunResult = 0;
 	for(int i = 0; i < 3; ++i){
 		//g_pField[i]->m_pool.dump();
-		g_pField[i]->FinalizeCompile();
+		if (g_pField[i]->FinalizeCompile() < 0) return -1;
 
 		sa.emplace_back(std::make_unique<CarnageSA>(g_pField[i]->m_pool, g_pField[i]->m_name));
 		sa_ptrs.push_back(sa[i].get());
@@ -1112,8 +1112,8 @@ int main(void){
 
 	OutputSvg("okecc.svg", sa_ptrs);
 	if(RunResult){
-		std::cerr << "Error: Some chips are not connected properly." << std::endl;
-		return 0;
+		std::cout << "Error: Some chips are not connected properly." << std::endl;
+		return -1;
 	}
 
 	OkeSoft soft(g_pField[0]->m_pool.m_width);
@@ -1146,24 +1146,24 @@ int main(void){
 	std::fstream file(filepath, std::ios::in | std::ios::out | std::ios::binary);
 
 	if (!file) {
-		std::cerr << "Can't open file: " << filepath << "\n";
-		return false;
+		std::cout << "Can't open file: " << filepath << "\n";
+		return -1;
 	}
 
 	// 1. ファイルサイズを取得
 	file.seekg(0, std::ios::end);
 	std::streamsize size = file.tellg();
 	if (size <= 0) {
-		std::cerr << "File is empty or size cannot be determined.	\n";
-		return false;
+		std::cout << "File is empty or size cannot be determined.	\n";
+		return -1;
 	}
 
 	// 2. バッファに全データを読み込む
 	file.seekg(0, std::ios::beg);
 	std::vector<uint8_t> buffer(static_cast<size_t>(size));
 	if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
-		std::cerr << "Failed to read file data.\n";
-		return false;
+		std::cout << "Failed to read file data.\n";
+		return -1;
 	}
 
 	// 3. データの書き換え
@@ -1174,8 +1174,8 @@ int main(void){
 
 	// 5. 書き換えたバッファを上書き
 	if (!file.write(reinterpret_cast<const char*>(buffer.data()), size)) {
-		std::cerr << "Failed to write updated data to file.\n";
-		return false;
+		std::cout << "Failed to write updated data to file.\n";
+		return -1;
 	}
 
 	std::cout << "Successfully updated " << filepath << ".\n";

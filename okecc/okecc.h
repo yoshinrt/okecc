@@ -631,7 +631,7 @@ public:
 
 	CField(const char *name, UINT width, UINT height) : m_name(name), m_pool(width, height), m_tree(m_pool){}
 
-	void FinalizeCompile(){
+	int FinalizeCompile(){
 		m_tree.AddToG(IDX_EXIT);
 		m_pool.m_start = m_tree.m_start;
 		//m_pool.dump();
@@ -643,7 +643,19 @@ public:
 			// Goto 最適化
 			m_pool.CleanupGoto();
 		}
-		printf("%s: Number of chip(s): %d\n", m_name, (UINT)m_pool.m_list.size());
+		printf("%s: Number of chip(s): %d\n", m_name, (int)m_pool.m_list.size());
+
+		// field 最大チップ数を超えていたらエラー
+		if(m_pool.m_list.size() > CField::m_pool.m_width * CField::m_pool.m_height){
+			printf("Number of chip(s) exceeds the maximum limit: %d > %d\n",
+				(int)m_pool.m_list.size(),
+				CField::m_pool.m_width * CField::m_pool.m_height
+			);
+
+			return -1;
+		}
+
+		return (int)m_pool.m_list.size();
 	}
 
 	// ブロック制御
