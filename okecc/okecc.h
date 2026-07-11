@@ -870,6 +870,8 @@ public:
 	CChipTree operator< (int num) const;
 	CChipTree operator>=(int num) const;
 	CChipTree operator> (int num) const;
+	CChipTree operator==(int num) const;
+	CChipTree operator!=(int num) const;
 
 	UINT m_type;
 	int m_param;
@@ -2188,11 +2190,6 @@ public:
 	ScaledInt<8, 0, 37, 1, 1>	m_bodycode;
 };
 
-static auto _bodyCode(LastLocationArg) {
-	LastLocation();
-	return CChipTree(std::make_unique<CChipIfBodyCode>(), g_pCurField->m_pool);
-}
-
 //////////////////////////////////////////////////////////////////////////////
 // 被ロック数
 
@@ -2932,6 +2929,8 @@ auto& CChipVal::GetCChipCond(void) const {
 
 	if(m_type == CChipVal::TIME){
 		pchip = std::make_unique<CChipIfTime>(CChipIfTime::START);
+	}else if(m_type == CChipVal::TGT_BODYCODE){
+		pchip = std::make_unique<CChipIfBodyCode>();
 	}else{
 		Error("Invalid use of compare operator");
 	}
@@ -2942,6 +2941,8 @@ CChipTree CChipVal::operator<=(int num) const {return GetCChipCond() <= num;}
 CChipTree CChipVal::operator< (int num) const {return GetCChipCond() <  num;}
 CChipTree CChipVal::operator>=(int num) const {return GetCChipCond() >= num;}
 CChipTree CChipVal::operator> (int num) const {return GetCChipCond() >  num;}
+CChipTree CChipVal::operator==(int num) const {return GetCChipCond() == num;}
+CChipTree CChipVal::operator!=(int num) const {return GetCChipCond() != num;}
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -3270,7 +3271,6 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define Return		okecc_exit()
 
 	#define autoTurn				_autoTurn()
-	#define bodyCode				_bodyCode()
 	#define energy					_energy()
 	#define fight					_fight()
 	#define fightHigh				_fightHigh()
@@ -3297,7 +3297,7 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define isTargetSpecial			_isTargetSpecial()
 	#define isTargetStumbling		_isTargetStumbling()
 	#define isTargetTurning			_isTargetTurning()
-	#define isTargetWaiting			_isTargetWaiting()
+	#define isTargetStopped			_isTargetWaiting()
 	#define isUnlock				_isUnlock()
 	#define jumpBackward			_jumpBackward()
 	#define jumpForward				_jumpForward()
