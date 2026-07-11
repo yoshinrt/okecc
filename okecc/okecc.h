@@ -60,6 +60,8 @@ static constexpr UINT IDX_NONE = 0xFFFFFFFF;
 static constexpr UINT IDX_EXIT = 0xFFFFFFFE;
 constexpr int DEFAULT_INT = 0x7FFFFFFF;
 
+extern void setCpuSize(int size);
+
 //////////////////////////////////////////////////////////////////////////////
 
 inline std::source_location g_LastLocation = std::source_location::current();
@@ -2177,7 +2179,7 @@ public:
 	ScaledInt<8, 0, 37, 1, 1>	m_bodycode;
 };
 
-static auto _bodycode(LastLocationArg) {
+static auto _bodyCode(LastLocationArg) {
 	LastLocation();
 	return CChipTree(std::make_unique<CChipIfBodyCode>(), g_pCurField->m_pool);
 }
@@ -3259,7 +3261,7 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define Return		okecc_exit()
 
 	#define autoTurn				_autoTurn()
-	#define bodycode				_bodycode()
+	#define bodyCode				_bodyCode()
 	#define energy					_energy()
 	#define fight					_fight()
 	#define fightHigh				_fightHigh()

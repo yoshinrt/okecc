@@ -1080,11 +1080,29 @@ public:
 };
 
 //////////////////////////////////////////////////////////////////////////////
+// CPU サイズ
+
+void setCpuSize(int size){
+	if(g_pCurField != g_pField[0].get()){
+		std::cout << "Error: CPU size can only be set in the MAIN field." << std::endl;
+		exit(1);
+	}
+
+	if(size < 4 || size > 15){
+		std::cout << "Error: CPU size must be between 4 and 15." << std::endl;
+		exit(1);
+	}
+
+	g_pCurField->m_pool.m_width = size;
+	g_pCurField->m_pool.m_height = size;
+}
+
+//////////////////////////////////////////////////////////////////////////////
 
 void chip_main(void);
 
 int main(void){
-	g_pField.push_back(std::make_unique<CField>("MAIN", 10, 10));
+	g_pField.push_back(std::make_unique<CField>("MAIN", 15, 15));
 	g_pField.push_back(std::make_unique<CField>("SUB1", 7, 7));
 	g_pField.push_back(std::make_unique<CField>("SUB2", 7, 7));
 	g_pCurField = g_pField[0].get();
@@ -1099,7 +1117,7 @@ int main(void){
 	int RunResult = 0;
 	for(int i = 0; i < 3; ++i){
 		//g_pField[i]->m_pool.dump();
-		if (g_pField[i]->FinalizeCompile() < 0) return -1;
+		if (g_pField[i]->FinalizeCompile() < 0) return 1;
 
 		sa.emplace_back(std::make_unique<CarnageSA>(g_pField[i]->m_pool, g_pField[i]->m_name));
 		sa_ptrs.push_back(sa[i].get());
@@ -1113,7 +1131,7 @@ int main(void){
 	OutputSvg("okecc.svg", sa_ptrs);
 	if(RunResult){
 		std::cout << "Error: Some chips are not connected properly." << std::endl;
-		return -1;
+		return 1;
 	}
 
 	OkeSoft soft(g_pField[0]->m_pool.m_width);
@@ -1147,7 +1165,7 @@ int main(void){
 
 	if (!file) {
 		std::cout << "Can't open file: " << filepath << "\n";
-		return -1;
+		return 1;
 	}
 
 	// 1. ファイルサイズを取得
@@ -1155,7 +1173,7 @@ int main(void){
 	std::streamsize size = file.tellg();
 	if (size <= 0) {
 		std::cout << "File is empty or size cannot be determined.	\n";
-		return -1;
+		return 1;
 	}
 
 	// 2. バッファに全データを読み込む
@@ -1163,11 +1181,18 @@ int main(void){
 	std::vector<uint8_t> buffer(static_cast<size_t>(size));
 	if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
 		std::cout << "Failed to read file data.\n";
-		return -1;
+		return 1;
 	}
 
 	// 3. データの書き換え
 	memcpy(buffer.data() + 0xFE6, &soft, sizeof(soft));
+
+	// CPU サイズの書き換え
+	int cpu_size = g_pField[0]->m_pool.m_width;
+	buffer[0x2BE] =
+		cpu_size == 4 ? 0 :
+		cpu_size <= 6 ? 1 :
+		cpu_size <= 10 ? 3 : 5;
 
 	// 4. 書き込み位置をファイルの先頭に戻す
 	file.seekp(0, std::ios::beg);
@@ -1175,7 +1200,7 @@ int main(void){
 	// 5. 書き換えたバッファを上書き
 	if (!file.write(reinterpret_cast<const char*>(buffer.data()), size)) {
 		std::cout << "Failed to write updated data to file.\n";
-		return -1;
+		return 1;
 	}
 
 	std::cout << "Successfully updated " << filepath << ".\n";

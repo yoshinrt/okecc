@@ -117,8 +117,8 @@ void chip_main(){
 	If(time <= 300) nop; Endif
 	If(timeRemained <= 300) nop; Endif
 	
-	If(bodycode == 0) nop; Endif
-	If(bodycode != 37) nop; Endif
+	If(bodyCode == 0) nop; Endif
+	If(bodyCode != 37) nop; Endif
 	
 	If(numLocked != 1) nop; Endif
 	If(numLocked == 3) nop; Endif
