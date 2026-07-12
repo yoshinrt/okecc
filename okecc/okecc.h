@@ -2546,6 +2546,7 @@ static CChipTree _isSelfTurning		(LastLocationArg){LastLocation(); return is_sel
 static CChipTree _isSelfJumping		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::JUMP);}
 static CChipTree _isSelfFiring		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIRE);}
 static CChipTree _isSelfFighting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIGHT);}
+static CChipTree _isSelfGuarding	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::DEFENCE);}
 static CChipTree _isSelfSpecial		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::SPECIAL);}
 static CChipTree _isSelfStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::STUN);}
 static CChipTree _isUnlock			(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::UNLOCK);}
@@ -2556,6 +2557,7 @@ static CChipTree _isTargetTurning	(LastLocationArg){LastLocation(); return is_se
 static CChipTree _isTargetJumping	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::JUMP);}
 static CChipTree _isTargetFiring	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIRE);}
 static CChipTree _isTargetFighting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIGHT);}
+static CChipTree _isTargetGuarding	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::DEFENCE);}
 static CChipTree _isTargetSpecial	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::SPECIAL);}
 static CChipTree _isTargetStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::STUN);}
 #endif
@@ -3253,7 +3255,7 @@ static bool start_sub_internal(int num, LastLocationArg){
 	return true;
 }
 
-#define start_sub(num) if(!start_sub_internal(num)) return; CFieldSwitch FieldInfo(num)
+#define startSub(num) if(!start_sub_internal(num)) return; CFieldSwitch FieldInfo(num)
 
 //////////////////////////////////////////////////////////////////////////////
 // C との命名被り回避
