@@ -2289,13 +2289,13 @@ static auto targetWeaponId(int weapon, LastLocationArg) {
 //////////////////////////////////////////////////////////////////////////////
 // 射線クリア?
 
-class CChipIfLineClear : public CChipCond {
+class CChipIfLineBlocked : public CChipCond {
 public:
-	CChipIfLineClear(){
+	CChipIfLineBlocked(){
 		m_Id			= CHIPID_IS_LINE_CLEAR;
 	}
 
-	virtual ~CChipIfLineClear(){}
+	virtual ~CChipIfLineBlocked(){}
 
 	virtual std::string GetLayoutText(void){
 		return "射線クリア?";
@@ -2310,9 +2310,9 @@ public:
 	}
 };
 
-static auto _isLineClear(LastLocationArg) {
+static auto _isLineBlocked(LastLocationArg) {
 	LastLocation();
-	return CChipTree(std::make_unique<CChipIfLineClear>(), g_pCurField->m_pool);
+	return CChipTree(std::make_unique<CChipIfLineBlocked>(), g_pCurField->m_pool);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -3280,7 +3280,7 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define fightLow				_fightLow()
 	#define health					_health()
 	#define heat					_heat()
-	#define isLineClear				_isLineClear()
+	#define isLineBlocked			_isLineBlocked()
 	#define isOutsideArea			_isOutsideArea()
 	#define isPositionFromTarget	_isPositionFromTarget()
 	#define isSelfFighting			_isSelfFighting()
