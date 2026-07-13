@@ -1,10 +1,103 @@
 #include "okecc.h"
 
+void test_sub1(){
+	startSub(1);
+	
+	stop;
+	
+	moveForward;
+	moveBackward;
+	moveLeft;
+	moveRight;
+	
+	moveForward.fast;
+	moveBackward.fast;
+	moveLeft.fast.wait;
+	moveRight.fast.wait;
+	
+	moveForward.turnRight;
+	moveBackward.turnLeft;
+	moveLeft.turnRight;
+	moveRight.turnLeft;
+	
+	turnLeft;
+	turnRight;
+	
+	jumpForward;
+	jumpBackward;
+	jumpLeft.wait;
+	jumpRight.wait;
+	
+	jumpForward.turnLeft;
+	jumpBackward.turnRight;
+	jumpLeft.turnLeft.wait;
+	jumpRight.turnRight.wait;
+	
+	turnLeft.fast;
+	turnRight.fast.wait;
+	
+	fightLow;
+	fightHigh;
+	fightLong;
+	fight.wait;
+	
+	guard(5);
+	crouch(60).wait;
+	
+	special(1);
+	special(3).wait;
+}
+
+void test_sub2(){
+	startSub(2);
+	
+	fire(1, 16).h(0);
+	fire(5, 1).h(0).wide;
+	fire(5, 1).snipe.wait;
+	
+	fire(1, 16).target;
+	fire(5, 1).target.snipe.wait;
+	
+	fire(1, 16).moveLeft;
+	fire(1, 16).moveRight;
+	fire(1, 16).moveForward;
+	fire(5, 1).moveBackward.wait;
+	fire(1, 16).jumpLeft;
+	fire(5, 1).jumpBackward.wait;
+	
+	fire(0, 90, 1, 16);
+	fire(180, -90, 5, 1).wait;
+	fire(A, H, 1, 16);
+	fire(H, A, 5, 1).wait;
+	
+	option(1);
+	option(5);
+	
+	lockon;
+	lockonFriendly.type(OKE_BIPED);
+	lockonAll;
+	
+	autoTurn.h(0);
+	autoTurn.span(0);
+	autoTurn.off;
+	
+	lockonPart(BODY);
+	lockonPart(1);
+	lockonPart(5);
+	
+	lockonId(A);
+	lockonId(H);
+	
+	setAltitude(20);
+	setAltitude(100);
+}
+
 void chip_main(){
 	nop;
 	sleep(1);
 	sleep(120);
 	wait;
+	
 	A = H;
 	H = A;
 	A += B;
@@ -47,10 +140,8 @@ void chip_main(){
 	A = targetDistance;
 	A = targetDistanceXy;
 
-	If (numAmmo(1) >= 1) nop; Endif
-	If (numAmmo(5) >= 990) nop; Endif
-	If (numOption(1) <= 1) nop; Endif
-	If (numOption(4) <= 1) nop; Endif
+	If (numAmmo(1) >= 1 && numAmmo(5) > 990) nop; Endif
+	If (numOption(1) <= 1 || numOption(4) < 1) nop; Endif
 
 	If(isBarrierOver(1).h(0)) nop; Endif
 	If(isBarrierOver(1).w(0)) nop; Endif
@@ -112,13 +203,14 @@ void chip_main(){
 	If(C <= D) nop; Endif
 	If(E == F) nop; Endif
 	If(G == -99999.9) nop; Endif
-	If(H == 99999) nop; Endif
+	If(H != 99999) nop; Endif
+	
 	If(time >= 1) nop; Endif
 	If(time <= 300) nop; Endif
 	If(timeRemained <= 300) nop; Endif
 	
-	If(bodyCode == 0) nop; Endif
-	If(bodyCode != 37) nop; Endif
+	If(targetBodyCode == BC_UNLOCK) nop; Endif
+	If(targetBodyCode != BC_FLIGHT) nop; Endif
 	
 	If(numLocked != 1) nop; Endif
 	If(numLocked == 3) nop; Endif
@@ -139,89 +231,8 @@ void chip_main(){
 	If(targetWeaponId(1) == W_MINE) nop; Endif
 	If(targetWeaponId(1) == W_FMINE) nop; Endif
 	
-	If(isLineClear) nop; Endif
+	If(isLineBlocked) nop; Endif
 	
-	stop;
-	
-	moveForward;
-	moveBackward;
-	moveLeft;
-	moveRight;
-	
-	moveForward.fast;
-	moveBackward.fast;
-	moveLeft.fast.wait;
-	moveRight.fast.wait;
-	
-	moveForward.turnRight;
-	moveBackward.turnLeft;
-	moveLeft.turnRight;
-	moveRight.turnLeft;
-	
-	turnLeft;
-	turnRight;
-	
-	jumpForward;
-	jumpBackward;
-	jumpLeft.wait;
-	jumpRight.wait;
-	
-	jumpForward.turnLeft;
-	jumpBackward.turnRight;
-	jumpLeft.turnLeft.wait;
-	jumpRight.turnRight.wait;
-	
-	turnLeft.fast;
-	turnRight.fast.wait;
-	
-	fightLow;
-	fightHigh;
-	fightLong;
-	fight.wait;
-	
-	guard(5);
-	crouch(60).wait;
-	
-	special(1);
-	special(3).wait;
-	
-	fire(1, 16).h(0);
-	fire(5, 1).h(0).wide;
-	fire(5, 1).snipe.wait;
-	
-	fire(1, 16).target;
-	fire(5, 1).target.snipe.wait;
-	
-	fire(1, 16).moveLeft;
-	fire(1, 16).moveRight;
-	fire(1, 16).moveForward;
-	fire(5, 1).moveBackward.wait;
-	fire(1, 16).jumpLeft;
-	fire(5, 1).jumpBackward.wait;
-	
-	fire(0, 90, 1, 16);
-	fire(180, -90, 5, 1).wait;
-	fire(A, H, 1, 16);
-	fire(H, A, 5, 1).wait;
-	
-	option(1);
-	option(5);
-	
-	lockon;
-	lockonFriendly.type(OKE_BIPED);
-	lockonAll;
-	
-	autoTurn.h(0);
-	autoTurn.span(0);
-	autoTurn.off;
-	
-	lockonPart(BODY);
-	lockonPart(1);
-	lockonPart(5);
-	
-	lockonId(A);
-	lockonId(H);
-	
-	setAltitude(20);
-	setAltitude(100);
+	test_sub1();
+	test_sub2();
 }
