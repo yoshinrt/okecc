@@ -210,7 +210,7 @@ void chip_main(){
 	If(timeRemained <= 300) nop; Endif
 	
 	If(targetBodyCode == BC_UNLOCK) nop; Endif
-	If(targetBodyCode != BC_FLIGHT) nop; Endif
+	If(targetBodyCode != OKE_FLIGHT) nop; Endif
 	
 	If(numLocked != 1) nop; Endif
 	If(numLocked == 3) nop; Endif

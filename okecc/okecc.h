@@ -9,15 +9,6 @@
 #include <cmath>
 
 enum {
-	OKE_BIPED,
-	OKE_QUADRUPED,
-	OKE_HOVER,
-	OKE_VEHICLE,
-	OKE_FLIGHT,
-	OKE_ALL,
-};
-
-enum {
 	P_BULLET,
 	P_BEAM,
 	P_PULSE,
@@ -52,11 +43,12 @@ enum {
 
 enum {
 	BC_UNLOCK,
-	BC_BIPED	= 33,
-	BC_QUADRUPED,
-	BC_HOVER,
-	BC_VEHICLE,
-	BC_FLIGHT,
+	OKE_BIPED		= 33,
+	OKE_QUADRUPED,
+	OKE_HOVER,
+	OKE_VEHICLE,
+	OKE_FLIGHT,
+	OKE_ALL,
 };
 
 enum {
@@ -1726,7 +1718,7 @@ public:
 	CChipOkeNum(
 		int enemy
 	){
-		m_type		= OKE_ALL;
+		m_type		= OKE_ALL - OKE_BIPED;
 		m_enemy		= enemy;
 		m_Id		= CHIPID_IF_OKE_NUM;
 		m_num		= 1;
@@ -1758,7 +1750,12 @@ public:
 	}
 
 	// option
-	auto& type(int param)	{m_type = param;	return *this;}
+	auto& type(int param){
+		if(param > (OKE_ALL - OKE_BIPED)) param -= OKE_BIPED;
+		
+		m_type = param;
+		return *this;
+	}
 	
 	ScaledInt<4>		m_enemy;
 	ScaledInt<4>		m_type;
@@ -2325,7 +2322,7 @@ public:
 	CChipLockon(
 		int enemy
 	){
-		m_type		= OKE_ALL;
+		m_type		= OKE_ALL - OKE_BIPED;
 		m_enemy		= enemy;
 		m_Id		= CHIPID_LOCKON;
 		
@@ -2359,7 +2356,12 @@ public:
 	}
 	
 	// option
-	auto& type(int param)	{m_type = param;	return *this;}
+	auto& type(int param){
+		if(param > (OKE_ALL - OKE_BIPED)) param -= OKE_BIPED;
+		
+		m_type = param;
+		return *this;
+	}
 	
 	ScaledInt<>		m_enemy;
 	ScaledInt<>		m_type;
