@@ -187,7 +187,7 @@ public:
 		CHIPID_AUTO_TURN			= 0xE7,
 		CHIPID_GOTO					= 0xFF,
 	};
-	
+
 	static inline const char *m_OkeTypeStr[] = {
 		"二脚",
 		"四脚",
@@ -270,13 +270,13 @@ public:
 		EM_WAIT,
 		EM_THROUGH,
 	};
-	
+
 	enum {
 		FM_NORMAL,
 		FM_WIDE,
 		FM_SNIPE,
 	};
-	
+
 	CChip(){
 		m_Id		= CHIPID_NULL;
 		m_RawG		= 0;
@@ -338,7 +338,7 @@ public:
 	operator CChipTree();
 
 	CChipTree GetChipTree();
-	
+
 	bool m_cond_eq = false;
 };
 
@@ -609,11 +609,11 @@ public:
 		m_pool[m_start]->num_set(num);
 		return *this;
 	}
-	
+
 	CChipTree operator!=(int num) {
 		return !(*this == num);
 	}
-	
+
 	CChipTree operator!(void) const {
 		auto cc = *this;
 		cc.m_LastG = m_LastR;
@@ -631,6 +631,8 @@ public:
 	CChipPool	m_pool;
 	CChipTree	m_tree;
 	const char	*m_name;
+
+	UINT m_uISubRetIdx = IDX_EXIT;
 
 	CField(const char *name, UINT width, UINT height) : m_name(name), m_pool(width, height), m_tree(m_pool){}
 
@@ -1026,7 +1028,7 @@ public:
 		FAST,
 		TURN,
 	};
-	
+
 	CChipMove(int param){
 		m_Id		= CHIPID_MOVE;
 		m_param		= param;
@@ -1037,18 +1039,18 @@ public:
 
 	virtual std::string GetLayoutText(void){
 		std::string s = std::format("{}{}{}移動", m_exmode_str[m_exmode.get()], m_fastmode_str[m_mode], m_move_str[m_param.get()]);
-		
+
 		if(m_mode == TURN){
 			s += std::format("\n+{}旋回", m_move_str[m_turn.get()]);
 		}
-		
+
 		return s;
 	}
 
 	virtual void GetBin(CChipBinary& bin){
 		if(     m_mode == FAST) m_Id = CHIPID_FAST_MOVE;
 		else if(m_mode == TURN) m_Id = CHIPID_MOVE_TURN;
-		
+
 		CChip::GetBin(bin);
 		m_param.GetBin(bin);
 		if(m_mode == TURN) m_turn.GetBin(bin);
@@ -1133,7 +1135,7 @@ public:
 
 	virtual std::string GetLayoutText(void) {
 		std::string s = std::format("{}{}Jmp", m_exmode_str[m_exmode.get()], m_move_str[m_param.get()]);
-		
+
 		if(m_with_turn){
 			s += std::format("\n+{}旋回", m_move_str[m_turn.get()]);
 		}
@@ -1156,7 +1158,7 @@ public:
 	ScaledInt<> m_param;
 	ScaledInt<>	m_turn;
 	ScaledInt<> m_exmode;
-	
+
 	bool m_with_turn = false;
 };
 
@@ -1359,14 +1361,14 @@ g_pCurField->m_tree.AddToTree(std::make_unique<CChipAlt>(param));
 class CChipFire : public CChip {
 public:
 	#include "opt_coordinate.h"
-	
+
 	enum {
 		NORMAL,
 		TGT,
 		MOVE,
 		JUMP
 	};
-	
+
 	CChipFire(
 		int weapon,
 		int cnt
@@ -1376,7 +1378,7 @@ public:
 		m_cnt			= cnt;
 		m_firemode		= FM_NORMAL;
 		m_exmode		= EM_THROUGH;
-		
+
 		InitCoordinate();
 	}
 
@@ -1390,16 +1392,16 @@ public:
 				m_weapon.get(),
 				m_cnt.get()
 			);
-			
+
 			if(m_mode == MOVE){
 				s += std::format("\n+{}移動", m_move_str[m_movedir.get()]);
 			}else if(m_mode == JUMP){
 				s += std::format("\n+{}Jmp", m_move_str[m_movedir.get()]);
 			}
-			
+
 			return s;
 		}
-		
+
 		return std::format(
 			"{}射撃 w{}x{}\n{}",
 			m_exmode_str[m_exmode.get()],
@@ -1413,18 +1415,18 @@ public:
 		if(     m_mode == TGT ) m_Id = CHIPID_FIRE_TGT;
 		else if(m_mode == MOVE) m_Id = CHIPID_FIRE_MOVE;
 		else if(m_mode == JUMP) m_Id = CHIPID_FIRE_JMP;
-		
+
 		CChip::GetBin(bin);
-		
+
 		if(m_mode == NORMAL) GetCoordinateBin(bin);
-		
+
 		if(m_mode >= MOVE){
 			m_movedir.GetBin(bin);
 		}
-		
+
 		m_weapon.GetBin(bin);	if(m_mode != NORMAL) bin.m_pos += 5;
 		m_cnt.GetBin(bin);		if(m_mode != NORMAL) bin.m_pos += 3;
-		
+
 		if(m_mode <= TGT){
 			m_firemode.GetBin(bin);
 			if(m_mode == TGT) bin.m_pos += 4;
@@ -1445,13 +1447,13 @@ public:
 	auto& _jumpRight()		{m_movedir	= RIGHT;	m_mode = JUMP; return *this;}
 	auto& _jumpForward()	{m_movedir	= FWD;		m_mode = JUMP; return *this;}
 	auto& _jumpBackward()	{m_movedir	= BACK; 	m_mode = JUMP; return *this;}
-	
+
 	ScaledInt<3, 1, 5, 1, 1>	m_weapon;
 	ScaledInt<5, 1, 16>			m_cnt;
 	ScaledInt<4>				m_firemode;
 	ScaledInt<4>				m_exmode;
 	ScaledInt<>					m_movedir;
-	
+
 	int m_mode = NORMAL;
 };
 
@@ -1519,13 +1521,13 @@ public:
 
 	// option
 	auto& _wait()	{m_exmode	= EM_WAIT;	return *this;}
-	
+
 	ScaledInt<>					m_elev;
 	ScaledInt<>					m_dir;
 	ScaledInt<8, 1, 5, 1, 1>	m_weapon;
 	ScaledInt<8, 1, 16>			m_cnt;
 	ScaledInt<>					m_exmode;
-	
+
 	int m_target = 0;
 };
 
@@ -1585,13 +1587,13 @@ public:
 
 	// option
 	auto& _wait()	{m_exmode	= EM_WAIT;	return *this;}
-	
+
 	ScaledInt<>					m_elev;
 	ScaledInt<>					m_dir;
 	ScaledInt<8, 1, 5, 1, 1>	m_weapon;
 	ScaledInt<8, 1, 16>			m_cnt;
 	ScaledInt<>					m_exmode;
-	
+
 	int m_target = 0;
 };
 
@@ -1714,7 +1716,7 @@ static CChipTree numOption(
 class CChipOkeNum : public CChipCond {
 public:
 	#include "opt_coordinate.h"
-	
+
 	CChipOkeNum(
 		int enemy
 	){
@@ -1752,11 +1754,11 @@ public:
 	// option
 	auto& type(int param){
 		if(param > (OKE_ALL - OKE_BIPED)) param -= OKE_BIPED;
-		
+
 		m_type = param;
 		return *this;
 	}
-	
+
 	ScaledInt<4>		m_enemy;
 	ScaledInt<4>		m_type;
 	ScaledInt<4, 1, 31>	m_num;
@@ -1779,7 +1781,7 @@ static auto& _numOke		(LastLocationArg){LastLocation(); return numOke(CChip::ENE
 class CChipOutsideArea : public CChipCond {
 public:
 	#include "opt_coordinate.h"
-	
+
 	CChipOutsideArea(){
 		m_Id		= CHIPID_IF_OUTSIDE_AREA;
 		InitCoordinate();
@@ -1819,7 +1821,7 @@ static auto& _isOutsideArea(
 class CChipBarrier : public CChipCond {
 public:
 	#include "opt_coordinate.h"
-	
+
 	CChipBarrier(
 		int num,
 		int opr		= OP_GE
@@ -1884,7 +1886,7 @@ static auto& isBarrierUnder(
 class CChipProjectileNum : public CChipCond {
 public:
 	#include "opt_coordinate.h"
-	
+
 	static inline const char *m_ProjectileTypeStr[] = {
 		"徹甲弾", "ビーム", "パルス", "ナパーム", "グレネード", "爆弾", "ロケット", "ミサイル", "地雷", "機雷", "高速", "全種"
 	};
@@ -1929,7 +1931,7 @@ public:
 
 	// option
 	auto& type(int param)	{m_type = param;	return *this;}
-	
+
 	ScaledInt<8>		m_type;
 	ScaledInt<4, 1, 31>	m_num;
 	ScaledInt<4>		m_operator;
@@ -2318,14 +2320,14 @@ static auto _isLineBlocked(LastLocationArg) {
 class CChipLockon : public CChip {
 public:
 	#include "opt_coordinate.h"
-	
+
 	CChipLockon(
 		int enemy
 	){
 		m_type		= OKE_ALL - OKE_BIPED;
 		m_enemy		= enemy;
 		m_Id		= CHIPID_LOCKON;
-		
+
 		InitCoordinate();
 	}
 
@@ -2354,15 +2356,15 @@ public:
 		m_enemy.SetBin(bin);
 		m_type.SetBin(bin);
 	}
-	
+
 	// option
 	auto& type(int param){
 		if(param > (OKE_ALL - OKE_BIPED)) param -= OKE_BIPED;
-		
+
 		m_type = param;
 		return *this;
 	}
-	
+
 	ScaledInt<>		m_enemy;
 	ScaledInt<>		m_type;
 };
@@ -2412,7 +2414,7 @@ public:
 		CChip::SetBin(bin);
 		m_var.SetBin(bin);
 	}
-	
+
 	ScaledInt<>		m_var;
 };
 
@@ -2427,7 +2429,7 @@ static auto& lockonId(CChipVar& id, LastLocationArg){
 class CChipTgtPosition : public CChipCond {
 public:
 	#include "opt_coordinate.h"
-	
+
 	enum {
 		TGT,
 		FROM_TGT,
@@ -2570,7 +2572,7 @@ static CChipTree _isTargetStumbling	(LastLocationArg){LastLocation(); return is_
 class CChipAutoTurn : public CChip {
 public:
 	#include "opt_coordinate.h"
-	
+
 	CChipAutoTurn(){
 		m_Id	= CHIPID_AUTO_TURN;
 		m_on	= 1;
@@ -2644,8 +2646,9 @@ public:
 	ScaledInt<> m_param;
 };
 
-static void lockonPart(int param, LastLocationArg){LastLocation();
-g_pCurField->m_tree.AddToTree(std::make_unique<CChipLockonPart>(param));
+static void lockonPart(int param, LastLocationArg){
+	LastLocation();
+	g_pCurField->m_tree.AddToTree(std::make_unique<CChipLockonPart>(param));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -3208,15 +3211,14 @@ static void break_statement(LastLocationArg){
 static void okecc_exit(LastLocationArg){
 	LastLocation();
 
-	// Goto chip * 2 を置き，1個目を Exit に向ける
-	auto chip = std::make_unique<CChipGoto>();
-
-	g_pCurField->m_tree.AddToTree(std::move(chip));
+	// Exit に飛ばす chip の idx
 	auto idx = g_pCurField->m_tree.m_LastG;
+
+	// 後続 chip を接続する用の goto 生成
 	g_pCurField->m_tree.AddToTree(std::make_unique<CChipGoto>());
 
-	// 1個目の goto を Exit に向ける
-	g_pCurField->m_pool[idx]->m_NextG = IDX_EXIT;
+	// 実際に Exit (or ISub return) に向ける
+	g_pCurField->m_pool[idx]->m_NextG = g_pCurField->m_uISubRetIdx;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -3257,7 +3259,29 @@ static bool start_sub_internal(int num, LastLocationArg){
 	return true;
 }
 
-#define startSub(num) if(!start_sub_internal(num)) return; CFieldSwitch FieldInfo(num)
+//////////////////////////////////////////////////////////////////////////////
+// Inline sub 開始
+
+class CInlineSub {
+public:
+	UINT m_uPrevISubRetIdx = IDX_EXIT;
+
+	CInlineSub(){
+		// 直前の return 先を保存
+		m_uPrevISubRetIdx = g_pCurField->m_uISubRetIdx;
+
+		// return 用 goto を生成
+		g_pCurField->m_uISubRetIdx = g_pCurField->m_pool.add(std::make_unique<CChipGoto>());
+	}
+
+	~CInlineSub(){
+		// LastG を return 先に接続
+		g_pCurField->m_tree.AddToG(g_pCurField->m_uISubRetIdx);
+
+		// 直前の return 先を復元
+		g_pCurField->m_uISubRetIdx = m_uPrevISubRetIdx;
+	}
+};
 
 //////////////////////////////////////////////////////////////////////////////
 // C との命名被り回避
@@ -3271,8 +3295,10 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define Break		break_statement()
 	#define While(cc)	loop_statement(); If(!(cc)) Break; Endif
 	#define Endwhile	endloop_statement();
-
 	#define Return		okecc_exit()
+
+	#define startSub(num)	if(!start_sub_internal(num)) return; CFieldSwitch FieldInfo(num)
+	#define startInlineSub	CInlineSub _virtual_sub_info
 
 	#define autoTurn				_autoTurn()
 	#define energy					_energy()
@@ -3344,7 +3370,7 @@ static bool start_sub_internal(int num, LastLocationArg){
 	#define turnLeft				_turnLeft()
 	#define turnRight				_turnRight()
 	#define wait					_wait()
-	
+
 	#define	fast					_fast()
 	#define wide					_wide()
 	#define snipe					_snipe()
