@@ -483,16 +483,56 @@ public:
 		}
 	}
 
+	// チップに突入する数が多いものを分割する
+	void SplitFanin(void){
+		auto numChip = m_list.size();
+		std::vector<std::vector<UINT>> fanin(numChip);
+
+		// その chip に突入する chip の index を集める
+		for(UINT u = 0; u < numChip; ++u){
+			if(m_list[u]->ValidG()) fanin[m_list[u]->m_NextG].push_back(u);
+			if(m_list[u]->ValidR()) fanin[m_list[u]->m_NextR].push_back(u);
+		}
+
+		// NextG/R を付け替える
+		auto fixNext = [&](UINT chip, UINT oldIdx, UINT newIdx){
+			if(m_list[chip]->m_NextG == oldIdx) m_list[chip]->m_NextG = newIdx;
+			if(m_list[chip]->m_NextR == oldIdx) m_list[chip]->m_NextR = newIdx;
+		};
+
+		// fanin が多い chip を分割する
+		for(UINT chip = 0; chip < numChip; ++chip){
+			if(fanin[chip].size() >= 6){
+				// 追加する nop 数
+				int numNop = ((int)fanin[chip].size() - 2) / 2;
+
+				for(int i = 1; i < numNop; ++i){
+					UINT NopIdx, PrevNopIdx;
+					PrevNopIdx = i == 1 ? chip : NopIdx;
+					NopIdx = add(std::make_unique<CChipNop>());
+					m_list[NopIdx]->m_NextG = PrevNopIdx;
+
+					// 途中の nop は 2chip だけ受け入れ
+					fixNext(fanin[chip][i], chip, NopIdx);
+					fixNext(fanin[chip][fanin[chip].size() - i - 1], chip, NopIdx);
+
+					// 最後の nop は残りすべてを受け入れる
+					if(i == numNop - 1){
+						for(int j = numNop; j < fanin[chip].size() - numNop; ++j){
+							fixNext(fanin[chip][j], chip, NopIdx);
+						}
+					}
+				}
+			}
+		}
+	}
+
 	int Finalize(void){
 		if(m_list.size() > 0){
-			// 参照されないチップを goto に置き換える
-			DeleteUnreferencedChips();
-
-			// Goto 最適化
-			CleanupGoto();
-
-			// 自分に分岐しているチップは nop を挟む
-			FixSelfReference();
+			DeleteUnreferencedChips();	// 参照されないチップを goto に置き換える
+			CleanupGoto();				// Goto 最適化
+			FixSelfReference();			// 自分に分岐しているチップは nop を挟む
+			SplitFanin();				// fanin が多い chip を分割する
 
 			// field 最大チップ数を超えていたらエラー
 			if(m_list.size() > m_width * m_height){
