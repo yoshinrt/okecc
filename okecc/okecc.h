@@ -295,7 +295,7 @@ public:
 		return s;
 	}
 
-	virtual void num_set(int num){}
+	virtual void set_num(int num){}
 	virtual void set_operator(int opr){}
 
 	bool ValidG(void) const { return m_NextG < IDX_EXIT; }
@@ -451,6 +451,28 @@ public:
 		}
 	}
 
+	int Finalize(void){
+		if(m_list.size() > 0){
+			// 参照されないチップを goto に置き換える
+			DeleteUnreferencedChips();
+
+			// Goto 最適化
+			CleanupGoto();
+
+			// field 最大チップ数を超えていたらエラー
+			if(m_list.size() > m_width * m_height){
+				printf("Number of chip(s) exceeds the maximum limit: %d > %d\n",
+					(int)m_list.size(),
+					m_width * m_height
+				);
+
+				return -1;
+			}
+		}
+
+		return (int)m_list.size();
+	}
+
 	void dump(void){
 		printf("Start=%d\n ID   G   R  Description\n", m_start);
 		for(UINT u = 0; u < m_list.size(); ++u){
@@ -586,13 +608,13 @@ public:
 	}
 
 	CChipTree& operator>=(int num) {
-		m_pool[m_start]->num_set(num);
+		m_pool[m_start]->set_num(num);
 		m_pool[m_start]->set_operator(CChip::OP_GE);
 		return *this;
 	}
 
 	CChipTree& operator<=(int num) {
-		m_pool[m_start]->num_set(num);
+		m_pool[m_start]->set_num(num);
 		m_pool[m_start]->set_operator(CChip::OP_LE);
 		return *this;
 	}
@@ -606,7 +628,7 @@ public:
 	}
 
 	CChipTree& operator==(int num) {
-		m_pool[m_start]->num_set(num);
+		m_pool[m_start]->set_num(num);
 		return *this;
 	}
 
@@ -637,30 +659,14 @@ public:
 	CField(const char *name, UINT width, UINT height) : m_name(name), m_pool(width, height), m_tree(m_pool){}
 
 	int FinalizeCompile(){
+		// start / end 最終設定
 		m_tree.AddToG(IDX_EXIT);
 		m_pool.m_start = m_tree.m_start;
 		//m_pool.dump();
 
-		if(m_pool.size() > 0){
-			// 参照されないチップを goto に置き換える
-			m_pool.DeleteUnreferencedChips();
-
-			// Goto 最適化
-			m_pool.CleanupGoto();
-		}
-		printf("%s: Number of chip(s): %d\n", m_name, (int)m_pool.m_list.size());
-
-		// field 最大チップ数を超えていたらエラー
-		if(m_pool.m_list.size() > CField::m_pool.m_width * CField::m_pool.m_height){
-			printf("Number of chip(s) exceeds the maximum limit: %d > %d\n",
-				(int)m_pool.m_list.size(),
-				CField::m_pool.m_width * CField::m_pool.m_height
-			);
-
-			return -1;
-		}
-
-		return (int)m_pool.m_list.size();
+		auto ret = m_pool.Finalize();
+		if(ret >= 0) printf("%s: Number of chip(s): %d\n", m_name, (int)m_pool.m_list.size());
+		return ret;
 	}
 
 	// ブロック制御
@@ -1663,7 +1669,7 @@ public:
 
 	virtual ~CChipAmmoNum(){}
 
-	virtual void num_set(int num){m_num = num;}
+	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -1729,7 +1735,7 @@ public:
 
 	virtual ~CChipOkeNum(){}
 
-	virtual void num_set(int num){m_num = num;}
+	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -1834,7 +1840,7 @@ public:
 
 	virtual ~CChipBarrier(){}
 
-	virtual void num_set(int num){m_barrier_height = num;}
+	virtual void set_num(int num){m_barrier_height = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -1901,7 +1907,7 @@ public:
 
 	virtual ~CChipProjectileNum(){}
 
-	virtual void num_set(int num){m_num = num;}
+	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -1966,7 +1972,7 @@ public:
 
 	virtual ~CChipSelfStatus(){}
 
-	virtual void num_set(int num){m_num = num;}
+	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -2121,7 +2127,7 @@ public:
 
 	virtual ~CChipIfTime(){}
 
-	virtual void num_set(int num){m_num = num;}
+	virtual void set_num(int num){m_num = num;}
 	virtual void set_operator(int opr){m_operator = opr;}
 
 	virtual std::string GetLayoutText(void){
@@ -2169,7 +2175,7 @@ public:
 
 	virtual ~CChipIfBodyCode(){}
 
-	virtual void num_set(int num){m_bodycode = num;}
+	virtual void set_num(int num){m_bodycode = num;}
 
 	virtual std::string GetLayoutText(void){
 		return
@@ -2201,7 +2207,7 @@ public:
 
 	virtual ~CChipIfNumLock(){}
 
-	virtual void num_set(int num){m_num = num;}
+	virtual void set_num(int num){m_num = num;}
 
 	virtual std::string GetLayoutText(void){
 		return
@@ -2257,7 +2263,7 @@ public:
 
 	virtual ~CChipIfTargetWeaponId(){}
 
-	virtual void num_set(int num){m_num = num;}
+	virtual void set_num(int num){m_num = num;}
 
 	virtual std::string GetLayoutText(void){
 		return
