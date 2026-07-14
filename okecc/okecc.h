@@ -343,6 +343,20 @@ public:
 };
 
 //////////////////////////////////////////////////////////////////////////////
+// NOP
+
+class CChipNop : public CChip {
+	public:
+	CChipNop(){
+		m_Id = CHIPID_NOP;
+	}
+	virtual ~CChipNop(){}
+	virtual std::string GetLayoutText(void){
+		return "NOP";
+	}
+};
+
+//////////////////////////////////////////////////////////////////////////////
 // ゲームには存在しない仮チップ
 
 class CChipGoto : public CChip {
@@ -397,6 +411,7 @@ public:
 		return dst;
 	}
 
+	// Goto 最適化
 	void CleanupGoto(void){
 		// Goto 飛び先解決
 		std::vector<UINT> IdxOld2New;
@@ -430,6 +445,7 @@ public:
 		m_list.resize(IdxNew2Old.size());
 	}
 
+	// 参照されないチップを goto に置き換えることで，goto 最適化で削除する
 	void DeleteUnreferencedChips(void){
 		std::vector<bool> referenced(m_list.size(), false);
 
@@ -451,6 +467,22 @@ public:
 		}
 	}
 
+	// 自分に分岐しているチップは nop を挟む
+	void FixSelfReference(void){
+		for(UINT u = 0; u < m_list.size(); ++u){
+			if(m_list[u]->m_NextG == u){
+				UINT idx = add(std::make_unique<CChipNop>());
+				m_list[u]->m_NextG = idx;
+				m_list[idx]->m_NextG = u;
+			}
+			if(m_list[u]->m_NextR == u){
+				UINT idx = add(std::make_unique<CChipNop>());
+				m_list[u]->m_NextR = idx;
+				m_list[idx]->m_NextG = u;
+			}
+		}
+	}
+
 	int Finalize(void){
 		if(m_list.size() > 0){
 			// 参照されないチップを goto に置き換える
@@ -458,6 +490,9 @@ public:
 
 			// Goto 最適化
 			CleanupGoto();
+
+			// 自分に分岐しているチップは nop を挟む
+			FixSelfReference();
 
 			// field 最大チップ数を超えていたらエラー
 			if(m_list.size() > m_width * m_height){
@@ -939,19 +974,7 @@ inline CChipVar G(6);
 inline CChipVar H(7);
 
 //////////////////////////////////////////////////////////////////////////////
-// NOP
-
-class CChipNop : public CChip {
-	public:
-	CChipNop(){
-		m_Id = CHIPID_NOP;
-	}
-	virtual ~CChipNop(){}
-	virtual std::string GetLayoutText(void){
-		return "NOP";
-	}
-};
-
+// simple chip
 
 static void _nop(
 	LastLocationArg
