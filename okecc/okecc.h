@@ -320,6 +320,11 @@ public:
 	UINT			m_NextG = IDX_NONE;
 	UINT			m_NextR = IDX_NONE;
 	UINT			m_ChipId = 0;
+	
+	static std::string int2fixp32s(int val){
+		if(val % 10 == 0) return std::format("{}", val / 10);
+		return std::format("{:.1f}", val / 10.0);
+	}
 };
 
 class CChipTree;
@@ -1058,7 +1063,7 @@ public:
 	virtual ~CChipWait(){}
 
 	virtual std::string GetLayoutText(void){
-		return std::format("Stop {:d}", m_param.get());
+		return std::format("Stop\n{}/30s", m_param.get());
 	}
 
 	virtual void GetBin(CChipBinary& bin){
@@ -2242,7 +2247,7 @@ public:
 
 	virtual std::string GetLayoutText(void){
 		return
-			std::format("機体コード={}?", m_bodycode.m_value == 0xFF ? 0 : m_bodycode.get());
+			std::format("機体コード\n={}?", m_bodycode.m_value == 0xFF ? 0 : m_bodycode.get());
 	}
 
 	virtual void GetBin(CChipBinary& bin){
@@ -2505,7 +2510,7 @@ public:
 	};
 
 	static inline const char* m_tgt_str[] = {
-		"", "からの",
+		"", "からの\n",
 	};
 
 	CChipTgtPosition(
@@ -2737,7 +2742,7 @@ public:
 	virtual std::string GetLayoutText(void){
 		return
 			std::format(
-				"{} = {}",
+				"{}=\n{}",
 				m_VarNameStr[m_var.get()],
 				m_StatusTypeStr[m_param.get()]
 			);
@@ -2871,7 +2876,7 @@ public:
 		double op2
 	){
 		if(-99999.9 > op2 || op2 > 99999.9){
-			Error(std::format("Value {} is out of range [-99999.9 - 99999.9]", op2));
+			Error(std::format("Value {:.1f} is out of range [-99999.9 - 99999.9]", op2));
 		}
 
 		m_op1		= op1;
@@ -2886,7 +2891,7 @@ public:
 
 	virtual std::string GetLayoutText(void){
 		return m_immxvar.get() ?
-			std::format("{}{}{}", m_VarNameStr[m_op1.get()], m_OprStr[m_operator.get()], m_imm.get() / 10.0) :
+			std::format("{}{}\n{}", m_VarNameStr[m_op1.get()], m_OprStr[m_operator.get()], int2fixp32s(m_imm.get())) :
 			std::format("{}{}{}", m_VarNameStr[m_op1.get()], m_OprStr[m_operator.get()], m_VarNameStr[m_op2.get()]);
 	}
 
@@ -3045,7 +3050,7 @@ public:
 		double op2
 	){
 		if(-99999.9 > op2 || op2 > 99999.9){
-			Error(std::format("Value {} is out of range [-99999.9 - 99999.9]", op2));
+			Error(std::format("Value {:.1f} is out of range [-99999.9 - 99999.9]", op2));
 		}
 
 		m_op1		= op1;
@@ -3060,7 +3065,7 @@ public:
 
 	virtual std::string GetLayoutText(void){
 		return m_immxvar.get() ?
-			std::format("{}{}{}?", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_op2.get() / 10.0) :
+			std::format("{}{}\n{}?", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], int2fixp32s(m_imm.get())) :
 			std::format("{}{}{}?", m_VarNameStr[m_op1.get()], m_operator_str[m_operator.get()], m_VarNameStr[m_op2.get()]);
 	}
 
