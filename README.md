@@ -9,7 +9,7 @@ OKE Chip Compiler (okecc) は，カルネージハート ポータブルの OKE 
 	- 他の OKE ソフトをコピペするだけで流用できます．
 - プログラミング言語で書かれたソフトは，保守・管理が容易です
 	- コメントで，ソフトの意図を明確に記述することができます．
-	- `If` `Else` `Endif` などの制御構文等，複雑な条件分岐も簡潔に記述できます．
+	- `If` `Else` `EndIf` などの制御構文等，複雑な条件分岐も簡潔に記述できます．
 
 また，okecc は以下のような特徴を持っています．
 
@@ -175,22 +175,22 @@ void chip_main(){
 
 ## 条件分岐の記述
 
-条件分岐には，`If` `Elseif` `Else` `Endif` を使用して記述します．以下に記述例を示します．
+条件分岐には，`If` `ElseIf` `Else` `EndIf` を使用して記述します．以下に記述例を示します．
 
 ```
 If(numAmmo(1) >= 100)
 	// 武装 1残弾が 100 発以上の時の処理
 	...
-Elseif(isTargetStopped)
+ElseIf(isTargetStopped)
 	// 武装 1残弾が 100 未満 かつ ターゲットが静止中の処理
 	...
 Else
 	// 上記条件のいずれにも当てはまらないときの処理
 	...
-Endif
+EndIf
 ```
 
-`If(...)` および `Elseif(...)` のカッコ内には，OKE ソフトの条件判定チップに相当する条件判定命令を記述します．
+`If(...)` および `ElseIf(...)` のカッコ内には，OKE ソフトの条件判定チップに相当する条件判定命令を記述します．
 
 条件判定命令は大きく分けて 3種類あります．
 
@@ -214,17 +214,17 @@ Endif
 // 正面 30m 以内の地上敵に格闘攻撃をする
 If(isTargetPosition.span(90).dist(50) && targetBodyCode != BC_FLIGHT)
 	fight;
-Endif
+EndIf
 
 If(!isTargetStopped)
 	// ターゲットが静止中ではないときの処理
 	
-Endif
+EndIf
 ```
 
 ## ループの記述
 
-繰り返し処理を行うためのループ構文は `While` `Endwhile` `Break` を使用して記述します．以下に記述例を示します．
+繰り返し処理を行うためのループ構文は `While` `EndWhile` `Break` を使用して記述します．以下に記述例を示します．
 ```
 // ミサイルが 100m 以内にある限りループし続ける
 While(numProjectile.dist(100).type(P_MISSILE) >= 1)
@@ -233,11 +233,11 @@ While(numProjectile.dist(100).type(P_MISSILE) >= 1)
 	If(numProjectile.dist(100).type(P_MISSILE) >= 2)
 		option(1); // ミサイル妨害
 		Break;
-	Endif
+	EndIf
 	
 	// ミサイル 1発は機動で避ける，等
 	...
-Endwhile
+EndWhile
 ```
 
 ループを脱出するためには `Break` を使用してください．

@@ -3277,7 +3277,7 @@ static void break_statement(LastLocationArg){
 //////////////////////////////////////////////////////////////////////////////
 // end
 
-static void okecc_exit(LastLocationArg){
+static void okeccReturn(LastLocationArg){
 	LastLocation();
 
 	// Exit に飛ばす chip の idx
@@ -3357,14 +3357,17 @@ public:
 
 #ifndef NO_OKECC_SYNTAX
 	#define If(cc)		if_statement(cc);
-	#define Elseif(cc)	elseif_statement(cc);
+	#define ElseIf(cc)	elseif_statement(cc);
+	#define	Elseif		ElseIf
 	#define Else		else_statement();
-	#define Endif		endif_statement();
+	#define EndIf		endif_statement();
+	#define Endif		EndIf
 
 	#define Break		break_statement()
 	#define While(cc)	loop_statement(); If(!(cc)) Break; Endif
-	#define Endwhile	endloop_statement();
-	#define Return		okecc_exit()
+	#define EndWhile	endloop_statement();
+	#define Endwhile	EndWhile
+	#define Return		okeccReturn()
 
 	#define startSub(num)	if(!start_sub_internal(num)) return; CFieldSwitch FieldInfo(num)
 	#define startInlineSub	CInlineSub _virtual_sub_info
