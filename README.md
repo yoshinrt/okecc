@@ -134,6 +134,7 @@ void sub_routine(){
 
 void chip_main(){
 	...
+	// SUB1 の呼び出し
 	sub_routine();
 	...
 }
@@ -161,6 +162,7 @@ void inline_sub_routine(){
 
 void chip_main(){
 	...
+	// インライサブルーチンのチップをここに展開
 	inline_sub_routine();
 	...
 }
@@ -170,8 +172,9 @@ void chip_main(){
 ## Return 命令
 
 `Return` 命令は，そのサブルーチンを抜けて呼び出し元に戻ります．
-	- MAIN/SUB1/SUB2 では，チップ配置エリアの外枠に向かうチップが配置されます．
-	- インラインサブルーチンでは，呼び出し位置に戻ります．
+
+- MAIN/SUB1/SUB2 では，チップ配置エリアの外枠に向かうチップが配置されます．
+- インラインサブルーチンでは，呼び出し位置に戻ります．
 
 ## 条件分岐の記述
 
@@ -211,7 +214,7 @@ End
 条件判定命令には `!` `&&` `||` の論理演算子を使用することができます．
 
 ```
-// 正面 30m 以内の地上敵に格闘攻撃をする
+// 正面 50m 以内の地上敵に格闘攻撃をする
 If(isTargetPosition.span(90).dist(50) && targetBodyCode != BC_FLIGHT)
 	fight;
 End
@@ -244,7 +247,7 @@ End
 
 ## カウンタ入力
 
-武装残弾数をカウンタ代入する命令 `numAllEnemy` 等は，以下のように記述します．
+カウンタ代入する命令 `numAllEnemy` 等は，以下のように記述します．
 
 ```
 A = numAllEnemy;
