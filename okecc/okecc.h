@@ -3184,14 +3184,6 @@ static void endif_statement(
 ){
 	LastLocation();
 
-	if(
-		g_pCurField->GetMode() != CField::BM_IF &&
-		g_pCurField->GetMode() != CField::BM_ELSE
-	){
-		g_pCurField->BlockError("Unexpected endif");
-		if(!g_pCurField->m_BlockStack.size()) return;
-	}
-
 	while(
 		g_pCurField->GetMode() == CField::BM_IF ||
 		g_pCurField->GetMode() == CField::BM_ELSE
@@ -3241,10 +3233,6 @@ static void loop_statement(LastLocationArg){
 static void endloop_statement(LastLocationArg){
 	LastLocation();
 
-	if(g_pCurField->GetMode() != CField::BM_LOOP){
-		g_pCurField->BlockError("Unexpected endloop");
-		if(!g_pCurField->m_BlockStack.size()) return;
-	}
 	auto bi_ptr = std::move(g_pCurField->m_BlockStack.back());
 	g_pCurField->m_BlockStack.pop_back();
 
@@ -3275,7 +3263,29 @@ static void break_statement(LastLocationArg){
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// end
+// end: endif と endwhile 共通
+
+static void end_statement(LastLocationArg){
+	LastLocation();
+	
+	if(
+		g_pCurField->GetMode() == CField::BM_IF ||
+		g_pCurField->GetMode() == CField::BM_ELSE
+	){
+		endif_statement(location);
+	}
+
+	else if(g_pCurField->GetMode() == CField::BM_LOOP){
+		endloop_statement(location);
+	}
+	
+	else{
+		g_pCurField->BlockError("Unexpected End");
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// return
 
 static void okeccReturn(LastLocationArg){
 	LastLocation();
@@ -3360,13 +3370,10 @@ public:
 	#define ElseIf(cc)	elseif_statement(cc);
 	#define	Elseif		ElseIf
 	#define Else		else_statement();
-	#define EndIf		endif_statement();
-	#define Endif		EndIf
-
+	#define End			end_statement();
+	
 	#define Break		break_statement()
-	#define While(cc)	loop_statement(); If(!(cc)) Break; Endif
-	#define EndWhile	endloop_statement();
-	#define Endwhile	EndWhile
+	#define While(cc)	loop_statement(); If(!(cc)) Break; End
 	#define Return		okeccReturn()
 
 	#define startSub(num)	if(!start_sub_internal(num)) return; CFieldSwitch FieldInfo(num)
