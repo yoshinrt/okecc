@@ -1,8 +1,10 @@
 # OKE Chip Compiler for ZEUS: Carnage Heart Second
 
+- カルネージハート ポータブル版は[こちら](https://github.com/yoshinrt/okecc/tree/chp)
+
 ## 概要
 
-OKE Chip Compiler (okecc) は，ゼウス カルネージハートセカンドの OKE ソフトを C 言語に似た[プログラミング言語](https://github.com/yoshinrt/okecc/blob/main/sample.cpp)で記述し，チップ配置を自動で行うソフトウェアです．
+OKE Chip Compiler (okecc) は，ゼウス カルネージハートセカンドの OKE ソフトを C 言語に似た[プログラミング言語](https://github.com/yoshinrt/okecc/blob/zeus/sample.cpp)で記述し，チップ配置を自動で行うソフトウェアです．
 チップ配置ではなくプログラミング言語で OKE ソフトを設計することは，以下のような利点があります．
 
 - 「チップを並べる」行為から開放されます
@@ -19,7 +21,10 @@ Windows (Microsoft Visual Studio または Cygwin)，Linux 環境で動作しま
 ### Windows 環境 (Microsoft Visual Studio)
 
 1. 本ソフトの動作には Microsoft Visual Studio が必要ですのでインストールしてください．Microsoft Visual Studio Community 2022 で動作確認しています．
-1. 本 git リポジトリをクローンします．
+1. 本 git リポジトリをクローンします (branch 名: zeus)．
+	```
+	git clone -b zeus --single-branch https://github.com/yoshinrt/okecc.git
+	```
 1. powershell プロンプトを立ち上げ，git リポジトリをクローンしたディレクトリに移動します．
 1. 以下のコマンドを実行すると，サンプルの OKE ソフトがコンパイルされます．
 	```
@@ -38,7 +43,10 @@ Windows (Microsoft Visual Studio または Cygwin)，Linux 環境で動作しま
 ### Windows Cygwin, Linux 環境
 
 1. g++, Make が必要ですのでインストールしてください．
-1. 本 git リポジトリをクローンします．
+1. 本 git リポジトリをクローンします (branch 名: zeus)．
+	```
+	git clone -b zeus --single-branch https://github.com/yoshinrt/okecc.git
+	```
 1. git リポジトリをクローンしたディレクトリに移動します．
 1. 以下のコマンドを実行すると，サンプルの OKE ソフトがコンパイルされます．
 	```
