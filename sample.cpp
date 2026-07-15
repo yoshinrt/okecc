@@ -1,131 +1,97 @@
-/*
-+[機体名 ] かのんべいべー１Ｄ
-[OKE CODE] CBAB1D                    重量   VP
-[BODY    ] バッドドリーム            5000  1000
-[CPU     ] MCP112(中速)               100   200
-[Armor   ] 70mm                      5000   300
-[EX Armor] 対徹甲                    1000   300
-[Weapon 1] 185mmカノン        x  70  1260   840
-[Weapon 2] ムラマサ           x   4   480   480
-[Weapon 3] ラプトル           x   8   440   560
-[Option 1] 機体冷却装置               100   100
-[Option 2] 機体冷却装置               100   100
-[Option 3] 誘導妨害装置               150   150
-[Total   ]                    19200/13630  4030
-[Loadage ]                       70.99% (白 / 白)
-[Paint   ] 塗装パターン4     (10,8,16) (4,4,6)
-*/
+// シナリオモードのラスティネイル用ソフト
 
 #include "okecc.h"
 
-#define cur_time			A
-#define cannon_timer		B
-#define missile_timer		C
-#define prev_cannon_ammo	D
+#define prev_ammo_num	A
+#define missile_timer	B
+#define cur_time		C
+#define overheat		D
 
-void move(){
-	start_sub(1);
+void useOption(){
 	
-	If(is_barrier_over(0, 384, 20, 3))
-		move_backward();
-		
-	Elseif(
-		enemy_num(256, 64, 240, OKE_ALL) ||
-		is_barrier_over(256, 96, 40, 24)
-	)
-		turn_left();
-		
-	Elseif(is_barrier_over(256, 96, 20, 3))
-		If(cur_time >= 3)
-			turn_right();
-		Else
-			turn_left();
-		Endif
-		
-	Elseif(
-		enemy_num(-144, 448, 320, OKE_ALL) ||
-		projectile_num(112, 64, 160, P_ALL) ||
-		enemy_num(0, 512, 80, OKE_ALL)
-	)
-		move_backward();
-		
-	Elseif(cur_time < 10)
-		cannon_timer = 10;
-		move_backward();
-	Else
-		move_forward();
-	Endif
-}
-
-void fire_missile(int oke_type){
-	If(ammo_num(2))
-		fire(0, 512, 320, oke_type, 2, 1);
-	Elseif(ammo_num(3))
-		fire(0, 512, 320, oke_type, 3, 1);
-	Endif
+	// ミサイル妨害
+	If(numProjectile.dist(50).type(P_MISSILE))
+		option(1);
+	End
+	
+	// 冷却
+	If(heat >= 60)
+		option(3);
+	End
+	
+	// 修復
+	If(health <= 50)
+		option(2);
+	End
 }
 
 void chip_main(){
+	setCpuSize(10);
 	
-	lockon(0, 512, 320, OKE_ALL);
+	useOption();
+	lockon;
 	
 	// 格闘
-	If(target_z() <= 6 && target_distance() <= 30 && is_target_direction(0, 160))
-		strike();
+	If(numEnemy.span(90).dist(50) && targetBodyCode != OKE_FLIGHT)
+		fight;
 		Return;
-	Endif
+	End
 	
-	cur_time = time();
+	// 冷却 op が 0 のときの挙動:
+	//   heat が 60 を超えたら 45 まで攻撃しない
+	If(!numOption(3))
+		If(overheat)
+			If(heat <= 45)
+				overheat = 0;
+			End
+		Elseif(heat >= 60)
+			overheat = 1;
+		End
+	End
 	
-	move();
+	// 敵弾に対する反応
+	If(numProjectile.span(90).dist(80).type(P_HI_V))
+			
+		// 超短距離に敵弾: ガード
+		If(numProjectile.span(90).dist(20).type(P_HI_V))
+			guard(15);
+			
+		Elseif(!isSelfJumping)
+			If(isRand(50))
+				jumpLeft;
+			Else
+				jumpRight;
+			End
+		End
+		
+		Return;
+	End
 	
-	// 冷却
-	If(heat() > 70)
-		If(option_num(1) >= 1)
-			option(1);
+	// 移動
+	If(!isTargetPosition.span(120))
+		If(isTargetPosition.dir(-90).span(180))
+			turnLeft;
 		Else
-			option(2);
-		Endif
-		
-		// 冷却中は移動に徹する
-		(cannon_timer = cur_time) += 4;
-		(missile_timer = cur_time) += 2;
-	Endif
-	
-	// ミサイル妨害
-	If(projectile_num(0, 320, 50, P_MISSILE))
-		option(3);
-	Endif
-	
-	// カノン
-	If(cur_time >= cannon_timer && ammo_num(1))
-		
-		get_target_direction(E, F);
-		If(F <= 32)
-			While(is_self_firing() && prev_cannon_ammo == (F = ammo_num(1)))
-			Endwhile
-			
-			// 被弾したら 3秒間移動
-			If(is_self_stun())
-				(cannon_timer = cur_time) += 3;
-				missile_timer = cannon_timer;
-				Return;
-			Endif
-			
-			fire(0, 448, 160, OKE_ALL, 3, 1);
-			fire(0, 448, 160, OKE_ALL, 1, 1);
-			prev_cannon_ammo = ammo_num(1);
-		Endif
-	Endif
+			turnRight;
+		End
+		Return;
+	End
 	
 	// ミサイル
-	If(cur_time >= missile_timer && is_self_moving())
-		(missile_timer = time()) += 4;
-		
-		If(enemy_num(0, 512, 320, OKE_FLIGHT))
-			fire_missile(OKE_FLIGHT);
-		Else
-			fire_missile(OKE_ALL);
-		Endif
-	Endif
+	If(missile_timer <= (cur_time = time) && isTargetPosition.dist(220) && numAmmo(2))
+		wait;
+		(missile_timer = time) += 4;
+		fire(2, 1).target.wide.wait;
+		Return;
+	End
+	
+	// カノン
+	If(isTargetPosition.dist(200).span(140))
+		If(!overheat)
+			// カノン発射
+			fire(1, 2).target.snipe;
+		End
+	Else
+		moveForward;
+	End
 }
