@@ -626,16 +626,6 @@ public:
 		m_pool[m_start]->m_NextR = m_LastR;
 	}
 
-	CChipTree(std::unique_ptr<CChipCond> upchip, CChipPool& pool) : m_pool(pool){
-		// チップ単体からツリーに変換 (Condition chip)
-		m_start = m_pool.add(std::move(upchip));
-		m_LastG = m_start;
-
-		// R 側に Goto を足して，常に m_NextG を触ればいいようにする
-		m_LastR = m_pool.add(std::make_unique<CChipGoto>());
-		m_pool[m_start]->m_NextR = m_LastR;
-	}
-
 	// g, r を update
 	void AddToG(UINT idx){
 		if(m_start == IDX_NONE) m_start = idx;
@@ -1800,20 +1790,20 @@ public:
 	ScaledInt<8>			m_operator;
 };
 
-static CChipTree numAmmo(
+static auto& numAmmo(
 	int weapon,
 	LastLocationArg
 ){
 	LastLocation();
-	return CChipTree(std::make_unique<CChipAmmoNum>(weapon - 1), g_pCurField->m_pool);
+	return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipAmmoNum>(weapon - 1));
 }
 
-static CChipTree numOption(
+static auto& numOption(
 	int weapon,
 	LastLocationArg
 ){
 	LastLocation();
-	return CChipTree(std::make_unique<CChipAmmoNum>(weapon + 4), g_pCurField->m_pool);
+	return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipAmmoNum>(weapon + 4));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2110,18 +2100,18 @@ static CChipSelfStatus& _health(
 	return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipSelfStatus>(CChipSelfStatus::HP));
 }
 
-static CChipTree _energy(
+static auto& _energy(
 	LastLocationArg
 ){
 	LastLocation();
-	return CChipTree(std::make_unique<CChipSelfStatus>(CChipSelfStatus::ENERGY), g_pCurField->m_pool);
+	return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipSelfStatus>(CChipSelfStatus::ENERGY));
 }
 
-static CChipTree _heat(
+static auto& _heat(
 	LastLocationArg
 ){
 	LastLocation();
-	return CChipTree(std::make_unique<CChipSelfStatus>(CChipSelfStatus::HEAT), g_pCurField->m_pool);
+	return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipSelfStatus>(CChipSelfStatus::HEAT));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2199,12 +2189,12 @@ public:
 	ScaledInt<8, 1, 99>		m_num;
 };
 
-static CChipTree isRand(
+static auto& isRand(
 	int num,
 	LastLocationArg
 ){
 	LastLocation();
-	return CChipTree(std::make_unique<CChipIsRand>(num), g_pCurField->m_pool);
+	return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipIsRand>(num));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2260,7 +2250,7 @@ public:
 
 static auto _timeRemained(LastLocationArg) {
 	LastLocation();
-	return CChipTree(std::make_unique<CChipIfTime>(CChipIfTime::END), g_pCurField->m_pool);
+	return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipIfTime>(CChipIfTime::END));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2329,7 +2319,7 @@ public:
 
 static auto _numLocked(LastLocationArg) {
 	LastLocation();
-	return CChipTree(std::make_unique<CChipIfNumLock>(), g_pCurField->m_pool);
+	return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipIfNumLock>());
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2388,7 +2378,7 @@ public:
 
 static auto targetWeaponId(int weapon, LastLocationArg) {
 	LastLocation();
-	return CChipTree(std::make_unique<CChipIfTargetWeaponId>(weapon), g_pCurField->m_pool);
+	return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipIfTargetWeaponId>(weapon));
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2417,7 +2407,7 @@ public:
 
 static auto _isLineBlocked(LastLocationArg) {
 	LastLocation();
-	return CChipTree(std::make_unique<CChipIfLineBlocked>(), g_pCurField->m_pool);
+	return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipIfLineBlocked>());
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2642,34 +2632,34 @@ public:
 	ScaledInt<>	m_param;
 };
 
-static CChipTree is_self_target_status(
+static auto& is_self_target_status(
 	int my_tgt,
 	int param
 ){
-	return CChipTree(std::make_unique<CChipTgtAction>(my_tgt, param), g_pCurField->m_pool);
+	return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipTgtAction>(my_tgt, param));
 }
 
 #ifndef NO_OKECC_SYNTAX
-static CChipTree _isSelfWaiting		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::WAIT);}
-static CChipTree _isSelfMoving		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::MOVE);}
-static CChipTree _isSelfTurning		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::TURN);}
-static CChipTree _isSelfJumping		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::JUMP);}
-static CChipTree _isSelfFiring		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIRE);}
-static CChipTree _isSelfFighting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIGHT);}
-static CChipTree _isSelfGuarding	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::DEFENCE);}
-static CChipTree _isSelfSpecial		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::SPECIAL);}
-static CChipTree _isSelfStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::STUN);}
-static CChipTree _isUnlock			(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::UNLOCK);}
+static auto& _isSelfWaiting		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::WAIT);}
+static auto& _isSelfMoving		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::MOVE);}
+static auto& _isSelfTurning		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::TURN);}
+static auto& _isSelfJumping		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::JUMP);}
+static auto& _isSelfFiring		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIRE);}
+static auto& _isSelfFighting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::FIGHT);}
+static auto& _isSelfGuarding	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::DEFENCE);}
+static auto& _isSelfSpecial		(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::SPECIAL);}
+static auto& _isSelfStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::STUN);}
+static auto& _isUnlock			(LastLocationArg){LastLocation(); return is_self_target_status(CChip::MY, CChipTgtAction::UNLOCK);}
 
-static CChipTree _isTargetWaiting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::WAIT);}
-static CChipTree _isTargetMoving	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::MOVE);}
-static CChipTree _isTargetTurning	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::TURN);}
-static CChipTree _isTargetJumping	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::JUMP);}
-static CChipTree _isTargetFiring	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIRE);}
-static CChipTree _isTargetFighting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIGHT);}
-static CChipTree _isTargetGuarding	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::DEFENCE);}
-static CChipTree _isTargetSpecial	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::SPECIAL);}
-static CChipTree _isTargetStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::STUN);}
+static auto& _isTargetWaiting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::WAIT);}
+static auto& _isTargetMoving	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::MOVE);}
+static auto& _isTargetTurning	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::TURN);}
+static auto& _isTargetJumping	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::JUMP);}
+static auto& _isTargetFiring	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIRE);}
+static auto& _isTargetFighting	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::FIGHT);}
+static auto& _isTargetGuarding	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::DEFENCE);}
+static auto& _isTargetSpecial	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::SPECIAL);}
+static auto& _isTargetStumbling	(LastLocationArg){LastLocation(); return is_self_target_status(CChip::TARGET, CChipTgtAction::STUN);}
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -3127,16 +3117,16 @@ public:
 };
 
 #ifndef NO_OKECC_SYNTAX
-CChipTree CChipVar::operator>=(const CChipVar& op2) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_GE, op2.m_var), g_pCurField->m_pool);}
-CChipTree CChipVar::operator<=(const CChipVar& op2) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_LE, op2.m_var), g_pCurField->m_pool);}
-CChipTree CChipVar::operator==(const CChipVar& op2) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_EQ, op2.m_var), g_pCurField->m_pool);}
+CChipTree CChipVar::operator>=(const CChipVar& op2) const {return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipCmp>(m_var, CChip::OP_GE, op2.m_var));}
+CChipTree CChipVar::operator<=(const CChipVar& op2) const {return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipCmp>(m_var, CChip::OP_LE, op2.m_var));}
+CChipTree CChipVar::operator==(const CChipVar& op2) const {return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipCmp>(m_var, CChip::OP_EQ, op2.m_var));}
 CChipTree CChipVar::operator!=(const CChipVar& op2) const {return !(*this == op2);}
 CChipTree CChipVar::operator> (const CChipVar& op2) const {return !(*this <= op2);}
 CChipTree CChipVar::operator< (const CChipVar& op2) const {return !(*this >= op2);}
 
-CChipTree CChipVar::operator>=(const double imm) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_GE, imm), g_pCurField->m_pool);}
-CChipTree CChipVar::operator<=(const double imm) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_LE, imm), g_pCurField->m_pool);}
-CChipTree CChipVar::operator==(const double imm) const {return CChipTree(std::make_unique<CChipCmp>(m_var, CChip::OP_EQ, imm), g_pCurField->m_pool);}
+CChipTree CChipVar::operator>=(const double imm) const {return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipCmp>(m_var, CChip::OP_GE, imm));}
+CChipTree CChipVar::operator<=(const double imm) const {return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipCmp>(m_var, CChip::OP_LE, imm));}
+CChipTree CChipVar::operator==(const double imm) const {return *g_pCurField->m_tree.AddToPool(std::make_unique<CChipCmp>(m_var, CChip::OP_EQ, imm));}
 CChipTree CChipVar::operator!=(const double imm) const {return !(*this == imm);}
 CChipTree CChipVar::operator> (const double imm) const {return !(*this <= imm);}
 CChipTree CChipVar::operator< (const double imm) const {return !(*this >= imm);}
