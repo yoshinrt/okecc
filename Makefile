@@ -7,7 +7,6 @@ OBJDIR		= ./obj
 CXXFLAGS	= -pipe -O3 -march=native -mtune=native -ffast-math -flto=auto -pthread -std=c++20 -I$(SRCDIR)
 HEADERS		= $(SRCDIR)/okecc.h $(SRCDIR)/opt_coordinate.h 
 
-# プリコンパイルヘッダの設定
 PCH_SRC		= $(SRCDIR)/okecc.h
 PCH_OUT		= $(PCH_SRC).gch
 
