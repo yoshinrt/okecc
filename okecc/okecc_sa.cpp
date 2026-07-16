@@ -900,7 +900,11 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 		total_height += h * CELL_SIZE + SECTION_GAP;
 	}
 
-	fprintf(fp, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+	#ifdef _DEBUG
+		fprintf(fp, "<?xml version=\"1.0\" encoding=\"SJIS\"?>\n");
+	#else
+		fprintf(fp, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+	#endif
 	fprintf(fp, "<svg width=\"%d\" height=\"%d\" viewBox=\"0 0 %d %d\" xmlns=\"http://www.w3.org/2000/svg\">\n",
 		max_width, total_height + 20, max_width, total_height + 20);
 
@@ -988,7 +992,7 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 			int centerX = x + CHIP_SIZE / 2;
 
 			const char* fill_color =
-				pool.m_list[i]->m_Id.get() == CHIPID_NOP && static_cast<CChipNop*>(pool.m_list[i].get())->m_param.get() == 0 ? "#F0F0F0" :
+				pool.m_list[i]->m_Id.get() == CChip::CHIPID_NOP && static_cast<CChipNop*>(pool.m_list[i].get())->m_param.get() == 0 ? "#F0F0F0" :
 				pool.m_list[i]->m_NextR != IDX_NONE ? "#FFF0F0" : "white";
 
 			// 💡 エラーチェックを行い、枠線の色と太さを決定
@@ -1075,7 +1079,7 @@ int main(void){
 	int RunResult = 0;
 	for(int i = 0; i < 3; ++i){
 		//g_pField[i]->m_pool.dump();
-		g_pField[i]->FinalizeCompile();
+		if (g_pField[i]->FinalizeCompile() < 0) return 1;
 
 		sa.emplace_back(std::make_unique<CarnageSA>(g_pField[i]->m_pool, g_pField[i]->m_name));
 		sa_ptrs.push_back(sa[i].get());
@@ -1088,8 +1092,8 @@ int main(void){
 
 	OutputSvg("okecc.svg", sa_ptrs);
 	if(RunResult){
-		std::cerr << "Error: Some chips are not connected properly." << std::endl;
-		return 0;
+		std::cout << "Error: Some chips are not connected properly." << std::endl;
+		return 1;
 	}
 
 	const std::string mcFile = "memcard.mcd";
@@ -1108,7 +1112,7 @@ int main(void){
 		size_t dataSize = mcr.read(saveBuffer);
 
 		if (dataSize == 0) {
-			std::cerr << "Not found Game ID '" << gameId[i] << std::endl;
+			std::cout << "Not found Game ID '" << gameId[i] << std::endl;
 			continue;
 		}
 
@@ -1169,7 +1173,7 @@ int main(void){
 	if (bMcrUpdate && mcr.saveToFile()) {
 		std::cout << "Successfully wrote to " << mcFile << std::endl;
 	} else {
-		std::cerr << "Failed to write to " << mcFile << std::endl;
+		std::cout << "Failed to write to " << mcFile << std::endl;
 		return 1;
 	}
 
