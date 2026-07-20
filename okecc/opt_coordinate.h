@@ -9,6 +9,7 @@ void InitCoordinate(){
 	
 	m_span				= int2span(360);
 	m_dist				= int2dist(800);
+	m_min_dist			= 0;
 	m_dir				= 0;
 }
 
@@ -65,9 +66,19 @@ std::string GetCoordinateText(void){
 		);
 	}
 
+	if(g_bChp){
+		return std::format(
+			"{}m\n{},{}",
+			dist2int(m_dist.get()),
+			angle2int(m_dir.get()),
+			span2int(m_span.get())
+		);
+	}
+	
 	return std::format(
-		"{}m\n{},{}",
+		"{}-{}m\n{},{}",
 		dist2int(m_dist.get()),
+		dist2int(m_min_dist.get()),
 		angle2int(m_dir.get()),
 		span2int(m_span.get())
 	);
@@ -81,7 +92,8 @@ void GetCoordinateBin(CChipBinary& bin){
 		m_x.GetBin(bin);
 		m_y.GetBin(bin);
 	}else{
-		m_dummy.GetBin(bin);
+		m_cartesian_pos.GetBin(bin);
+		m_min_dist.GetBin(bin);
 		m_span.GetBin(bin);
 		m_dist.GetBin(bin);
 		m_dir.GetBin(bin);
@@ -93,13 +105,16 @@ void SetCoordinateBin(CChipBinary& bin){
 }
 
 // option
-auto& h(int param)	{m_height	= int2dist(param);  m_cartesian_pos = 1;				return *this;}
-auto& w(int param)	{m_width	= int2dist(param);  m_cartesian_pos = 1;				return *this;}
-auto& x(int param)	{m_x		= int2dist(param);  m_cartesian_pos = 1;				return *this;}
-auto& y(int param)	{m_y		= int2dist(param);  m_cartesian_pos = 1;				return *this;}
-auto& span(int param){m_span	= int2span(param);  m_cartesian_pos = 0; m_height = 0;	return *this;}
-auto& dist(int param){m_dist	= int2dist(param);  m_cartesian_pos = 0; m_height = 0;	return *this;}
-auto& dir(int param)	{m_dir	= int2angle(param); m_cartesian_pos = 0; m_height = 0;	return *this;}
+auto& h(int param)			{m_height	= int2dist(param);  m_cartesian_pos = 1;				return *this;}
+auto& w(int param)			{m_width	= int2dist(param);  m_cartesian_pos = 1;				return *this;}
+auto& x(int param)			{m_x		= int2dist(param);  m_cartesian_pos = 1;				return *this;}
+auto& y(int param)			{m_y		= int2dist(param);  m_cartesian_pos = 1;				return *this;}
+auto& span(int param)		{m_span		= int2span(param);  m_cartesian_pos = 0; m_height = 0;	return *this;}
+auto& dist(int param)		{m_dist		= int2dist(param);  m_cartesian_pos = 0; m_height = 0;	return *this;}
+#ifndef CHP
+auto& minDist(int param)	{m_min_dist	= int2dist(param);  m_cartesian_pos = 0; m_height = 0;	return *this;}
+#endif
+auto& dir(int param) 		{m_dir		= int2angle(param); m_cartesian_pos = 0; m_height = 0;	return *this;}
 
 ScaledInt<1>	m_cartesian_pos;
 ScaledInt<7>	m_height;
@@ -107,7 +122,7 @@ ScaledInt<8>	m_width;
 ScaledInt<8>	m_x;
 ScaledInt<8>	m_y;
 
-ScaledInt<8>	m_dummy;
+ScaledInt<7>	m_min_dist;
 ScaledInt<8>	m_span;
 ScaledInt<8>	m_dist;
 ScaledInt<8>	m_dir;
