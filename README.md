@@ -1,9 +1,9 @@
-# OKE Chip Compiler for Carnage Heart Portable
+# OKE Chip Compiler for Carnage Heart EXA
 
-- カルネージハート EXA 版は[こちら](https://github.com/yoshinrt/okecc/tree/che)
+- カルネージハート ポータブル版は[こちら](https://github.com/yoshinrt/okecc/tree/chp)
 - カルネージハート Zeus/Zeus II 版は[こちら](https://github.com/yoshinrt/okecc/tree/zeus)
 
-OKE Chip Compiler (okecc) は，カルネージハート ポータブルの OKE ソフトを C 言語に似た[プログラミング言語](https://github.com/yoshinrt/okecc/blob/chp/sample.cpp)で記述し，チップ配置を自動で行うソフトウェアです．
+OKE Chip Compiler (okecc) は，カルネージハート ポータブルの OKE ソフトを C 言語に似た[プログラミング言語](https://github.com/yoshinrt/okecc/blob/che/sample.cpp)で記述し，チップ配置を自動で行うソフトウェアです．
 チップ配置ではなく，okecc とプログラミング言語 (テキスト) で OKE ソフトを設計することは，以下のような利点があります．
 
 - 「チップを並べる」行為から解放されます
@@ -72,10 +72,6 @@ Windows (Microsoft Visual Studio または Cygwin)，Linux 環境で動作しま
 
 - 45チップ (sample.cpp): 3秒以下
 - 198チップ (test_all_chip.cpp): およそ 20-30秒
-
-## 交差矢印について
-
-本コンパイラが生成するチップ配置は，チップ配置成功率を上げるため，交差矢印を禁止していません．
 
 # OKE ソフトの記述方法
 
@@ -281,7 +277,10 @@ void chip_main(){
 
 `nop` : 何もしない (ノップ)  
 `sleep(<待ちカウント>)` : 思考停止  
-`wait` : 動作完了待ち
+`wait` : 全ての動作完了待ち  
+`waitMove` : 移動動作完了待ち  
+`waitTurn` : 旋回動作完了待ち  
+`waitFire` : 射撃動作完了待ち
 
 ## カウンタ入力
 
@@ -303,7 +302,25 @@ void chip_main(){
 `targetBodyCode` : ターゲット機体コード  
 `targetActCode` : ターゲット動作コード  
 `targetDistance` : ターゲット距離  
-`targetDistanceXy` : ターゲット XY 距離
+`targetDistanceXy` : ターゲット XY 距離  
+`timeRemained` : 残り時間  
+`myId` : 自機識別番号  
+`myActCode` : 自機動作コード  
+`heat` : 自機熱量  
+`health` : 自機 HP  
+`energy` : 自機燃料  
+`mySpeed` : 自機速度  
+`targetSpeed` : ターゲット速度  
+`numAmmo(<武装>)` : 武装残弾数  
+`numOption(<オプション>)` : オプション残数  
+`raderRange` : レーダー有効距離  
+`mathPi` : 定数π  
+`buttonValue` : ボタン状態値  
+`analogX` : アナログ X 値  
+`analogY` : アナログ Y 値  
+`gunsightDirection` : ガンサイト方向  
+`gunsightElevation` : ガンサイト仰角  
+`gunsightNum` : ガンサイト起動中の武装番号
 
 ## カウンタ操作 [カウンタ入力]
 
@@ -313,11 +330,19 @@ void chip_main(){
 `<カウンタ1> *= <数値>` `<カウンタ1> *= <カウンタ2>` : 乗算  
 `<カウンタ1> /= <数値>` `<カウンタ1> /= <カウンタ2>` : 除算  
 `<カウンタ1> %= <数値>` `<カウンタ1> %= <カウンタ2>` : 余り (mod)  
+`<カウンタ1> &= <数値>` `<カウンタ1> &= <カウンタ2>` : ビット積  
+`<カウンタ1> |= <数値>` `<カウンタ1> |= <カウンタ2>` : ビット和  
+`<カウンタ1> ^= <数値>` `<カウンタ1> ^= <カウンタ2>` : 排他的ビット和  
 `<カウンタ1> = mathInt(<カウンタ2>)` : 小数切り捨て  
 `<カウンタ1> = mathAbs(<カウンタ2>)` : 絶対値  
 `<カウンタ1> = mathMax(<カウンタ2>)` : 最大値  
 `<カウンタ1> = mathMin(<カウンタ2>)` : 最小値  
-`<カウンタ1> = mathSqr(<カウンタ2>)` : 平方根
+`<カウンタ1> = mathSqr(<カウンタ2>)` : 平方根  
+`<カウンタ1> = mathSin(<カウンタ2>)` : 正弦  
+`<カウンタ1> = mathCos(<カウンタ2>)` : 余弦  
+`<カウンタ1> = mathTan(<カウンタ2>)` : 正接  
+`<カウンタ1> = mathAtan(<カウンタ2>)` : 逆正接  
+`<カウンタ1> = mathNot(<カウンタ2>)` : ビット否定
 
 ## カウンタ送信
 
@@ -344,7 +369,8 @@ void chip_main(){
 
 `numEnemy` : 指定範囲の敵機体数を判定  
 `numFriendly` : 指定範囲の味方機体数を判定  
-`numOke` : 指定範囲の敵味方機体数を判定
+`numAllOke` : 指定範囲の敵味方機体数を判定  
+`numUnknownOke` : 指定範囲の不明機体数を判定
 
 ### オプション
 
@@ -386,6 +412,10 @@ void chip_main(){
 `isSelfGuarding` : 自機の状態が防御中であれば分岐  
 `isSelfSpecial` : 自機の状態が特殊動作中であれば分岐  
 `isSelfStumbling` : 自機の状態が被弾中であれば分岐  
+`isOptionActive(<オプション番号>)` : オプション起動中  
+`isGunsightActive` : ガンサイト起動中  
+`isAutoTurnActive` : 自動旋回起動中  
+`isWeaponActive(<武装番号>)` : 武装起動中  
 `isTargetStopped` : ターゲットの状態が静止中であれば分岐  
 `isTargetMoving` : ターゲットの状態が移動中であれば分岐  
 `isTargetTurning` : ターゲットの状態が旋回中であれば分岐  
@@ -395,7 +425,10 @@ void chip_main(){
 `isTargetGuarding` : ターゲットの状態が防御中であれば分岐  
 `isTargetSpecial` : ターゲットの状態が特殊動作中であれば分岐  
 `isTargetStumbling` : ターゲットの状態が被弾中であれば分岐  
-`isUnlock` : ターゲットをアンロック状態であれば分岐
+`isTargetShieldActive` : ターゲットシールド発生中  
+`isTargetOverheat` : ターゲットオーバーヒート中  
+`isLocked` : ターゲットをロック状態であれば分岐  
+`isMutualLock` : 相互ロック中
 
 ## ランダムに分岐 [条件判定]
 
@@ -409,17 +442,18 @@ void chip_main(){
 ## ターゲット位置判断 [条件判定]
 
 `isTargetPosition` : ターゲットが指定範囲であれば分岐  
-`isPositionFromTarget` : ターゲットからの自機位置が指定範囲であれば分岐
+`isPositionFromTarget` : ターゲット (基準部位:機体) からの自機位置が指定範囲であれば分岐
 
 ### オプション
 
-エリア指定 : [エリア指定オプション](#エリア指定オプション) を参照してください
+エリア指定 : [エリア指定オプション](#エリア指定オプション) を参照してください  
+`.turret` : `isPositionFromTarget` のみ: 基準部位を砲塔にする
 
 ## 機体コード判断 [数値同値判定]
 
 `targetBodyCode` : 機体コードが指定値と等しければ分岐
 
-機体コードは[定義済み定数](#機体コード)を指定します．
+機体コードは[定義済み定数](#機体コード)，または固有の機体は数値を直接指定します．
 
 ## ターゲットロック警戒判断 [数値同値判定]
 
@@ -431,9 +465,12 @@ void chip_main(){
 
 武装種別は[定義済み定数](#武装種別)を指定します．
 
-## ターゲットまでの地表判断 [条件判定]
+## ターゲットまでの射線判断 [条件判定]
 
-`isLineBlocked` : ターゲットまでの射線が遮られていれば分岐
+`isLineBlocked` : ターゲットまでの射線が何れか障害で遮られていれば分岐  
+`isLineBlockedByTerrain` : ターゲットまでの射線が地表面で遮られていれば分岐  
+`isLineBlockedByFriendly` : ターゲットまでの射線が味方機で遮られていれば分岐  
+`isLineBlockedByBarrier` : ターゲットまでの射線が建造物で遮られていれば分岐
 
 ## カウンタの値を判断
 
@@ -445,21 +482,27 @@ void chip_main(){
 
 ## 動作中止
 
-`stop` : 現在実行中の動作を停止し，停止が完了するまで CPU も停止．
+`stop` : すべての動作を中止  
+`stopMove` : 移動動作を中止  
+`stopTurn` : 旋回動作を中止  
+`stopFire` : 射撃動作を中止
 
 ## 移動動作
 
 `moveForward` : 前進する  
 `moveBackward` : 後退する  
 `moveRight` : 右移動する  
-`moveLeft` : 左移動する
+`moveLeft` : 左移動する  
+`moveForwardLeft` : 左前に移動する  
+`moveForwardRight` : 右前に移動する  
+`moveBackwardLeft` : 左後ろに移動する  
+`moveBackwardRight` : 右後ろに移動する
 
 ### オプション
 
-`.fast` : 急速移動を実行します．自動的に旋回オプションは無視されます．  
-`.turnLeft`
-`.turnRight` : 指定方向に旋回しながら移動します．自動的に急速オプションは無視されます．  
-`.wait` : 急速移動において実行モードを 停止 にします
+`.fast` : 急速移動を実行します．自動的に `.dist` オプションは無視されます．  
+`.dist(<距離>)` : 指定距離を移動．自動的に `.fast` オプションは無視されます．  
+`.wait` : 実行モードを 停止 にします
 
 ## 旋回動作
 
@@ -468,8 +511,9 @@ void chip_main(){
 
 ### オプション
 
-`.fast` : 急速旋回を実行します  
-`.wait` : 急速旋回において実行モードを 停止 にします
+`.fast` : 急速旋回を実行します．自動的に `.angle` オプションは無視されます．  
+`.angle(<角度>)` : 指定角度だけ旋回．自動的に `.fast` オプションは無視されます．  
+`.wait` : 実行モードを 停止 にします
 
 ## ジャンプ
 
@@ -477,12 +521,14 @@ void chip_main(){
 `jumpBackward` : 後ろへジャンプする  
 `jumpRight` : 右へジャンプする  
 `jumpLeft` : 左へジャンプする  
+`jumpForwardLeft` : 左前にジャンプする  
+`jumpForwardRight` : 右前にジャンプする  
+`jumpBackwardLeft` : 左後ろにジャンプする  
+`jumpBackwardRight` : 右後ろにジャンプする  
 `jumpUp` : 上へジャンプする
 
 ### オプション
 
-`.turnLeft`
-`.turnRight` : 指定方向に旋回しながらジャンプします  
 `.wait` : 実行モードを 停止 にします
 
 ## 格闘
@@ -513,37 +559,46 @@ void chip_main(){
 
 `.wait` : 実行モードを 停止 にします
 
-## 射撃攻撃
+## 射撃
 
-`fire(<武装番号>, <発射弾数>)` : <武装番号>を<発射弾数>発発射
+`fire(<武装番号>, <発射弾数>)` : <武装番号>を<発射弾数>発発射．武装番号に `W_ACTIVE` を指定すると，ガンサイト起動中の武装を発射．  
+`fire(<発射弾数>)` : ガンサイト起動中の武装を<発射弾数>発発射．自動的に `.gunsight` オプションが指定されます．
 
 ### オプション
 
-エリア指定 : [エリア指定オプション](#エリア指定オプション) を参照してください
-
-`.target` : エリア指定ではなく，ロック中のターゲットに射撃します  
+エリア指定 : [エリア指定オプション](#エリア指定オプション) を参照してください  
+`.gunsight` : エリア指定ではなく，ロック中のターゲットに射撃します  
 `.wide` : 射撃モードを乱射 にします (移動射撃，ジャンプ射撃時は無視されます)  
 `.snipe` : 射撃モードを 狙撃 にします (移動射撃，ジャンプ射撃時は無視されます)  
-`.moveForward` 
-`.moveBackward` 
-`.moveLeft` 
-`.moveRight` : 指定方向に移動しながら射撃します．自動的にターゲット射撃になります．  
-`.jumpForward` 
-`.jumpBackward` 
-`.jumpLeft` 
-`.jumpRight` : 指定方向にジャンプしながら射撃します．自動的にターゲット射撃になります．  
 `.wait` : 実行モードを 停止 にします
+
+## ガンサイト起動
+
+`gunsightOn(<武装番号>)` : 指定された武装でガンサイト起動．または次の値を指定する．
+
+- `GS_OFF` : 照準解除
+- `GS_NEXT` : 次の武装
 
 ## 方向指定発射
 
-`fire(<機体からの方向(数値 or カウンタ)>, <機体からの上下角(数値 or カウンタ)>, <武装番号>, <発射弾数>)` : 指定した方向と角度で<武装番号>番武装<発射弾数>発発射
+`fire(<機体からの方向(数値 or カウンタ)>, <機体からの上下角(数値 or カウンタ)>, <武装番号>, <発射弾数>)` : 指定した方向と角度で<武装番号>番武装<発射弾数>発発射．武装番号に `W_ACTIVE` を指定すると，ガンサイト起動中の武装を発射．
 
 ### オプション
 
 `.wait` : 実行モードを 停止 にします
 
+## ガンサイト移動
+
+`aimGunsight(<方位値 or カウンタ>, <仰角値 or カウンタ>)` : ガンサイトを機体正面から，指定された方位・仰角に移動．
+
+### オプション
+
+`.rel` : 基準方向を 現在の方向 にする
+
 ## 飛行高度設定
 
+`ascend` : 10m 上昇する  
+`descend` : 10m 下降する  
 `setAltitude(<数値>)` : 飛行高度を設定します
 
 ## オプション装置機動
@@ -552,14 +607,16 @@ void chip_main(){
 
 ## ターゲットロック
 
-`lockonEnemy` : 指定範囲の敵機体をターゲットロックオン  
-`lockonFriendly` : 指定範囲の味方機体をターゲットロックオン  
-`lockonAll` : 指定範囲の敵味方機体をターゲットロックオン
+`lockon` : 指定範囲の最も近い敵機体をターゲットロックオン  
+`lockonFriendly` : 指定範囲の最も近い味方機体をターゲットロックオン  
+`lockonAll` : 指定範囲の最も近い敵味方機体をターゲットロックオン
 
 ### オプション
 
 エリア指定 : [エリア指定オプション](#エリア指定オプション) を参照してください  
-`.type(<数値>)` : 機体種別．機体の種別は[定義済み定数](#機体コード)の，`OKE_*` から始まるものを指定します．デフォルト値 = OKE_ALL
+`.type(<数値>)` : 機体種別．機体の種別は[定義済み定数](#機体コード)の，`OKE_*` から始まるものを指定します．デフォルト値 = OKE_ALL  
+`.farthest` : 最も遠い機体をロックする  
+`.front` : 最も正面の方位に近い機体をロックする
 
 ## ターゲットへの自動旋回
 
@@ -578,6 +635,73 @@ void chip_main(){
 
 `lockonId(<カウンタ>)` : カウンタで指定された識別番号をターゲットロック．
 
+## ロックオン解除
+
+`unlock` : ロックオン解除
+
+## ボタン状態の取得
+
+`getButton` : ボタン状態の取得
+
+### オプション
+
+`.wait` : 実行モードを 変化するまで停止 にします
+
+## ボタン状態の判定 [条件判定]
+
+`isButton(<ボタンパラメータ>)` : ボタン状態を判定します．ボタンパラメータは，以下の定数を `|` で繋げて指定します．
+
+- `BT_UP` : ↑
+- `BT_DOWN` : ↓
+- `BT_RIGHT` : →
+- `BT_LEFT` : ←
+- `BT_CIRCLE` : ◯
+- `BT_CROSS` : ✕
+- `BT_TRIANGLE` : △
+- `BT_SQUARE` : □
+- `BT_L` : L ボタン
+- `BT_R` : R ボタン
+- `BT_HELD_ALL` : 全てが押されている
+- `BT_HELD_ANY` : いずれかが押されている
+- `BT_PUSHED` : いずれかが押された
+- `BT_RELEASED` : いずれかが離された
+- `BT_CHANGED` : いずれかが変わった
+
+## アナログスティック判定 [数値大小判定]
+
+`analogX` : アナログ X 値が<数値>以上/以下であれば分岐  
+`analogY` : アナログ Y 値が<数値>以上/以下であれば分岐
+
+## カメラビュー変更
+
+`viewBack` : カメラビューを後方ビュー (中距離) に変更  
+`viewFront` : カメラビューを前方ビュー (中距離) に変更  
+`viewLeft` : カメラビューを左サイドビュー (中距離) に変更  
+`viewRight` : カメラビューを右サイドビュー (中距離) に変更  
+`viewTop` : カメラビューをトップビュー (中距離) に変更  
+`viewGunsight` : カメラビューをガンサイトビュー (中距離) に変更  
+`viewPair` : カメラビューをペアビュー (中距離) に変更  
+`viewNext` : カメラビューを次のビュー (中距離) に変更
+
+### オプション
+
+`.far` : 遠距離  
+`.near` : 近距離
+
+## アラート
+
+`alert(<アラート音>, <アラート時間>, <アラート表示>)` : アラート音，アラート表示を指定時間発生．
+
+アラート音に `AL_NOSOUND` を指定すると，アラート音なし．  
+アラート表示位置は，以下の定数を指定する．
+
+- `AL_RIGHT` : 右
+- `AL_LEFT` : 左
+- `AL_TOP` : 上
+- `AL_BOTTOM` : 下
+- `AL_CENTER` : 中央
+- `AL_NONE` : 表示なし
+
 ## エリア指定オプション
 
 エリア指定を行う命令では，次に示す共通のエリア指定オプションが使用できます．
@@ -588,10 +712,10 @@ void chip_main(){
 
 ### 極座標指定
 
-`.dist(<数値>)` : 距離，デフォルト値 = 800  
+`.dist(<数値>)` : 最長距離，デフォルト値 = 800  
+`.minDist(<数値>)` : 最短距離，デフォルト値 = 0  
 `.dir(<数値>)` : 方位，デフォルト値 = 0  
 `.span(<数値>)` : 幅，デフォルト値 = 360
-
 
 ### 直交座標
 
@@ -604,12 +728,14 @@ void chip_main(){
 
 ### 機体コード
 
-- `BC_UNLOCK` : 非ロック状態
+- `BC_UNLOCK` : 非ロック状態 (`targetBodyCode` のみ)
 - `OKE_BIPED` : 二脚
 - `OKE_QUADRUPED` : 多脚
 - `OKE_VEHICLE` : 車両
 - `OKE_HOVER` : ホバー
 - `OKE_FLIGHT` : 飛行
+- `OKE_GROUND` : 地上型 (`lockon*` 系命令のみ)
+- `OKE_ALL` : 指定なし (`targetBodyCode` を除く)
 
 ### 弾種別
 
@@ -628,7 +754,7 @@ void chip_main(){
 
 ### 武装種別
 
-- `W_NONE` : 武器なし
+- `W_NONE` : 武器なし (`targetWeaponId` のみ)
 - `W_ASSAULT` : アサルトガン
 - `W_BEAM` : ビームガン
 - `W_PULSE` : 電磁パルスガン
@@ -643,6 +769,8 @@ void chip_main(){
 - `W_MISSILE` : ミサイルランチャー
 - `W_MINE` : 地雷ディスペンサー
 - `W_FMINE` : 機雷ディスペンサー
+- `W_SPECIAL` : 特殊弾 (`targetWeaponId` のみ)
+- `W_BROKEN` : 破壊済み (`targetWeaponId` のみ)
 
 # 既知のバグ
 

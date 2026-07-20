@@ -3,7 +3,6 @@ project(OkeccProject LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-add_compile_definitions(CHP)
 
 if(MSVC)
     add_compile_options(/O2 /Ot /Oi /Oy /GT /GL /utf-8)
