@@ -1,9 +1,9 @@
-# OKE Chip Compiler for Carnage Heart Portable
+# OKE Chip Compiler for Carnage Heart EXA
 
-- カルネージハート EXA 版は[こちら](https://github.com/yoshinrt/okecc/tree/che)
+- カルネージハート ポータブル版は[こちら](https://github.com/yoshinrt/okecc/tree/chp)
 - カルネージハート Zeus/Zeus II 版は[こちら](https://github.com/yoshinrt/okecc/tree/zeus)
 
-OKE Chip Compiler (okecc) は，カルネージハート ポータブルの OKE ソフトを C 言語に似た[プログラミング言語](https://github.com/yoshinrt/okecc/blob/chp/sample.cpp)で記述し，チップ配置を自動で行うソフトウェアです．
+OKE Chip Compiler (okecc) は，カルネージハート ポータブルの OKE ソフトを C 言語に似た[プログラミング言語](https://github.com/yoshinrt/okecc/blob/che/sample.cpp)で記述し，チップ配置を自動で行うソフトウェアです．
 チップ配置ではなく，okecc とプログラミング言語 (テキスト) で OKE ソフトを設計することは，以下のような利点があります．
 
 - 「チップを並べる」行為から解放されます
@@ -325,6 +325,42 @@ void chip_main(){
 
 `targetDistanceXy` : ターゲット XY 距離
 
+`timeRemained` : 残り時間
+
+`myId` : 自機識別番号
+
+`myActCode` : 自機アクションコード
+
+`heat` : 自機熱量
+
+`health` : 自機 HP
+
+`energy` : 自機燃料
+
+`mySpeed` : 自機スピード
+
+`targetSpeed` : ターゲットのスピード
+
+`numAmmo(<武装>)` : 武装残弾数
+
+`numOption(<オプション>)` : オプション残数
+
+`raderRange` : レーダー探知距離
+
+`mathPi` : 定数π
+
+`buttonState` : ボタン状態
+
+`analogX` : アナログ X 値
+
+`analogY` : アナログ Y 値
+
+`gunsightDirection` : ガンサイト方向
+
+`gunsightElevation` : ガンサイト仰角
+
+`gunsightNum` : ガンサイト起動中の武装番号
+
 ## カウンタ操作 [カウンタ入力]
 
 `<カウンタ1> = <数値>` `<カウンタ1> = <カウンタ2>` : 代入
@@ -339,6 +375,12 @@ void chip_main(){
 
 `<カウンタ1> %= <数値>` `<カウンタ1> %= <カウンタ2>` : 余り (mod)
 
+`<カウンタ1> &= <数値>` `<カウンタ1> &= <カウンタ2>` : 論理 AND
+
+`<カウンタ1> |= <数値>` `<カウンタ1> |= <カウンタ2>` : 論理 OR
+
+`<カウンタ1> ^= <数値>` `<カウンタ1> ^= <カウンタ2>` : 論理 XOR
+
 `<カウンタ1> = mathInt(<カウンタ2>)` : 小数切り捨て
 
 `<カウンタ1> = mathAbs(<カウンタ2>)` : 絶対値
@@ -348,6 +390,16 @@ void chip_main(){
 `<カウンタ1> = mathMin(<カウンタ2>)` : 最小値
 
 `<カウンタ1> = mathSqr(<カウンタ2>)` : 平方根
+
+`<カウンタ1> = mathSin(<カウンタ2>)` : サイン
+
+`<カウンタ1> = mathCos(<カウンタ2>)` : コサイン
+
+`<カウンタ1> = mathTan(<カウンタ2>)` : タンジェント
+
+`<カウンタ1> = mathAtan(<カウンタ2>)` : アークタンジェント
+
+`<カウンタ1> = mathNot(<カウンタ2>)` : 論理 NOT
 
 ## カウンタ送信
 
@@ -519,12 +571,19 @@ void chip_main(){
 
 `moveLeft` : 左移動する
 
+`moveForwardLeft` : 左前に移動する
+
+`moveForwardRight` : 右前に移動する
+
+`moveBackwardLeft` : 左後ろに移動する
+
+`moveBackwardRight` : 右後ろに移動する
+
 ### オプション
 
-`.fast` : 急速移動を実行します．自動的に旋回オプションは無視されます．
+`.fast` : 急速移動を実行します．自動的に `.dist` オプションは無視されます．
 
-`.turnLeft`
-`.turnRight` : 指定方向に旋回しながら移動します．自動的に急速オプションは無視されます．
+`.dist(<距離>)` : 指定距離を移動．自動的に `.fast` オプションは無視されます．
 
 `.wait` : 急速移動において実行モードを 停止 にします
 
@@ -536,7 +595,9 @@ void chip_main(){
 
 ### オプション
 
-`.fast` : 急速旋回を実行します
+`.fast` : 急速旋回を実行します．自動的に `.angle` オプションは無視されます．
+
+`.angle(<角度>)` : 指定角度だけ旋回．自動的に `.fast` オプションは無視されます．
 
 `.wait` : 急速旋回において実行モードを 停止 にします
 
@@ -550,12 +611,17 @@ void chip_main(){
 
 `jumpLeft` : 左へジャンプする
 
+`jumpForwardLeft` : 左前にジャンプする
+
+`jumpForwardRight` : 右前にジャンプする
+
+`jumpBackwardLeft` : 左後ろにジャンプする
+
+`jumpBackwardRight` : 右後ろにジャンプする
+
 `jumpUp` : 上へジャンプする
 
 ### オプション
-
-`.turnLeft`
-`.turnRight` : 指定方向に旋回しながらジャンプします
 
 `.wait` : 実行モードを 停止 にします
 
@@ -605,16 +671,6 @@ void chip_main(){
 
 `.snipe` : 射撃モードを 狙撃 にします (移動射撃，ジャンプ射撃時は無視されます)
 
-`.moveForward` 
-`.moveBackward` 
-`.moveLeft` 
-`.moveRight` : 指定方向に移動しながら射撃します．自動的にターゲット射撃になります．
-
-`.jumpForward` 
-`.jumpBackward` 
-`.jumpLeft` 
-`.jumpRight` : 指定方向にジャンプしながら射撃します．自動的にターゲット射撃になります．
-
 `.wait` : 実行モードを 停止 にします
 
 ## 方向指定発射
@@ -626,6 +682,10 @@ void chip_main(){
 `.wait` : 実行モードを 停止 にします
 
 ## 飛行高度設定
+
+`ascend` : 10m 上昇する
+
+`descend` : 10m 下降する
 
 `setAltitude(<数値>)` : 飛行高度を設定します
 
@@ -673,7 +733,9 @@ void chip_main(){
 
 ### 極座標指定
 
-`.dist(<数値>)` : 距離，デフォルト値 = 800
+`.dist(<数値>)` : 最長距離，デフォルト値 = 800
+
+`.minDist(<数値>)` : 最短距離，デフォルト値 = 0
 
 `.dir(<数値>)` : 方位，デフォルト値 = 0
 

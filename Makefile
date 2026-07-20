@@ -7,9 +7,6 @@ OBJDIR		= ./obj
 CXXFLAGS	= -O3 -march=native -mtune=native -ffast-math -flto=auto -pthread -std=c++20 -I$(SRCDIR)
 HEADERS		= $(SRCDIR)/okecc.h $(SRCDIR)/opt_coordinate.h 
 
-# CHP
-CXXFLAGS	+= -DCHP
-
 ifdef DEBUG
 	CXXFLAGS	+= -D_DEBUG
 else

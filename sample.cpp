@@ -1,97 +1,77 @@
-// シナリオモードのラスティネイル用ソフト
+// てきとうな手動操作 OKE
+
+// 操作方法
+// 移動方向はアナログスティック
+#define BT_FIGHT	BT_CIRCLE	// ◯ 格闘
+#define BT_JUMP		BT_CROSS	// ✕ ジャンプ
+#define BT_FIRE		BT_R		// R 武装1 発射
+#define BT_FIRE2	BT_L		// L 武装2 発射
 
 #include "okecc.h"
 
-#define prev_ammo_num	A
-#define missile_timer	B
-#define cur_time		C
-#define overheat		D
-
-void useOption(){
-	
-	// ミサイル妨害
-	If(numProjectile.dist(50).type(P_MISSILE))
-		option(1);
-	End
-	
-	// 冷却
-	If(heat >= 60)
-		option(3);
-	End
-	
-	// 修復
-	If(health <= 50)
-		option(2);
-	End
-}
-
 void chip_main(){
-	setCpuSize(10);
 	
-	useOption();
-	lockon;
+	// 移動
+	#define anX	A
+	#define anY	B
+	#define bt	C
 	
-	// 格闘
-	If(numEnemy.span(90).dist(50) && targetBodyCode != OKE_FLIGHT)
+	getButton;
+	anX = analogX;
+	anY = analogY;
+	
+	#define AN_TH	90
+	
+	If(isButton(BT_FIGHT))
 		fight;
 		Return;
 	End
 	
-	// 冷却 op が 0 のときの挙動:
-	//   heat が 60 を超えたら 45 まで攻撃しない
-	If(!numOption(3))
-		If(overheat)
-			If(heat <= 45)
-				overheat = 0;
-			End
-		Elseif(heat >= 60)
-			overheat = 1;
-		End
+	If(isButton(BT_FIRE))
+		fire(1, 3);
 	End
 	
-	// 敵弾に対する反応
-	If(numProjectile.span(90).dist(80).type(P_HI_V))
-			
-		// 超短距離に敵弾: ガード
-		If(numProjectile.span(90).dist(20).type(P_HI_V))
-			guard(15);
-			
-		Elseif(!isSelfJumping)
-			If(isRand(50))
-				jumpLeft;
-			Else
-				jumpRight;
-			End
-		End
-		
-		Return;
+	If(isButton(BT_FIRE2))
+		fire(2, 1);
 	End
 	
-	// 移動
-	If(!isTargetPosition.span(120))
-		If(isTargetPosition.dir(-90).span(180))
+	If(anY < -AN_TH)
+		If(isButton(BT_JUMP))
+			jumpForward;
+		Else
+			moveForward;
+		End
+	ElseIf(anY > AN_TH)
+		If(isButton(BT_JUMP))
+			jumpBackward;
+		Else
+			moveBackward;
+		End;
+	Else
+		stopMove;
+	End
+	
+	If(anX < - AN_TH)
+		If(isButton(BT_JUMP))
+			stopTurn;
+			jumpLeft;
+		Else
 			turnLeft;
+		End
+	ElseIf(anX > AN_TH)
+		If(isButton(BT_JUMP))
+			stopTurn;
+			jumpRight;
 		Else
 			turnRight;
 		End
-		Return;
-	End
-	
-	// ミサイル
-	If(missile_timer <= (cur_time = time) && isTargetPosition.dist(220) && numAmmo(2))
-		wait;
-		(missile_timer = time) += 4;
-		fire(2, 1).target.wide.wait;
-		Return;
-	End
-	
-	// カノン
-	If(isTargetPosition.dist(200).span(140))
-		If(!overheat)
-			// カノン発射
-			fire(1, 2).target.snipe;
-		End
 	Else
-		moveForward;
+		stopTurn;
+	End
+	
+	nop;
+	
+	If(anX > -AN_TH && anX < AN_TH && anY > -AN_TH && anY < AN_TH && isButton(BT_JUMP))
+		jumpUp;
 	End
 }
