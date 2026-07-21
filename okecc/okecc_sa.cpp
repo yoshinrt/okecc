@@ -1013,7 +1013,7 @@ void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
 
 			fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%d\" />\n",
 				x, draw_y_start + y, CHIP_SIZE, CHIP_SIZE, fill_color, stroke_color, stroke_width);
-			fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Meiryo, sans-serif\" text-anchor=\"middle\">\n", centerX, draw_y_start + y + 25);
+			fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Meiryo, sans-serif\" text-anchor=\"middle\">\n", centerX, draw_y_start + y + 22);
 			std::string txt = pool.m_list[i]->GetLayoutText();
 			if (txt.empty()) {
 				fprintf(fp, "    <tspan x=\"%d\" dy=\"1.2em\" font-size=\"10\" fill=\"#6c757d\">ID:%d</tspan>\n", centerX, i);
