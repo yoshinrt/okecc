@@ -1,4 +1,6 @@
-﻿#include <algorithm>
+﻿//#define NOPLACE
+
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cassert>
@@ -718,7 +720,7 @@ int CarnageSA::run(UINT num_threads){
 	Energy_t BestScore = std::numeric_limits<Energy_t>::max();
 	Energy_t PrevScore = std::numeric_limits<Energy_t>::max();
 
-	#ifdef _DEBUG
+	#if defined _DEBUG || defined NOPLACE
 		num_threads = 1;
 	#else
 		if(num_threads == 0) num_threads = std::thread::hardware_concurrency();
@@ -748,7 +750,11 @@ int CarnageSA::run(UINT num_threads){
 			OverallScore = std::numeric_limits<Energy_t>::max();
 			InitState();
 		}
-
+		
+		#ifdef NOPLACE
+			break;
+		#endif
+		
 		for (UINT u = 0; u < num_threads; ++u) {
 			// 1. スレッドごとに自分(*this)をコピーして独立したインスタンスを作る
 			workers.push_back(*this);
