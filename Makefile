@@ -10,7 +10,12 @@ HEADERS		= $(SRCDIR)/okecc.h $(SRCDIR)/opt_coordinate.h
 PCH_SRC		= $(SRCDIR)/okecc.h
 PCH_OUT		= $(PCH_SRC).gch
 
-ifndef DEBUG
+# CHP
+CXXFLAGS	+= -DCHP
+
+ifdef DEBUG
+	CXXFLAGS	+= -D_DEBUG
+else
 	MAKEFLAGS	+= -j4
 endif
 
