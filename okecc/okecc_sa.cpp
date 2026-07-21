@@ -441,7 +441,13 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT) {
 	constexpr UINT p_move_mid		= 50;	// 接続chip の真ん中に移動
 
 	std::mt19937_64 gen;
-	gen.seed(std::random_device{}());
+	#ifdef _DEBUG
+		UINT uFixedSeed = 1;
+		gen.seed(uFixedSeed);
+		++uFixedSeed;
+	#else
+		gen.seed(std::random_device{}());
+	#endif
 	std::uniform_real_distribution<double> dist_prob(0.0, 1.0);
 
 	auto GetRand = [&gen](uint32_t max) -> uint32_t {
