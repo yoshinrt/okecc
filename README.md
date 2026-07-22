@@ -1,5 +1,6 @@
 # OKE Chip Compiler for ZEUS: Carnage Heart Second
 
+- カルネージハート EXA 版は[こちら](https://github.com/yoshinrt/okecc/tree/che)
 - カルネージハート ポータブル版は[こちら](https://github.com/yoshinrt/okecc/tree/chp)
 
 ## 概要
