@@ -1,5 +1,6 @@
 # OKE Chip Compiler for Carnage Heart Portable
 
+- カルネージハート EXA 版は[こちら](https://github.com/yoshinrt/okecc/tree/che)
 - カルネージハート Zeus/Zeus II 版は[こちら](https://github.com/yoshinrt/okecc/tree/zeus)
 
 OKE Chip Compiler (okecc) は，カルネージハート ポータブルの OKE ソフトを C 言語に似た[プログラミング言語](https://github.com/yoshinrt/okecc/blob/chp/sample.cpp)で記述し，チップ配置を自動で行うソフトウェアです．
