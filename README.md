@@ -48,7 +48,7 @@ Windows (Microsoft Visual Studio または Cygwin)，Linux 環境で動作しま
 
 	`sample.svg` : チップ配置結果をグラフィカルに表示するためのファイル．Chrome 等の Web ブラウザで閲覧できます．
 
-	`DATA.BIN` : PPSSSPP 等の PSP エミュレータでセーブされた，バトルゲーム セーブデータ．このファイルが存在する場合，その 1番目の設計図ソフトに結果を書き込みます．
+	`DATA.BIN` : PPSSPP 等の PSP エミュレータでセーブされた，バトルゲーム セーブデータ．このファイルが存在する場合，その 1番目の設計図ソフトに結果を書き込みます．
 	  - PPSSPP のセーブデータの暗号化は解除されている必要があります．[ここ](https://www.google.com/search?q=ppsspp+%E3%82%BB%E3%83%BC%E3%83%96%E3%83%87%E3%83%BC%E3%82%BF+%E6%9A%97%E5%8F%B7%E5%8C%96+%E8%A7%A3%E9%99%A4+ppsspp.ini&sca_esv=c838462d85fc0d44&rlz=1C1CHBD_jaJP1161JP1161&sxsrf=APpeQnsifzrDhKaBzRbzngBwPyrIXcYdfA%3A1783811387139&ei=O81SaqD5B-zL2roP1PKHyAo&biw=1621&bih=1287&ved=0ahUKEwjggs6g38uVAxXspVYBHVT5AakQ4dUDCBA&uact=5&oq=ppsspp+%E3%82%BB%E3%83%BC%E3%83%96%E3%83%87%E3%83%BC%E3%82%BF+%E6%9A%97%E5%8F%B7%E5%8C%96+%E8%A7%A3%E9%99%A4+ppsspp.ini&gs_lp=Egxnd3Mtd2l6LXNlcnAiNXBwc3NwcCDjgrvjg7zjg5bjg4fjg7zjgr8g5pqX5Y-35YyWIOino-mZpCBwcHNzcHAuaW5pMgUQABjvBTIIEAAYiQUYogQyCBAAGIAEGKIEMgUQABjvBTIFEAAY7wVIxA9Q3QFY-ApwAXgBkAEAmAF-oAHjAaoBAzAuMrgBA8gBAPgBAfgBApgCA6AC6wHCAgoQABhHGNYEGLADmAMAiAYBkAYKkgcDMS4yoAeRBLIHAzAuMrgH6AHCBwMwLjPIBwaACAE&sclient=gws-wiz-serp)を参考に設定してください．
 
 ## Windows Cygwin, Linux 環境
@@ -165,7 +165,7 @@ void inline_sub_routine(){
 
 void chip_main(){
 	...
-	// インライサブルーチンのチップをここに展開
+	// インラインサブルーチンのチップをここに展開
 	inline_sub_routine();
 	...
 }
