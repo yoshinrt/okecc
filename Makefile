@@ -20,8 +20,7 @@ $(OBJDIR)/%: $(OBJDIR)/%.o $(OBJDIR)/okecc_sa.o
 	g++ $(CXXFLAGS) $^ -o $(OBJDIR)/$*
 
 %.oke: $(OBJDIR)/%
-	$(OBJDIR)/$*
-	if [ -e okecc.svg ]; then mv okecc.svg $*.svg; fi
+	-$(OBJDIR)/$* $* || true
 
 clean:
 	rm -rf *.svg $(OBJDIR) build x64
