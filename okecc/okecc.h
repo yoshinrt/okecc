@@ -576,9 +576,6 @@ public:
 		std::vector<UINT> IdxNew2Old;
 
 		for(UINT u = 0; u < m_list.size(); ++u){
-			if(u==0x2c){
-				int a = 0;
-			}
 			if(m_list[u]->m_Id.get() != CChip::CHIPID_GOTO){
 				m_list[u]->m_NextR = GetFinalDst(m_list[u]->m_NextR);
 				m_list[u]->m_NextG = GetFinalDst(m_list[u]->m_NextG);
