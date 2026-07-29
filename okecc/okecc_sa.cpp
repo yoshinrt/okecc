@@ -869,14 +869,14 @@ void CarnageSA::SetArrow(void){
 
 //////////////////////////////////////////////////////////////////////////////
 
-void OutputSvg(const char* filename, const std::vector<CarnageSA*>& sa_list) {
+void OutputSvg(const std::string& filename, const std::vector<CarnageSA*>& sa_list) {
 	const int CHIP_SIZE = 75;    // チップサイズ
 	const int GAP = 15;          // 隙間
 	const int CELL_SIZE = CHIP_SIZE + GAP;
 	const int OFFSET = (CELL_SIZE - CHIP_SIZE) / 2;
 	const int SECTION_GAP = 60;  // セクション間の余白（タイトル含む）
 
-	FILE* fp = fopen(filename, "w");
+	FILE* fp = fopen(filename.c_str(), "w");
 	if (!fp) return;
 
 	// 各 SA の有効な高さを計算するためのラムダ
@@ -1105,9 +1105,14 @@ void setCpuSize(int size){
 
 void chip_main(void);
 
-int main(void){
+int main(int argc, char **argv){
+	// ファイル名取得
+	std::string prog_name = "okecc";
+	if(argc >= 2) prog_name = argv[1];
+
 	auto start = std::chrono::steady_clock::now();
 
+	// フィールド初期化
 	g_pField.push_back(std::make_unique<CField>("MAIN", 15, 15));
 	g_pField.push_back(std::make_unique<CField>("SUB1", 7, 7));
 	g_pField.push_back(std::make_unique<CField>("SUB2", 7, 7));
@@ -1138,7 +1143,7 @@ int main(void){
 	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 	std::cout << std::format("Compile finished in {:.2f}s.\n", elapsed / 1000.0);
 
-	OutputSvg("okecc.svg", sa_ptrs);
+	OutputSvg(prog_name + ".svg", sa_ptrs);
 	if(RunResult){
 		std::cout << "Error: Some chips are not connected properly." << std::endl;
 		return 1;
