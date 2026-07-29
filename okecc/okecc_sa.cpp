@@ -5,14 +5,12 @@
 #include <chrono>
 #include <climits>
 #include <cmath>
-#include <concepts>
 #include <cstdlib>
 #include <format>
 #include <iostream>
 #include <memory>
 #include <random>
 #include <source_location>
-#include <stdexcept>
 #include <stdio.h>
 #include <thread>
 #include <vector>
@@ -725,8 +723,6 @@ int CarnageSA::run(UINT num_threads){
 	workers.reserve(num_threads);
 	threads.reserve(num_threads);
 
-	auto start = std::chrono::steady_clock::now();
-
 	// スレッドごとに T を変える
 	const double Tfactor = num_threads == 1 ? 1.0 : std::pow(0.0001, 1.0 / (num_threads - 1));
 
@@ -746,6 +742,10 @@ int CarnageSA::run(UINT num_threads){
 			OverallScore = std::numeric_limits<Energy_t>::max();
 			InitState();
 		}
+
+		#ifdef NOPLACE
+			break;
+		#endif
 
 		for (UINT u = 0; u < num_threads; ++u) {
 			// 1. スレッドごとに自分(*this)をコピーして独立したインスタンスを作る
@@ -797,11 +797,7 @@ int CarnageSA::run(UINT num_threads){
 		}
 	}
 
-	auto end = std::chrono::steady_clock::now();
-	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-	printf("Parallel run finished in %.2fs. Best score: %d\n", elapsed / 1000.0, (UINT)this->best_E);
-
+	std::cout << "Final best score: " << (UINT)best_E << std::endl;
 	return OverallScore.load(std::memory_order_relaxed) < 0;
 }
 
@@ -1064,6 +1060,8 @@ void OutputSvg(const char* filename, CarnageSA* sa) {
 void chip_main(void);
 
 int main(void){
+	auto start = std::chrono::steady_clock::now();
+
 	g_pField.push_back(std::make_unique<CField>("MAIN", 15, 15));
 	g_pField.push_back(std::make_unique<CField>("SUB1", 7, 7));
 	g_pField.push_back(std::make_unique<CField>("SUB2", 7, 7));
@@ -1089,6 +1087,10 @@ int main(void){
 			//sa[i]->dump();
 		}
 	}
+
+	auto end = std::chrono::steady_clock::now();
+	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+	std::cout << std::format("Compile finished in {:.2f}s.\n", elapsed / 1000.0);
 
 	OutputSvg("okecc.svg", sa_ptrs);
 	if(RunResult){
