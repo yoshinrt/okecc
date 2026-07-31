@@ -455,10 +455,10 @@ public:
 			if(fanin[chip].size() >= 6){
 				// 追加する nop 数
 				int numNop = ((int)fanin[chip].size() - 2) / 2;
-
+				
+				UINT NopIdx = chip, PrevNopIdx;
 				for(int i = 1; i < numNop; ++i){
-					UINT NopIdx, PrevNopIdx;
-					PrevNopIdx = i == 1 ? chip : NopIdx;
+					PrevNopIdx = NopIdx;
 					NopIdx = add(std::make_unique<CChipNop>());
 					m_list[NopIdx]->m_NextG = PrevNopIdx;
 
