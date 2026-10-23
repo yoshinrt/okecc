@@ -162,17 +162,6 @@ void CarnageSA::InitState() {
 		UINT x = u % GridWidth;
 		x = (y % 2 == 0) ? x : (GridWidth - 1 - x);
 		state[u] = {(uint8_t)x, (uint8_t)y};
-
-		// 接続リストの構築
-		UINT v;
-		if ((v = pool[u]->m_NextG) < pool.size()) {
-			LinkList[u].push_back(v);
-			LinkList[v].push_back(u); // 双方向に接続
-		}
-		if ((v = pool[u]->m_NextR) < pool.size()) {
-			LinkList[u].push_back(v);
-			LinkList[v].push_back(u); // 双方向に接続
-		}
 	}
 }
 
@@ -539,11 +528,11 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT) {
 			// 移動元選択
 			UINT SrcIdx;
 
-			if(GetRand(10) == 0){
+			if(move_chip_list.empty() || GetRand(10) == 0){
 				SrcIdx = GetRand((uint32_t)pool.size());
 			}else{
 				// 優先リストから選ぶ
-				SrcIdx = GetRand((uint32_t)move_chip_list.size());
+				SrcIdx = move_chip_list[GetRand((uint32_t)move_chip_list.size())];
 				int x = next_state[SrcIdx].x;
 				int y = next_state[SrcIdx].y;
 
