@@ -537,13 +537,15 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT) {
 				int y = next_state[SrcIdx].y;
 
 				// 優先チップの 5x5 周辺からランダムに選ぶ
-				while(1){
-					int pos_rand = GetRand(25);
-					x += (pos_rand % 5) - 2;
+				constexpr int move_area = 1;
+				
+				if(move_area > 1) while(1){
+					int pos_rand = GetRand(move_area * move_area);
+					x += (pos_rand % move_area) - (move_area / 2);
 					if(x < 0) x = 0;
 					else if(x >= (int)GridWidth) x = GridWidth - 1;
 
-					y += (pos_rand / 5) - 2;
+					y += (pos_rand / move_area) - (move_area / 2);
 					if(y < 0) y = 0;
 					else if(y >= (int)GridHeight) y = GridHeight - 1;
 
