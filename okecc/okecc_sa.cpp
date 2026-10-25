@@ -377,6 +377,10 @@ Energy_t CarnageSA::calculate_energy(
 			) - 1);
 
 			if(e == 0) return e;
+			
+			// 離れすぎていたら，真剣に探す価値なし
+			if(e > 4) return e * overwrap_penalty;
+			
 			return e + FindPath(u, ToIdx, state, occ) * overwrap_penalty;
 		};
 
