@@ -5,18 +5,12 @@ void use_option(){
 	
 	// 冷却
 	If(heat() >= 65)
-		If(option_num(1))
-			option(1);
-		Else
-			option(2);
-		Endif
-		
-		If(heat() >= 70) option(3); Endif
+		option(1);
 	Endif
 }
 
 void chip_main(){
-	for(int i = 0; i < 4; ++i){
+	for(int i = 0; i < 5; ++i){
 		// 格闘
 		If(target_z() <= 6 && is_target_direction(0, 160) && target_distance() <= 30)
 			strike();
