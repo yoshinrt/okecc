@@ -1,4 +1,6 @@
-﻿#include <algorithm>
+﻿//#define NOPLACE
+
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cassert>
@@ -428,7 +430,13 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT) {
 	constexpr UINT p_move_mid		= 50;	// 接続chip の真ん中に移動
 
 	std::mt19937_64 gen;
-	gen.seed(std::random_device{}());
+	#ifdef _DEBUG
+		UINT uFixedSeed = 1;
+		gen.seed(uFixedSeed);
+		++uFixedSeed;
+	#else
+		gen.seed(std::random_device{}());
+	#endif
 	std::uniform_real_distribution<double> dist_prob(0.0, 1.0);
 
 	auto GetRand = [&gen](uint32_t max) -> uint32_t {
@@ -709,7 +717,7 @@ int CarnageSA::run(UINT num_threads){
 	Energy_t BestScore = std::numeric_limits<Energy_t>::max();
 	Energy_t PrevScore = std::numeric_limits<Energy_t>::max();
 
-	#ifdef _DEBUG
+	#if defined _DEBUG || defined NOPLACE
 		num_threads = 1;
 	#else
 		if(num_threads == 0) num_threads = std::thread::hardware_concurrency();
@@ -996,7 +1004,7 @@ void OutputSvg(const std::string& filename, const std::vector<CarnageSA*>& sa_li
 
 			fprintf(fp, "  <rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" rx=\"4\" fill=\"%s\" stroke=\"%s\" stroke-width=\"%d\" />\n",
 				x, draw_y_start + y, CHIP_SIZE, CHIP_SIZE, fill_color, stroke_color, stroke_width);
-			fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Meiryo, sans-serif\" text-anchor=\"middle\">\n", centerX, draw_y_start + y + 25);
+			fprintf(fp, "  <text x=\"%d\" y=\"%d\" font-family=\"Meiryo, sans-serif\" text-anchor=\"middle\">\n", centerX, draw_y_start + y + 22);
 			std::string txt = pool.m_list[i]->GetLayoutText();
 			if (txt.empty()) {
 				fprintf(fp, "    <tspan x=\"%d\" dy=\"1.2em\" font-size=\"10\" fill=\"#6c757d\">ID:%d</tspan>\n", centerX, i);
