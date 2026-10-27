@@ -127,20 +127,20 @@ public:
 		S_NOT_FOUND,
 	};
 
-	inline static std::atomic<Energy_t> OverallScore = std::numeric_limits<Energy_t>::max();
+	inline static std::atomic<Energy_t> BestScoreGlobal = std::numeric_limits<Energy_t>::max();
 
-	// 割り込みハンドラ，割込み時に OverallScore = -1 にする
+	// 割り込みハンドラ，割込み時に BestScoreGlobal = -1 にする
 	static void InterruptHandler(int signum){
-		OverallScore.store(-1, std::memory_order_relaxed);
+		BestScoreGlobal.store(-1, std::memory_order_relaxed);
 	}
 
 	Energy_t UpdateScore(Energy_t score){
 		Energy_t NewScore = score;
-		Energy_t OtherScore = OverallScore.load(std::memory_order_relaxed);
+		Energy_t OtherScore = BestScoreGlobal.load(std::memory_order_relaxed);
 
 		// 現在の共有ベストスコアよりも小さい場合のみ、更新を試みる
 		while (NewScore < OtherScore) {
-			if (OverallScore.compare_exchange_weak(
+			if (BestScoreGlobal.compare_exchange_weak(
 				OtherScore, NewScore,
 				std::memory_order_release,
 				std::memory_order_relaxed
@@ -736,6 +736,9 @@ int CarnageSA::run(UINT num_threads){
 
 	// 最初から探索やり直し
 	bool bRestart = true;
+	
+	// 解発見後に最後に 1回だけ回す
+	bool bFinalOptimize = false;
 
 	for(UINT uLoopCnt = 0; ; ++uLoopCnt){
 		workers.clear();
@@ -744,7 +747,7 @@ int CarnageSA::run(UINT num_threads){
 		double T = StartT;
 
 		if(bRestart){
-			OverallScore = std::numeric_limits<Energy_t>::max();
+			BestScoreGlobal = std::numeric_limits<Energy_t>::max();
 			InitState();
 		}
 
@@ -775,7 +778,7 @@ int CarnageSA::run(UINT num_threads){
 		);
 
 		state = best_it->state;
-		best_E = best_it->best_E;
+		best_E = (std::min)(best_it->best_E, BestScoreGlobal.load(std::memory_order_relaxed));
 
 		// 5. 全体の最良スコアを更新
 		if(best_E >= 0 && best_E < BestScore){
@@ -791,8 +794,9 @@ int CarnageSA::run(UINT num_threads){
 			bRestart = true;
 			PrevScore = std::numeric_limits<Energy_t>::max();
 		}
-
-		if(best_E == 0 || OverallScore.load(std::memory_order_relaxed) <= 0 || uLoopCnt >= 1 && best_E < 100){
+		
+		// 解発見 or Ctrl+C で中断処理
+		if(best_E <= 0 || bFinalOptimize){
 			state = BestState;
 			best_E = BestScore;
 
@@ -800,10 +804,15 @@ int CarnageSA::run(UINT num_threads){
 			SetArrow();
 			break;
 		}
+		
+		// 解を発見したので最後に 1回回す
+		if(best_E < 100){
+			bFinalOptimize = true;
+		}
 	}
 
 	std::cout << "Final best score: " << (UINT)best_E << std::endl;
-	return OverallScore.load(std::memory_order_relaxed) < 0;
+	return best_E < 0;
 }
 
 //////////////////////////////////////////////////////////////////////////////
