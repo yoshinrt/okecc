@@ -778,7 +778,7 @@ int CarnageSA::run(UINT num_threads){
 		);
 
 		state = best_it->state;
-		best_E = (std::min)(best_it->best_E, BestScoreGlobal.load(std::memory_order_relaxed));
+		best_E = best_it->best_E;
 
 		// 5. 全体の最良スコアを更新
 		if(best_E >= 0 && best_E < BestScore){
@@ -796,7 +796,7 @@ int CarnageSA::run(UINT num_threads){
 		}
 		
 		// 解発見 or Ctrl+C で中断処理
-		if(best_E <= 0 || bFinalOptimize){
+		if(best_E <= 0 || bFinalOptimize || BestScoreGlobal.load(std::memory_order_relaxed) < 0){
 			state = BestState;
 			best_E = BestScore;
 
