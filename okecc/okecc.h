@@ -426,7 +426,9 @@ public:
 	}
 
 	virtual ~CChip(){}
-
+	
+	bool IsNop();
+	
 	virtual std::string GetLayoutText(void){
 		return "";
 	}
@@ -513,6 +515,12 @@ class CChipNop : public CChip {
 		return "NOP";
 	}
 };
+
+#ifdef NO_OKECC_SYNTAX
+bool CChip::IsNop(){
+	return m_Id.get() == CChip::CHIPID_NOP;
+}
+#endif
 
 //////////////////////////////////////////////////////////////////////////////
 // ゲームには存在しない仮チップ
