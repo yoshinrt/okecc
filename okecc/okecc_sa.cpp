@@ -1000,7 +1000,7 @@ void OutputSvg(const std::string& filename, const std::vector<CarnageSA*>& sa_li
 			int centerX = x + CHIP_SIZE / 2;
 
 			const char* fill_color =
-				pool.m_list[i]->m_Id.get() == CChip::CHIPID_NOP && static_cast<CChipNop*>(pool.m_list[i].get())->m_param.get() == 0 ? "#F0F0F0" :
+				pool.m_list[i]->IsNop() ? "#F0F0F0" :
 				pool.m_list[i]->m_NextR != IDX_NONE ? "#FFF0F0" : "white";
 
 			// 💡 エラーチェックを行い、枠線の色と太さを決定

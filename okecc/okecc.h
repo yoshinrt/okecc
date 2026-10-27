@@ -213,7 +213,9 @@ public:
 	}
 
 	virtual ~CChip(){}
-
+	
+	bool IsNop();
+	
 	virtual std::string GetLayoutText(void){
 		return "";
 	}
@@ -308,6 +310,12 @@ public:
 
 	ScaledInt<5,2> m_param;
 };
+
+#ifdef NO_OKECC_SYNTAX
+bool CChip::IsNop(){
+	return m_Id.get() == CChip::CHIPID_NOP && static_cast<CChipNop*>(this)->m_param.get() == 0;
+}
+#endif
 
 //////////////////////////////////////////////////////////////////////////////
 // ゲームには存在しない仮チップ
