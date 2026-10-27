@@ -207,7 +207,9 @@ public:
 	static inline const char *m_VarNameStr[] = {
 		"A", "B", "C", "D", "E", "F"
 	};
-
+	
+	static constexpr int NONE_ARROW = 0;
+	
 	CChip(){
 		m_Id		= CHIPID_NULL;
 	}
