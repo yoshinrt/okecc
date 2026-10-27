@@ -418,7 +418,9 @@ public:
 		FM_WIDE,
 		FM_SNIPE,
 	};
-
+	
+	static constexpr int NONE_ARROW = 4;
+	
 	CChip(){
 		m_Id		= CHIPID_NULL;
 		m_RawG		= 0;

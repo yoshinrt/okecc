@@ -837,7 +837,7 @@ void CarnageSA::NopRouting(void){
 void CarnageSA::SetArrow(void){
 
 	auto GetArrowCode = [&](UINT from, UINT to) -> int {
-		if(to == IDX_NONE) return 4;
+		if(to == IDX_NONE) return CChip::NONE_ARROW;
 
 		if(to == IDX_EXIT){
 			// EXIT は外枠への矢印とする
