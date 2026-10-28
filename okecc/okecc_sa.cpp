@@ -79,9 +79,11 @@ public:
 	inline static const int dx[] = { 0,  1,  1,  1,  0, -1, -1, -1, 0};
 	inline static const int dy[] = {-1, -1,  0,  1,  1,  1,  0, -1, 0};
 
-	inline static constexpr int max_iter	= 2000000;
-	inline static constexpr double StartT	= 2000.0;
-	inline static constexpr double EndT		= 0.005;
+	inline static constexpr int max_iter		= 2000000;
+	inline static constexpr double StartT		= 2000.0;
+	inline static constexpr double RestartT		= 100.0;
+	inline static constexpr double StartTmin	= 2.0;
+	inline static constexpr double EndT			= 0.005;
 
 	CarnageSA(CChipPool& p, const char *name = nullptr)
 		: pool(p), GridWidth(p.m_width), GridHeight(p.m_height), m_name(name){
@@ -733,9 +735,6 @@ int CarnageSA::run(UINT num_threads){
 	workers.reserve(num_threads);
 	threads.reserve(num_threads);
 
-	// スレッドごとに T を変える
-	const double Tfactor = num_threads == 1 ? 1.0 : std::pow(0.0001, 1.0 / (num_threads - 1));
-
 	// 割込みハンドラの設定
 	std::signal(SIGINT, InterruptHandler);
 
@@ -754,8 +753,13 @@ int CarnageSA::run(UINT num_threads){
 		if(bRestart){
 			BestScoreGlobal = std::numeric_limits<Energy_t>::max();
 			InitState();
+		}else{
+			T = RestartT;
 		}
 
+		// スレッドごとに T を変える
+		const double Tfactor = num_threads == 1 ? 1.0 : std::pow(StartTmin / T , 1.0 / (num_threads - 1));
+	
 		#ifdef NOPLACE
 			break;
 		#endif
