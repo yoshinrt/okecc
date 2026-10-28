@@ -348,7 +348,9 @@ Energy_t CarnageSA::calculate_energy(
 	Energy_t base_energy = 0;
 	move_chip_list.resize(0);
 	std::array<uint8_t, MAX_CHIPS> Added = {};
-
+	
+	int FindPathCnt = 0;
+	
 	// パラメータ（調整可能）
 
 	for (UINT u = 0; u < (UINT)pool.size(); ++u) {
@@ -380,10 +382,13 @@ Energy_t CarnageSA::calculate_energy(
 
 			if(e == 0) return e;
 			
-			// 離れすぎていたら，真剣に探す価値なし
-			if(e > 4) return e * overwrap_penalty;
+			// FindPath は 10回までとする
+			if(FindPathCnt >= 10) return e + overwrap_penalty;
 			
-			return e + FindPath(u, ToIdx, state, occ) * overwrap_penalty;
+			int result = FindPath(u, ToIdx, state, occ);
+			FindPathCnt += result;
+			
+			return e + (result ? overwrap_penalty : 0);
 		};
 
 		if(pool[u]->m_NextG < N) chip_energy += ChipE(pool[u]->m_NextG);
