@@ -90,9 +90,9 @@ public:
 		MakeLinkList();
 	}
 
-	void InitState(void);
+	void InitState(std::mt19937_64& gen);
 	int run(UINT num_threads = 0);
-	void run_single(UINT uThreadID, double CurrentT);
+	void run_single(UINT uThreadID, double CurrentT, bool bRestart);
 	Energy_t calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org, std::vector<ChipID_t>& move_chip_list);
 	void SetArrow(void);
 
@@ -156,14 +156,18 @@ public:
 	}
 };
 
-void CarnageSA::InitState() {
+void CarnageSA::InitState(std::mt19937_64& gen) {
+	
+	std::vector<UINT> rand_pos;
+	rand_pos.reserve(GridWidth * GridHeight);
+	for (UINT u = 0; u < GridHeight * GridWidth; u++) rand_pos.emplace_back(u);
+	std::shuffle(rand_pos.begin(), rand_pos.end(), gen);
+	
 	state.fill({POS_INVALID, POS_INVALID});
-
+	
 	for (UINT u = 0; u < (UINT)pool.size(); ++u) {
-		UINT y = u / GridWidth;
-		UINT x = u % GridWidth;
-		x = (y % 2 == 0) ? x : (GridWidth - 1 - x);
-		state[u] = {(uint8_t)x, (uint8_t)y};
+		UINT pos = rand_pos[u];
+		state[u] = {(ChipID_t)(pos % GridWidth), (ChipID_t)(pos / GridWidth)};
 	}
 }
 
@@ -430,7 +434,7 @@ void CarnageSA::rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<
 	}
 };
 
-void CarnageSA::run_single(UINT uThreadID, double CurrentT) {
+void CarnageSA::run_single(UINT uThreadID, double CurrentT, bool bRestart) {
 
 	const double Tcooling	= std::pow(EndT / CurrentT, 1.0 / max_iter);
 
@@ -474,6 +478,9 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT) {
 	nice(10);
 #endif
 
+	// 初期配置生成
+	if(bRestart) InitState(gen);
+	
 	std::array<Pos, MAX_CHIPS> best_state;
 	rebuild_occ(state, occ);
 
@@ -485,7 +492,7 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT) {
 			if(u % GridWidth == (GridWidth - 1)) printf("\n");
 		}
 	};
-
+	
 	Energy_t current_E	= calculate_energy(state, occ, move_chip_list);
 
 	best_state	= state;
@@ -752,7 +759,6 @@ int CarnageSA::run(UINT num_threads){
 
 		if(bRestart){
 			BestScoreGlobal = std::numeric_limits<Energy_t>::max();
-			InitState();
 		}else{
 			T = RestartT;
 		}
@@ -769,7 +775,7 @@ int CarnageSA::run(UINT num_threads){
 			workers.push_back(*this);
 
 			// 2. 各インスタンスの run を並列実行
-			threads.emplace_back(&CarnageSA::run_single, &workers[u], u, T);
+			threads.emplace_back(&CarnageSA::run_single, &workers[u], u, T, bRestart);
 
 			if (!bRestart) T *= Tfactor;
 		}
