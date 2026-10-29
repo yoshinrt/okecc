@@ -73,6 +73,9 @@ public:
 	const char *m_name;
 	Energy_t best_E;
 
+	inline static std::atomic<int> m_iMaxIterReachedCnt = 0;
+	inline static int m_iNumThreads = 1;
+
 	// 8方向のベクトル定義 (N, NE, E, SE, S, SW, W, NW)
 	inline static const int dx[] = { 0,  1,  1,  1,  0, -1, -1, -1, 0};
 	inline static const int dy[] = {-1, -1,  0,  1,  1,  1,  0, -1, 0};
@@ -83,10 +86,16 @@ public:
 	inline static constexpr double StartTmin	= 2.0;
 	inline static constexpr double EndT			= 0.005;
 
-	CarnageSA(CChipPool& p, const char *name = nullptr) : pool(p), GridWidth(p.m_width), GridHeight(p.m_height), m_name(name){}
+	CarnageSA(CChipPool& p, const char *name = nullptr) : pool(p), GridWidth(p.m_width), GridHeight(p.m_height), m_name(name){
+		#if defined _DEBUG || defined NOPLACE
+			m_iNumThreads = 1;
+		#else
+			m_iNumThreads = std::thread::hardware_concurrency();
+		#endif
+	}
 
 	void InitState(std::mt19937_64& gen);
-	int run(UINT num_threads = 0);
+	int run();
 	void run_single(UINT uThreadID, double CurrentT, bool bRestart);
 	Energy_t calculate_energy(std::array<Pos, MAX_CHIPS>& state, const std::array<ChipID_t, MAX_CHIPS>& occ_org, std::vector<ChipID_t>& move_chip_list);
 	void SetArrow(void);
@@ -528,7 +537,9 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT, bool bRestart) {
 	};
 
 	int iter;
-	for (iter = 0; iter < max_iter; ++iter) {
+	bool bMaxIterReached = false;
+
+	for (iter = 0;; ++iter) {
 		next_state	= state;
 		next_occ	= occ;
 
@@ -725,6 +736,13 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT, bool bRestart) {
 				}
 			}
 		#endif
+
+		if(!bMaxIterReached && iter >= max_iter) {
+			bMaxIterReached = true;
+			m_iMaxIterReachedCnt.fetch_add(1, std::memory_order_relaxed);
+		}
+
+		if(m_iMaxIterReachedCnt.load(std::memory_order_relaxed) >= m_iNumThreads) break;
 	}
 
 	Energy_t BestScore = UpdateScore(best_E);
@@ -735,7 +753,7 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT, bool bRestart) {
 
 //////////////////////////////////////////////////////////////////////////////
 
-int CarnageSA::run(UINT num_threads){
+int CarnageSA::run(){
 	std::vector<CarnageSA> workers;
 	std::vector<std::thread> threads;
 
@@ -743,14 +761,8 @@ int CarnageSA::run(UINT num_threads){
 	Energy_t BestScore = std::numeric_limits<Energy_t>::max();
 	Energy_t PrevScore = std::numeric_limits<Energy_t>::max();
 
-	#if defined _DEBUG || defined NOPLACE
-		num_threads = 1;
-	#else
-		if(num_threads == 0) num_threads = std::thread::hardware_concurrency();
-	#endif
-
-	workers.reserve(num_threads);
-	threads.reserve(num_threads);
+	workers.reserve(m_iNumThreads);
+	threads.reserve(m_iNumThreads);
 
 	// 割込みハンドラの設定
 	std::signal(SIGINT, InterruptHandler);
@@ -767,6 +779,7 @@ int CarnageSA::run(UINT num_threads){
 	for(UINT uLoopCnt = 0; ; ++uLoopCnt){
 		workers.clear();
 		threads.clear();
+		m_iMaxIterReachedCnt = 0;
 
 		double T = StartT;
 
@@ -777,13 +790,13 @@ int CarnageSA::run(UINT num_threads){
 		}
 
 		// スレッドごとに T を変える
-		const double Tfactor = num_threads == 1 ? 1.0 : std::pow(StartTmin / T , 1.0 / (num_threads - 1));
+		const double Tfactor = m_iNumThreads == 1 ? 1.0 : std::pow(StartTmin / T , 1.0 / (m_iNumThreads - 1));
 	
 		#ifdef NOPLACE
 			break;
 		#endif
 
-		for (UINT u = 0; u < num_threads; ++u) {
+		for (UINT u = 0; u < m_iNumThreads; ++u) {
 			// 1. スレッドごとに自分(*this)をコピーして独立したインスタンスを作る
 			workers.push_back(*this);
 
