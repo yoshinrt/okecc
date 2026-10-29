@@ -67,7 +67,7 @@ static constexpr ChipID_t POS_INVALID = 0xFF;
 class CarnageSA {
 public:
 	CChipPool& pool;
-	std::vector<std::vector<ChipID_t>> LinkList; // チップごとの接続リスト
+	inline static std::vector<std::vector<ChipID_t>> LinkList; // チップごとの接続リスト
 
 	UINT GridWidth;
 	UINT GridHeight;
@@ -85,10 +85,7 @@ public:
 	inline static constexpr double StartTmin	= 2.0;
 	inline static constexpr double EndT			= 0.005;
 
-	CarnageSA(CChipPool& p, const char *name = nullptr)
-		: pool(p), GridWidth(p.m_width), GridHeight(p.m_height), m_name(name){
-		MakeLinkList();
-	}
+	CarnageSA(CChipPool& p, const char *name = nullptr) : pool(p), GridWidth(p.m_width), GridHeight(p.m_height), m_name(name){}
 
 	void InitState(std::mt19937_64& gen);
 	int run(UINT num_threads = 0);
@@ -156,6 +153,8 @@ public:
 	}
 };
 
+//////////////////////////////////////////////////////////////////////////////
+
 void CarnageSA::InitState(std::mt19937_64& gen) {
 	
 	std::vector<UINT> rand_pos;
@@ -171,7 +170,10 @@ void CarnageSA::InitState(std::mt19937_64& gen) {
 	}
 }
 
+//////////////////////////////////////////////////////////////////////////////
+
 void CarnageSA::MakeLinkList() {
+	LinkList.clear();
 	LinkList.resize(pool.size());
 
 	for (UINT u = 0; u < (UINT)pool.size(); ++u) {
@@ -187,6 +189,8 @@ void CarnageSA::MakeLinkList() {
 		}
 	}
 }
+
+//////////////////////////////////////////////////////////////////////////////
 
 inline Energy_t CarnageSA::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ, bool PlaceNop, bool rxg){
 	CChip *chip;
@@ -337,6 +341,8 @@ inline Energy_t CarnageSA::FindPath(UINT from, UINT to, std::array<Pos, MAX_CHIP
 	return 0;
 }
 
+//////////////////////////////////////////////////////////////////////////////
+
 Energy_t CarnageSA::calculate_energy(
 	std::array<Pos, MAX_CHIPS>& state,
 	 const std::array<ChipID_t,
@@ -423,6 +429,8 @@ Energy_t CarnageSA::calculate_energy(
 	return base_energy;
 }
 
+//////////////////////////////////////////////////////////////////////////////
+
 void CarnageSA::rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<ChipID_t, MAX_CHIPS>& occ){
 	std::fill(occ.begin(), occ.end(), POS_INVALID);
 
@@ -433,6 +441,8 @@ void CarnageSA::rebuild_occ(const std::array<Pos, MAX_CHIPS>& state, std::array<
 		}
 	}
 };
+
+//////////////////////////////////////////////////////////////////////////////
 
 void CarnageSA::run_single(UINT uThreadID, double CurrentT, bool bRestart) {
 
@@ -725,6 +735,8 @@ void CarnageSA::run_single(UINT uThreadID, double CurrentT, bool bRestart) {
 	state = best_state;
 }
 
+//////////////////////////////////////////////////////////////////////////////
+
 int CarnageSA::run(UINT num_threads){
 	std::vector<CarnageSA> workers;
 	std::vector<std::thread> threads;
@@ -750,6 +762,9 @@ int CarnageSA::run(UINT num_threads){
 	
 	// 解発見後に最後に 1回だけ回す
 	bool bFinalOptimize = false;
+	
+	// リンクリストを 1回だけ生成
+	MakeLinkList();
 
 	for(UINT uLoopCnt = 0; ; ++uLoopCnt){
 		workers.clear();
